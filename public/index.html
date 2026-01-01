@@ -3,26 +3,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pangkah Online - Clockwise</title>
+    <title>Pangkah Online - Full Game</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #2c3e50; color: white; text-align: center; padding: 20px; }
-        .container { max-width: 500px; margin: auto; background: #34495e; padding: 20px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        input, select, button { width: 90%; padding: 12px; margin: 10px 0; border-radius: 5px; border: none; font-size: 16px; }
-        button { background: #27ae60; color: white; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        button:hover { background: #2ecc71; transform: scale(1.02); }
-        .player-card { background: #5d6d7e; margin: 10px 0; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
-        .active-turn { border: 2px solid #f1c40f; background: #717d7e; box-shadow: 0 0 10px #f1c40f; }
-        .hand { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 20px; }
-        .card-item { background: white; color: black; padding: 10px; margin: 5px; border-radius: 5px; cursor: pointer; min-width: 40px; font-weight: bold; }
-        #status-bar { background: #e67e22; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none; }
+        body { font-family: sans-serif; background: #1a252f; color: white; text-align: center; }
+        .container { max-width: 600px; margin: 20px auto; background: #2c3e50; padding: 20px; border-radius: 10px; }
+        .card { background: white; color: black; padding: 10px; border-radius: 5px; display: inline-block; margin: 5px; cursor: pointer; font-weight: bold; width: 50px; }
+        .player-tag { padding: 10px; margin: 5px; background: #34495e; border-radius: 5px; display: flex; justify-content: space-between; }
+        .active { border: 2px solid #f1c40f; background: #465a6d; }
+        #table { background: #16a085; padding: 20px; border-radius: 10px; min-height: 120px; margin: 20px 0; }
+        button { background: #27ae60; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+        input { padding: 10px; width: 80%; margin: 10px 0; }
     </style>
 </head>
 <body>
 
-    <div class="container" id="lobby">
-        <h2>🃏 Pangkah Online</h2>
-        <input type="text" id="playerName" placeholder="Masukkan Nama Anda">
+    <div id="lobby" class="container">
+        <h1>🃏 Pangkah Online</h1>
+        <input type="text" id="playerName" placeholder="Nama Anda">
+        <input type="text" id="roomID" placeholder="ID Bilik">
+        <select id="maxP" style="padding:10px; width:85%; margin-bottom:10px;">
+            <option value="4">4 Pemain</option>
+            <option value="5">5 Pemain</option>
+            <option value="6">6 Pemain</option>
+        </select>
+        <button onclick="join(true)">Cipta Bilik</button>
+        <button onclick="join(false)" style="background:#2980b9">Join Bilik</button>
+    </div>
+
+    <div id="gameArea" class="container" style="display:none;">
+        <h3 id="roomDisplay">Room: -</h3>
+        <div id="playerList"></div>
         
-        <div style="border-top: 1px solid #7f8c8d; margin-top: 20px;">
-            <h3>Cipta Room</h3>
-            <input type
+        <div id="table">
+            <p>Meja (Suit: <span id="suitText">-</span>)</p>
+            <div id="tableCards"></div>
+        </div>
+
+        <div id="myHandArea">
+            <h4>Kad Anda:</h4>
+            <div id="myHand"></div>
+        </div>
+        
+        <button id="startBtn" style="display:none; margin-top:20px;" onclick="start()">MULA GAME</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let myRoom = "";
+        let players = [];
+
+        function join(isCreate) {
+            const name = document.getElementById('playerName').value;
+            const room = document.getElementById('roomID').value;
+            const max = document.getElementById('maxP').value;
+            if(!name || !room) return alert("Lengkapkan maklumat");
+            myRoom = room;
+            socket.emit(isCreate ? 'createRoom' : 'joinRoom', { roomID: room, playerName: name, maxPlayers: max });
+        }
+
+        function start() { socket.emit('startGame', myRoom); }
+
+        socket.on('updatePlayers', (p) => {
+            players = p;
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('gameArea').style.display = 'block';
+            document.getElementById('roomDisplay').innerText = "Bilik: " + myRoom;
+            if(p.length >= 4) document.getElementById('startBtn').style.display = 'inline-block';
+            renderPlayers(-1);
+        });
+
+        socket.on('gameInit', (data) => {
+            document.getElementById('startBtn').style.display = 'none';
+            players = data.players;
+            renderHand();
+            renderPlayers(data.turn);
+        });
+
+        socket.on('updateTable', (data) => {
+            players = data.players;
+            const tDiv = document.getElementById('tableCards');
+            tDiv.innerHTML = "";
+            data.table.forEach(c => {
+                tDiv.innerHTML += `<div class="card"><small>${c.player}</small><br>${c.card.rank}${c.card.suit[0]}</div>`;
+            });
+            document.getElementById('suitText').innerText = data.suit;
+            renderHand();
+            renderPlayers(data.turn);
+        });
+
+        socket.on('clearTable', (data) => {
+            document.getElementById('tableCards').innerHTML = "";
+            document.getElementById('suitText').innerText = "-";
+            renderPlayers(data.turn);
+        });
+
+        function renderPlayers(t) {
+            const list = document.getElementById('playerList');
+            list.innerHTML = "";
+            players.forEach((p, i) => {
+                list.innerHTML += `<div class="player-tag ${i===t?'active':''}">
+                    <span>${i===t?'➡️':''} ${p.name}</span>
+                    <span>${p.id === socket.id ? '(Anda)' : ''}</span>
+                </div>`;
+            });
+        }
+
+        function renderHand() {
+            const me = players.find(p => p.id === socket.id);
+            const hDiv = document.getElementById('myHand');
+            hDiv.innerHTML = "";
+            me.hand.forEach((c, i) => {
+                const btn = document.createElement('div');
+                btn.className = 'card';
+                btn.innerText = c.rank + c.suit[0];
+                btn.onclick = () => socket.emit('playCard', { roomID: myRoom, cardIndex: i });
+                hDiv.appendChild(btn);
+            });
+        }
+
+        socket.on('errorMsg', m => alert(m));
+    </script>
+</body>
+</html>

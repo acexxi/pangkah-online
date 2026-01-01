@@ -71,41 +71,67 @@ io.on('connection', (socket) => {
             isPangkah = true;
         }
 
-        // Send update immediately so players see the card on the table
         io.to(roomID).emit('updateTable', { table: room.table, turn: room.turn, players: room.players });
 
-        let activePlayersCount = room.players.filter(p => p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p))).length;
-        
-        if (isPangkah || room.table.length === activePlayersCount) {
+        // Kira berapa ramai pemain yang masih ada kad dalam tangan
+        let playersWithCards = room.players.filter(p => p.hand.length > 0).length;
+        let activeInRound = room.players.filter(p => p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p))).length;
+
+        // Tamat pusingan jika ada pangkah ATAU semua pemain aktif sudah jalan
+        if (isPangkah || room.table.length === activeInRound) {
             setTimeout(() => {
-                let winnerIdx = room.table[0].playerIdx;
-                let bestCard = room.table[0].card;
-                let pangkahWinnerFound = false;
+                let winnerIdx = -1;
+                let bestCardValue = -1;
+                let pangkahFound = false;
+
+                // Tentukan pemenang:
+                // 1. Jika ada pangkah, cari nilai tertinggi di antara kad-kad pangkah sahaja.
+                // 2. Jika tiada pangkah, cari nilai tertinggi bagi suit asal.
 
                 room.table.forEach(item => {
-                    if (item.card.suit !== room.currentSuit) {
-                        if (!pangkahWinnerFound || item.card.val > bestCard.val) {
-                            pangkahWinnerFound = true;
-                            bestCard = item.card;
+                    const isItemPangkah = item.card.suit !== room.currentSuit;
+                    if (isItemPangkah) {
+                        if (!pangkahFound || item.card.val > bestCardValue) {
+                            pangkahFound = true;
+                            bestCardValue = item.card.val;
                             winnerIdx = item.playerIdx;
                         }
-                    } else if (!pangkahWinnerFound && item.card.val > bestCard.val) {
-                        bestCard = item.card;
+                    } else if (!pangkahFound && item.card.val > bestCardValue) {
+                        bestCardValue = item.card.val;
                         winnerIdx = item.playerIdx;
                     }
                 });
 
+                let logMsg = "";
+                if (isPangkah) {
+                    // AMBIL KAD: Masukkan semua kad dari meja ke tangan pemenang
+                    const cardsFromTable = room.table.map(t => t.card);
+                    room.players[winnerIdx].hand.push(...cardsFromTable);
+                    logMsg = `${room.players[winnerIdx].name} took the cards! (Pangkah)`;
+                } else {
+                    // BUANG KAD: Kad di meja dibakar
+                    logMsg = `Round clear. Cards discarded.`;
+                }
+
+                // Cek jika game tamat (hanya tinggal 1 orang ada kad)
                 let survivors = room.players.filter(p => p.hand.length > 0);
                 if (survivors.length <= 1) {
                     io.to(roomID).emit('gameOver', { loser: survivors[0]?.name || "None" });
+                    delete rooms[roomID];
                 } else {
-                    room.turn = winnerIdx;
+                    room.turn = winnerIdx; // Pemenang mulakan round baru
                     room.table = [];
                     room.currentSuit = null;
-                    io.to(roomID).emit('clearTable', { turn: room.turn, winner: room.players[winnerIdx].name, players: room.players });
+                    io.to(roomID).emit('clearTable', { 
+                        turn: room.turn, 
+                        winner: room.players[winnerIdx].name, 
+                        players: room.players,
+                        msg: logMsg
+                    });
                 }
             }, 2000);
         } else {
+            // Tukar giliran seperti biasa
             do {
                 room.turn = (room.turn + 1) % room.players.length;
             } while (room.players[room.turn].hand.length === 0);
@@ -113,4 +139,5 @@ io.on('connection', (socket) => {
         }
     });
 });
+
 server.listen(process.env.PORT || 3000, '0.0.0.0');

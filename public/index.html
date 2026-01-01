@@ -3,84 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pangkah Elite | International</title>
+    <title>Pangkah Elite</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg: #0f172a; --accent: #38bdf8; --gold: #fbbf24; --glass: rgba(255, 255, 255, 0.1);
-        }
-        body { 
-            font-family: 'Roboto', sans-serif; background: var(--bg); color: white; margin: 0; 
-            height: 100vh; overflow: hidden; display: flex; flex-direction: column;
-            background-image: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
-        }
-
-        /* Lobby */
-        #lobby { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.98); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .lobby-card { background: var(--glass); backdrop-filter: blur(10px); padding: 40px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.1); text-align: center; width: 90%; max-width: 400px; }
-        input, select { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #334155; background: rgba(0,0,0,0.3); color: white; font-family: 'Roboto'; }
-        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; font-family: 'Roboto'; text-transform: uppercase; }
-        .btn-main { background: var(--accent); color: var(--bg); }
-        .btn-main:hover { box-shadow: 0 0 20px var(--accent); }
-
-        /* Game Arena */
-        #gameArea { flex: 1; display: flex; flex-direction: column; position: relative; }
-        .header { padding: 15px; background: rgba(0,0,0,0.3); display: flex; justify-content: space-between; border-bottom: 1px solid var(--glass); }
+        :root { --bg: #0f172a; --accent: #38bdf8; --gold: #fbbf24; --green: #22c55e; --glass: rgba(255, 255, 255, 0.1); }
+        body { font-family: 'Roboto', sans-serif; background: var(--bg); color: white; margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
         
+        /* Lobby UI */
+        #lobby { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.98); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+        .lobby-card { background: var(--glass); backdrop-filter: blur(10px); padding: 40px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.1); text-align: center; width: 85%; max-width: 400px; }
+        .input-group { width: 100%; display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; }
+        input, select { padding: 14px; border-radius: 10px; border: 1px solid #334155; background: rgba(0,0,0,0.3); color: white; font-size: 16px; width: 100%; box-sizing: border-box; }
+        .btn { padding: 16px; border: none; border-radius: 10px; font-weight: 900; cursor: pointer; text-transform: uppercase; width: 100%; transition: 0.2s; }
+        .btn-main { background: var(--accent); color: var(--bg); }
+        .btn-main:hover { box-shadow: 0 0 20px var(--accent); transform: scale(1.02); }
+
+        /* Game Area */
+        #gameArea { flex: 1; display: flex; flex-direction: column; }
+        .header { padding: 15px; background: rgba(0,0,0,0.5); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass); z-index: 100; }
+        #turn-indicator { background: var(--green); color: white; padding: 6px 15px; border-radius: 20px; font-weight: 900; animation: pulse 1.5s infinite; display: none; box-shadow: 0 0 15px var(--green); }
+        @keyframes pulse { 0% { opacity: 0.7; } 50% { opacity: 1; } 100% { opacity: 0.7; } }
+
+        /* Table */
         #table-container { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; }
-        .table-circle { width: 300px; height: 300px; border-radius: 50%; border: 2px solid var(--accent); position: relative; background: radial-gradient(circle, rgba(56, 189, 248, 0.05) 0%, transparent 70%); }
+        .table-circle { width: 320px; height: 320px; border-radius: 50%; border: 2px solid rgba(56, 189, 248, 0.3); background: radial-gradient(circle, rgba(56,189,248,0.1) 0%, transparent 70%); position: relative; }
 
         /* Players */
-        .player-node { position: absolute; width: 80px; text-align: center; transition: 0.5s; }
-        .avatar { width: 50px; height: 50px; background: #334155; border-radius: 50%; margin: 0 auto; display: flex; align-items: center; justify-content: center; border: 2px solid transparent; position: relative; transition: 0.3s; }
-        .active .avatar { border-color: var(--gold); box-shadow: 0 0 20px var(--gold); background: #475569; }
-        .active .p-name { color: var(--gold); font-weight: 900; }
-        .c-count { position: absolute; top: -5px; right: -5px; background: var(--accent); color: black; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: bold; }
+        .player-node { position: absolute; width: 90px; text-align: center; transition: 0.5s; z-index: 10; }
+        .avatar { width: 55px; height: 55px; background: #1e293b; border-radius: 50%; margin: 0 auto; display: flex; align-items: center; justify-content: center; border: 3px solid #334155; position: relative; transition: 0.3s; }
+        .active .avatar { border-color: var(--gold); box-shadow: 0 0 20px var(--gold); }
+        .card-count-badge { position: absolute; -top: 5px; -right: 8px; background: var(--accent); color: #000; font-size: 11px; padding: 3px 7px; border-radius: 10px; font-weight: 900; display: flex; align-items: center; gap: 3px; }
 
-        /* Turn Alert */
-        .turn-alert { position: absolute; top: -40px; left: 50%; transform: translateX(-50%); background: var(--gold); color: black; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; animation: bounce 1s infinite; display: none; }
-        @keyframes bounce { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, -5px); } }
-
-        /* Cards */
-        .card { width: 70px; height: 105px; background: white; border-radius: 8px; color: black; display: flex; flex-direction: column; justify-content: space-between; padding: 6px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: pointer; position: relative; border: 1px solid #ddd; }
+        /* Card Visuals */
+        .card { width: 75px; height: 110px; background: white; border-radius: 10px; color: black; display: flex; flex-direction: column; justify-content: space-between; padding: 8px; font-weight: 900; border: 1px solid #ddd; cursor: pointer; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
         .card.red { color: #ef4444; }
-        .suit-center { font-size: 2.2em; text-align: center; }
-        
-        #myHand { height: 160px; display: flex; justify-content: center; padding-bottom: 20px; }
-        #myHand .card { margin-left: -25px; transition: 0.2s; }
-        #myHand .card:hover { transform: translateY(-40px) scale(1.1) !important; z-index: 100 !important; }
+        .suit-center { font-size: 2.5em; text-align: center; }
+        #myHand { height: 160px; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 30px; }
+        #myHand .card { margin-left: -30px; transition: 0.2s; }
+        #myHand .card:hover { transform: translateY(-40px) scale(1.1) rotate(0deg) !important; z-index: 100 !important; }
 
-        .played-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); transition: 0.5s; }
+        .played-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); transition: 0.4s; }
+
+        /* Round Popup */
+        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 30px 60px; border-radius: 20px; border: 2px solid var(--gold); z-index: 5000; display: none; text-align: center; box-shadow: 0 0 50px rgba(0,0,0,1); }
     </style>
 </head>
 <body>
 
 <div id="lobby">
     <div class="lobby-card">
-        <h1 style="color:var(--accent); margin:0">PANGKAH ELITE</h1>
-        <p style="font-size:10px; opacity:0.6; letter-spacing:3px; margin-bottom:20px">MULTIPLAYER ENGINE</p>
-        <input type="text" id="pName" placeholder="Enter Your Name">
-        <input type="text" id="rID" placeholder="Room ID">
-        <select id="mP">
-            <option value="4">4 Players</option>
-            <option value="5">5 Players</option>
-            <option value="6">6 Players</option>
-        </select>
-        <button class="btn btn-main" onclick="join(true)">Create Room</button>
+        <h1 style="color:var(--accent); margin:0; font-size: 32px;">PANGKAH</h1>
+        <p style="letter-spacing: 5px; opacity: 0.5; font-size: 10px; margin-bottom: 30px;">MULTIVERSE</p>
+        <div class="input-group">
+            <input type="text" id="pName" placeholder="Enter Name">
+            <input type="text" id="rID" placeholder="Room ID">
+            <select id="mP">
+                <option value="4">4 Players</option>
+                <option value="5">5 Players</option>
+                <option value="6">6 Players</option>
+            </select>
+        </div>
+        <button class="btn btn-main" onclick="join(true)">Create Private Room</button>
         <button class="btn" style="background:transparent; color:white; margin-top:10px" onclick="join(false)">Join Room</button>
     </div>
 </div>
 
+<div id="round-popup">
+    <h3 style="color:var(--gold); margin:0;">ROUND ENDED</h3>
+    <h1 id="winner-name" style="margin: 10px 0;">WINNER</h1>
+    <p>Collects all cards!</p>
+</div>
+
 <div id="gameArea">
     <div class="header">
-        <div id="roomDisp">Room: -</div>
-        <div id="statusDisp" style="color:var(--gold)">Waiting for players...</div>
+        <div id="roomDisp" style="font-weight:bold; opacity:0.7">Room: -</div>
+        <div id="turn-indicator">YOUR TURN</div>
+        <div id="statusDisp" style="color:var(--gold); font-weight:bold;">Waiting...</div>
     </div>
     <div id="table-container">
-        <div id="players-circle"></div>
+        <div id="players-circle" style="position:absolute; inset:0;"></div>
         <div class="table-circle">
             <div id="tableCards"></div>
-            <button id="startBtn" class="btn btn-main" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:auto" onclick="start()">Start Game</button>
+            <button id="startBtn" class="btn btn-main" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:auto" onclick="start()">Start Match</button>
         </div>
     </div>
     <div id="myHand"></div>
@@ -96,7 +100,7 @@
     function join(isCreate) {
         const n = document.getElementById('pName').value;
         const r = document.getElementById('rID').value;
-        if(!n || !r) return alert("Please fill in name and room!");
+        if(!n || !r) return alert("Fill all fields!");
         myRoom = r;
         socket.emit(isCreate ? 'createRoom' : 'joinRoom', { roomID: r, playerName: n, maxPlayers: document.getElementById('mP').value });
     }
@@ -105,54 +109,61 @@
 
     socket.on('updatePlayers', (p) => {
         document.getElementById('lobby').style.display = 'none';
-        document.getElementById('roomDisp').innerText = "Room: " + myRoom;
+        document.getElementById('roomDisp').innerText = "ROOM: " + myRoom;
         if(p.length >= 4) document.getElementById('startBtn').style.display = 'block';
         render(p, -1);
     });
 
     socket.on('gameInit', d => { document.getElementById('startBtn').style.display = 'none'; render(d.players, d.turn); });
+    socket.on('nextTurn', d => render(d.players, d.turn, d.table || []));
     socket.on('updateTable', d => render(d.players, d.turn, d.table));
+    
     socket.on('clearTable', d => {
-        setTimeout(() => { document.getElementById('tableCards').innerHTML = ""; render(d.players, d.turn); }, 2000);
+        const popup = document.getElementById('round-popup');
+        document.getElementById('winner-name').innerText = d.winner.toUpperCase();
+        popup.style.display = 'block';
+        setTimeout(() => {
+            popup.style.display = 'none';
+            document.getElementById('tableCards').innerHTML = "";
+            render(d.players, d.turn);
+        }, 2000);
     });
-    socket.on('gameOver', d => { alert("GAME OVER! Loser: " + d.loser); location.reload(); });
+
+    socket.on('gameOver', d => { alert("MATCH OVER! Loser: " + d.loser); location.reload(); });
 
     function render(players, turn, table = []) {
         const circle = document.getElementById('players-circle');
         circle.innerHTML = "";
         players.forEach((p, i) => {
-            const angle = (i * (360 / players.length)) * (Math.PI / 180);
-            const x = Math.cos(angle) * 210;
-            const y = Math.sin(angle) * 210;
-            const div = document.createElement('div');
+            const angle = (i * (360 / players.length) - 90) * (Math.PI / 180);
+            const x = Math.cos(angle) * 230;
+            const y = Math.sin(angle) * 230;
             const isActive = i === turn;
             const isMe = p.id === socket.id;
-            
+
+            const div = document.createElement('div');
             div.className = `player-node ${isActive ? 'active' : ''}`;
-            div.style.left = `calc(50% + ${x}px - 40px)`;
-            div.style.top = `calc(50% + ${y}px - 30px)`;
-            
+            div.style.left = `calc(50% + ${x}px - 45px)`;
+            div.style.top = `calc(50% + ${y}px - 45px)`;
             div.innerHTML = `
-                <div class="turn-alert" style="display: ${isActive && isMe ? 'block' : 'none'}">YOUR TURN</div>
                 <div class="avatar">
-                    <span>${p.name[0].toUpperCase()}</span>
-                    <div class="c-count">${p.hand.length}</div>
+                    <span style="font-weight:900; font-size:20px;">${p.name[0].toUpperCase()}</span>
+                    <div class="card-count-badge"><span>🎴</span>${p.hand.length}</div>
                 </div>
-                <div class="p-name" style="font-size:11px; margin-top:5px">${p.name}</div>
+                <div style="font-size:12px; margin-top:8px; font-weight:700;">${p.name}</div>
             `;
             circle.appendChild(div);
+
+            if(isActive && isMe) document.getElementById('turn-indicator').style.display = 'block';
+            else if(isMe) document.getElementById('turn-indicator').style.display = 'none';
         });
 
-        if(turn !== -1) {
-            const isMyTurn = players[turn].id === socket.id;
-            document.getElementById('statusDisp').innerText = isMyTurn ? "IT IS YOUR TURN!" : players[turn].name + "'S TURN";
-        }
+        if(turn !== -1) document.getElementById('statusDisp').innerText = players[turn].name + "'s Turn";
 
         const me = players.find(p => p.id === socket.id);
         const hDiv = document.getElementById('myHand');
         hDiv.innerHTML = "";
         if(me) {
-            // Sorting: Suit first, then Value (King to Ace)
             me.hand.sort((a,b) => (suitOrder[b.suit] - suitOrder[a.suit]) || (b.val - a.val));
             me.hand.forEach((c) => {
                 const cardUI = createCard(c);
@@ -166,7 +177,7 @@
         table.forEach((tc, idx) => {
             const cardUI = createCard(tc.card);
             cardUI.classList.add('played-card');
-            cardUI.style.transform = `translate(-50%, -50%) rotate(${idx * 12}deg) translate(${idx * 5}px)`;
+            cardUI.style.transform = `translate(-50%, -50%) rotate(${idx * 15}deg)`;
             tCards.appendChild(cardUI);
         });
     }
@@ -174,11 +185,7 @@
     function createCard(c) {
         const div = document.createElement('div');
         div.className = `card ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
-        div.innerHTML = `
-            <div style="font-size:12px">${c.rank}${suitIcons[c.suit]}</div>
-            <div class="suit-center">${suitIcons[c.suit]}</div>
-            <div style="font-size:12px; transform:rotate(180deg)">${c.rank}${suitIcons[c.suit]}</div>
-        `;
+        div.innerHTML = `<div style="font-size:12px">${c.rank}${suitIcons[c.suit]}</div><div class="suit-center">${suitIcons[c.suit]}</div><div style="font-size:12px; transform:rotate(180deg)">${c.rank}${suitIcons[c.suit]}</div>`;
         return div;
     }
     socket.on('errorMsg', m => alert(m));

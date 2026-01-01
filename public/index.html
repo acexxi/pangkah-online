@@ -7,44 +7,31 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #0f172a; --accent: #38bdf8; --gold: #fbbf24; --green: #22c55e; --glass: rgba(255, 255, 255, 0.1); }
-        body { font-family: 'Roboto', sans-serif; background: var(--bg); color: white; margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-        
-        /* Lobby UI */
+        body { font-family: 'Roboto', sans-serif; background: var(--bg); color: white; margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; background-image: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); }
         #lobby { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.98); display: flex; align-items: center; justify-content: center; z-index: 2000; }
         .lobby-card { background: var(--glass); backdrop-filter: blur(10px); padding: 40px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.1); text-align: center; width: 85%; max-width: 400px; }
         .input-group { width: 100%; display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; }
-        input, select { padding: 14px; border-radius: 10px; border: 1px solid #334155; background: rgba(0,0,0,0.3); color: white; font-size: 16px; width: 100%; box-sizing: border-box; }
-        .btn { padding: 16px; border: none; border-radius: 10px; font-weight: 900; cursor: pointer; text-transform: uppercase; width: 100%; transition: 0.2s; }
+        input, select { padding: 14px; border-radius: 10px; border: 1px solid #334155; background: rgba(0,0,0,0.3); color: white; font-size: 16px; width: 100%; box-sizing: border-box; font-family: 'Roboto'; }
+        .btn { padding: 16px; border: none; border-radius: 10px; font-weight: 900; cursor: pointer; text-transform: uppercase; width: 100%; transition: 0.2s; font-family: 'Roboto'; }
         .btn-main { background: var(--accent); color: var(--bg); }
         .btn-main:hover { box-shadow: 0 0 20px var(--accent); transform: scale(1.02); }
-
-        /* Game Area */
         #gameArea { flex: 1; display: flex; flex-direction: column; }
-        .header { padding: 15px; background: rgba(0,0,0,0.5); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass); z-index: 100; }
+        .header { padding: 15px; background: rgba(0,0,0,0.5); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass); z-index: 100; position: relative; }
         #turn-indicator { background: var(--green); color: white; padding: 6px 15px; border-radius: 20px; font-weight: 900; animation: pulse 1.5s infinite; display: none; box-shadow: 0 0 15px var(--green); }
         @keyframes pulse { 0% { opacity: 0.7; } 50% { opacity: 1; } 100% { opacity: 0.7; } }
-
-        /* Table */
         #table-container { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; }
         .table-circle { width: 320px; height: 320px; border-radius: 50%; border: 2px solid rgba(56, 189, 248, 0.3); background: radial-gradient(circle, rgba(56,189,248,0.1) 0%, transparent 70%); position: relative; }
-
-        /* Players */
         .player-node { position: absolute; width: 90px; text-align: center; transition: 0.5s; z-index: 10; }
         .avatar { width: 55px; height: 55px; background: #1e293b; border-radius: 50%; margin: 0 auto; display: flex; align-items: center; justify-content: center; border: 3px solid #334155; position: relative; transition: 0.3s; }
         .active .avatar { border-color: var(--gold); box-shadow: 0 0 20px var(--gold); }
-        .card-count-badge { position: absolute; -top: 5px; -right: 8px; background: var(--accent); color: #000; font-size: 11px; padding: 3px 7px; border-radius: 10px; font-weight: 900; display: flex; align-items: center; gap: 3px; }
-
-        /* Card Visuals */
+        .card-count-badge { position: absolute; top: -5px; right: -8px; background: var(--accent); color: #000; font-size: 11px; padding: 3px 7px; border-radius: 10px; font-weight: 900; display: flex; align-items: center; gap: 3px; }
         .card { width: 75px; height: 110px; background: white; border-radius: 10px; color: black; display: flex; flex-direction: column; justify-content: space-between; padding: 8px; font-weight: 900; border: 1px solid #ddd; cursor: pointer; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
         .card.red { color: #ef4444; }
         .suit-center { font-size: 2.5em; text-align: center; }
         #myHand { height: 160px; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 30px; }
         #myHand .card { margin-left: -30px; transition: 0.2s; }
         #myHand .card:hover { transform: translateY(-40px) scale(1.1) rotate(0deg) !important; z-index: 100 !important; }
-
         .played-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); transition: 0.4s; }
-
-        /* Round Popup */
         #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 30px 60px; border-radius: 20px; border: 2px solid var(--gold); z-index: 5000; display: none; text-align: center; box-shadow: 0 0 50px rgba(0,0,0,1); }
     </style>
 </head>
@@ -71,7 +58,7 @@
 <div id="round-popup">
     <h3 style="color:var(--gold); margin:0;">ROUND ENDED</h3>
     <h1 id="winner-name" style="margin: 10px 0;">WINNER</h1>
-    <p>Collects all cards!</p>
+    <p>Starting new round...</p>
 </div>
 
 <div id="gameArea">
@@ -115,7 +102,7 @@
     });
 
     socket.on('gameInit', d => { document.getElementById('startBtn').style.display = 'none'; render(d.players, d.turn); });
-    socket.on('nextTurn', d => render(d.players, d.turn, d.table || []));
+    socket.on('nextTurn', d => render(d.players, d.turn, d.table));
     socket.on('updateTable', d => render(d.players, d.turn, d.table));
     
     socket.on('clearTable', d => {
@@ -174,12 +161,14 @@
 
         const tCards = document.getElementById('tableCards');
         tCards.innerHTML = "";
-        table.forEach((tc, idx) => {
-            const cardUI = createCard(tc.card);
-            cardUI.classList.add('played-card');
-            cardUI.style.transform = `translate(-50%, -50%) rotate(${idx * 15}deg)`;
-            tCards.appendChild(cardUI);
-        });
+        if(table && table.length > 0) {
+            table.forEach((tc, idx) => {
+                const cardUI = createCard(tc.card);
+                cardUI.classList.add('played-card');
+                cardUI.style.transform = `translate(-50%, -50%) rotate(${idx * 15}deg)`;
+                tCards.appendChild(cardUI);
+            });
+        }
     }
 
     function createCard(c) {

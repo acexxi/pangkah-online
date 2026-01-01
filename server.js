@@ -28,11 +28,10 @@ io.on('connection', (socket) => {
         rooms[roomID] = {
             id: roomID,
             maxPlayers: parseInt(maxPlayers),
-            players: [{ id: socket.id, name: playerName, hand: [], score: 0, out: false }],
+            players: [{ id: socket.id, name: playerName, hand: [] }],
             turn: 0,
             table: [],
-            currentSuit: null,
-            gameStarted: false
+            currentSuit: null
         };
         socket.join(roomID);
         io.to(roomID).emit('updatePlayers', rooms[roomID].players);
@@ -40,8 +39,8 @@ io.on('connection', (socket) => {
 
     socket.on('joinRoom', ({ roomID, playerName }) => {
         const room = rooms[roomID];
-        if (!room || room.players.length >= room.maxPlayers) return socket.emit('errorMsg', 'Room penuh/tidak wujud!');
-        room.players.push({ id: socket.id, name: playerName, hand: [], score: 0, out: false });
+        if (!room || room.players.length >= room.maxPlayers) return socket.emit('errorMsg', 'Bilik penuh/tidak wujud!');
+        room.players.push({ id: socket.id, name: playerName, hand: [] });
         socket.join(roomID);
         io.to(roomID).emit('updatePlayers', room.players);
     });
@@ -51,20 +50,18 @@ io.on('connection', (socket) => {
         if (!room) return;
         let deck = generateDeck();
         let cardsPerPlayer = Math.floor(52 / room.maxPlayers);
-        let remainder = 52 % room.maxPlayers;
+        
+        room.players.forEach(p => { 
+            p.hand = deck.splice(0, cardsPerPlayer);
+        });
 
-        room.players.forEach(p => { p.hand = deck.splice(0, cardsPerPlayer); p.score = 0; p.out = false; });
-
+        // Cari siapa ada King Spades untuk mula
         let starterIdx = 0;
         room.players.forEach((p, index) => {
-            if (p.hand.some(c => c.suit === 'Spades' && c.rank === 'K')) {
-                starterIdx = index;
-                if (remainder > 0) p.hand.push(...deck.splice(0, remainder));
-            }
+            if (p.hand.some(c => c.suit === 'Spades' && c.rank === 'K')) starterIdx = index;
         });
 
         room.turn = starterIdx;
-        room.gameStarted = true;
         io.to(roomID).emit('gameInit', { players: room.players, turn: room.turn });
     });
 
@@ -77,50 +74,44 @@ io.on('connection', (socket) => {
 
         if (room.table.length === 1) room.currentSuit = playedCard.suit;
 
-        // Cari pemain seterusnya yang masih ada kad (Clockwise)
+        // Gerak turn ke pemain seterusnya yang masih ada kad
         let nextTurn = room.turn;
-        do {
-            nextTurn = (nextTurn + 1) % room.players.length;
-        } while (room.players[nextTurn].hand.length === 0 && room.table.length < room.players.filter(p => p.hand.length > 0 || room.table.some(tc => tc.playerIdx === room.players.indexOf(p))).length);
+        let activePlayersCount = room.players.filter(p => p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p))).length;
 
-        room.turn = nextTurn;
+        if (room.table.length < activePlayersCount) {
+            do {
+                nextTurn = (nextTurn + 1) % room.players.length;
+            } while (room.players[nextTurn].hand.length === 0);
+            room.turn = nextTurn;
+        }
 
-        io.to(roomID).emit('updateTable', { 
-            table: room.table, 
-            turn: room.turn, 
-            suit: room.currentSuit,
-            players: room.players 
-        });
+        io.to(roomID).emit('updateTable', { table: room.table, turn: room.turn, suit: room.currentSuit, players: room.players });
 
-        // Pusingan tamat bila semua pemain yang aktif sudah baling kad
-        const playersWithCards = room.players.filter(p => p.hand.length > 0 || room.table.some(tc => tc.playerIdx === room.players.indexOf(p)));
-        
-        if (room.table.length === playersWithCards.length) {
+        // Jika pusingan tamat (semua pemain aktif dah baling)
+        if (room.table.length === activePlayersCount) {
             setTimeout(() => {
                 let winnerIdx = room.table[0].playerIdx;
                 let bestCard = room.table[0].card;
                 let adaPangkah = false;
 
-                for (let i = 1; i < room.table.length; i++) {
-                    let current = room.table[i];
-                    if (current.card.suit !== room.currentSuit) {
-                        if (!adaPangkah || current.card.val > bestCard.val) {
-                            adaPangkah = true; bestCard = current.card; winnerIdx = current.playerIdx;
+                room.table.forEach(item => {
+                    if (item.card.suit !== room.currentSuit) {
+                        if (!adaPangkah || item.card.val > bestCard.val) {
+                            adaPangkah = true;
+                            bestCard = item.card;
+                            winnerIdx = item.playerIdx;
                         }
-                    } else if (!adaPangkah && current.card.val > bestCard.val) {
-                        bestCard = current.card; winnerIdx = current.playerIdx;
+                    } else if (!adaPangkah && item.card.val > bestCard.val) {
+                        bestCard = item.card;
+                        winnerIdx = item.playerIdx;
                     }
-                }
+                });
 
-                room.players[winnerIdx].score += room.table.length;
-                
-                // Cari siapa lagi yang masih ada kad
-                let activePlayers = room.players.filter(p => p.hand.length > 0);
-                
-                if (activePlayers.length <= 1) {
-                    io.to(roomID).emit('gameOver', { players: room.players, loser: activePlayers.length === 1 ? activePlayers[0].name : "Tiada" });
+                let survivors = room.players.filter(p => p.hand.length > 0);
+                if (survivors.length <= 1) {
+                    io.to(roomID).emit('gameOver', { players: room.players, loser: survivors[0]?.name || "Tiada" });
                 } else {
-                    // Pemenang pusingan jalan dulu, tapi jika dia sudah habis kad, cari orang sebelah dia
+                    // Pemenang pusingan mulakan pusingan baru
                     let nextStarter = winnerIdx;
                     while (room.players[nextStarter].hand.length === 0) {
                         nextStarter = (nextStarter + 1) % room.players.length;
@@ -128,11 +119,11 @@ io.on('connection', (socket) => {
                     room.turn = nextStarter;
                     room.table = [];
                     room.currentSuit = null;
-                    io.to(roomID).emit('clearTable', { turn: room.turn, players: room.players, winner: room.players[winnerIdx].name });
+                    io.to(roomID).emit('clearTable', { turn: room.turn, winner: room.players[winnerIdx].name, players: room.players });
                 }
             }, 3000);
         }
     });
 });
 
-server.listen(process.env.PORT || 3000);
+server.listen(process.env.PORT || 3000, '0.0.0.0');

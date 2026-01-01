@@ -3,104 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pangkah Online</title>
+    <title>Pangkah Online - Clockwise</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #2c3e50; color: white; text-align: center; padding: 20px; }
-        .container { max-width: 400px; margin: auto; background: #34495e; padding: 20px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        body { font-family: 'Segoe UI', sans-serif; background: #2c3e50; color: white; text-align: center; padding: 20px; }
+        .container { max-width: 500px; margin: auto; background: #34495e; padding: 20px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
         input, select, button { width: 90%; padding: 12px; margin: 10px 0; border-radius: 5px; border: none; font-size: 16px; }
-        button { background: #27ae60; color: white; cursor: pointer; font-weight: bold; }
-        button:hover { background: #2ecc71; }
-        .room-info { border-top: 2px solid #5d6d7e; margin-top: 20px; padding-top: 10px; }
-        ul { list-style: none; padding: 0; }
-        li { background: #5d6d7e; margin: 5px 0; padding: 8px; border-radius: 5px; }
+        button { background: #27ae60; color: white; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { background: #2ecc71; transform: scale(1.02); }
+        .player-card { background: #5d6d7e; margin: 10px 0; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .active-turn { border: 2px solid #f1c40f; background: #717d7e; box-shadow: 0 0 10px #f1c40f; }
+        .hand { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 20px; }
+        .card-item { background: white; color: black; padding: 10px; margin: 5px; border-radius: 5px; cursor: pointer; min-width: 40px; font-weight: bold; }
+        #status-bar { background: #e67e22; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none; }
     </style>
 </head>
 <body>
 
     <div class="container" id="lobby">
-        <h2>🃏 Pangkah Card Game</h2>
+        <h2>🃏 Pangkah Online</h2>
         <input type="text" id="playerName" placeholder="Masukkan Nama Anda">
         
-        <div style="border: 1px dashed #7f8c8d; padding: 10px; margin: 10px 0;">
+        <div style="border-top: 1px solid #7f8c8d; margin-top: 20px;">
             <h3>Cipta Room</h3>
-            <input type="text" id="newRoomID" placeholder="Contoh: bilik-raya">
-            <label>Jumlah Pemain:</label>
-            <select id="maxPlayers">
-                <option value="4">4 Orang</option>
-                <option value="5">5 Orang</option>
-                <option value="6">6 Orang</option>
-            </select>
-            <button onclick="createRoom()">Cipta & Join</button>
-        </div>
-
-        <div style="border: 1px dashed #7f8c8d; padding: 10px;">
-            <h3>Join Room Sedia Ada</h3>
-            <input type="text" id="joinRoomID" placeholder="Masukkan ID Room">
-            <button onclick="joinRoom()" style="background: #2980b9;">Join Room</button>
-        </div>
-    </div>
-
-    <div class="container" id="gameRoom" style="display:none;">
-        <h2 id="displayRoomID">Room: -</h2>
-        <div class="room-info">
-            <h3>Pemain Dalam Bilik:</h3>
-            <ul id="playerList"></ul>
-            <p id="waitMsg">Menunggu pemain lain cukup...</p>
-            <button id="startBtn" style="display:none; background: #e67e22;" onclick="startGame()">MULA PERMAINAN</button>
-        </div>
-    </div>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
-        let currentRoom = "";
-
-        function createRoom() {
-            const name = document.getElementById('playerName').value;
-            const room = document.getElementById('newRoomID').value;
-            const max = document.getElementById('maxPlayers').value;
-            if(!name || !room) return alert("Sila isi nama dan ID Room!");
-            currentRoom = room;
-            socket.emit('createRoom', { roomID: room, playerName: name, maxPlayers: max });
-        }
-
-        function joinRoom() {
-            const name = document.getElementById('playerName').value;
-            const room = document.getElementById('joinRoomID').value;
-            if(!name || !room) return alert("Sila isi nama dan ID Room!");
-            currentRoom = room;
-            socket.emit('joinRoom', { roomID: room, playerName: name });
-        }
-
-        function startGame() {
-            socket.emit('startGame', currentRoom);
-        }
-
-        socket.on('updatePlayers', (players) => {
-            document.getElementById('lobby').style.display = 'none';
-            document.getElementById('gameRoom').style.display = 'block';
-            document.getElementById('displayRoomID').innerText = "Room: " + currentRoom;
-            
-            const list = document.getElementById('playerList');
-            list.innerHTML = "";
-            players.forEach(p => {
-                const li = document.createElement('li');
-                li.innerText = "👤 " + p.name;
-                list.appendChild(li);
-            });
-
-            // Hanya tunjuk butang Start jika pemain sudah cukup (Owner Room boleh tekan)
-            // Untuk simulasi ringkas, kita benarkan butang muncul
-            document.getElementById('startBtn').style.display = 'block';
-        });
-
-        socket.on('gameInit', (players) => {
-            alert("Permainan Bermula! Kad telah diagihkan.");
-            console.log("Data Pemain & Kad:", players);
-            // Logik paparan kad akan ditambah di sini nanti
-        });
-
-        socket.on('errorMsg', (msg) => alert(msg));
-    </script>
-</body>
-</html>
+            <input type

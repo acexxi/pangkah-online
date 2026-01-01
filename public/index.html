@@ -3,50 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pangkah Online</title>
+    <title>Pangkah Online - Last Man Standing</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #1a252f; color: white; text-align: center; margin: 0; padding: 10px; }
-        .container { max-width: 600px; margin: auto; background: #2c3e50; padding: 20px; border-radius: 12px; }
+        .container { max-width: 600px; margin: auto; background: #2c3e50; padding: 20px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         
-        /* Turn Indicator Styling */
-        #turn-announcer { 
-            padding: 15px; border-radius: 8px; margin-bottom: 15px; 
-            font-weight: bold; font-size: 1.2em; transition: 0.3s;
-        }
-        .my-turn { background: #27ae60; animation: pulse 1.5s infinite; }
-        .others-turn { background: #e67e22; }
-
+        /* Turn & Status Styling */
+        #status-bar { padding: 15px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; font-size: 1.1em; background: #e67e22; transition: 0.3s; }
+        .my-turn { background: #27ae60 !important; animation: pulse 1.5s infinite; }
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.7); }
             70% { box-shadow: 0 0 0 10px rgba(39, 174, 96, 0); }
             100% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }
         }
 
-        .card { background: white; color: black; padding: 10px; border-radius: 5px; display: inline-block; margin: 5px; cursor: pointer; font-weight: bold; border: 2px solid #ddd; }
-        .player-tag { padding: 10px; margin: 5px; background: #34495e; border-radius: 5px; display: flex; justify-content: space-between; border-left: 5px solid transparent; }
+        /* Player & Card Styling */
+        .player-tag { padding: 10px; margin: 5px; background: #34495e; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid transparent; }
         .player-tag.active { border-left: 5px solid #f1c40f; background: #465a6d; color: #f1c40f; }
-        #table { background: #16a085; padding: 20px; border-radius: 10px; min-height: 120px; margin: 15px 0; border: 3px dashed rgba(255,255,255,0.2); }
-        button { background: #2ecc71; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; cursor: pointer; font-weight: bold; }
-        input { padding: 12px; width: 95%; margin: 10px 0; border-radius: 5px; border: none; }
+        .player-tag.out { opacity: 0.5; text-decoration: line-through; background: #212f3c; }
+        
+        #table { background: #16a085; padding: 20px; border-radius: 10px; min-height: 120px; margin: 15px 0; border: 3px dashed rgba(255,255,255,0.3); position: relative; }
+        .card { background: white; color: black; padding: 10px; border-radius: 5px; display: inline-block; margin: 5px; cursor: pointer; font-weight: bold; width: 45px; border: 2px solid #333; transition: 0.2s; }
+        .card:hover { transform: translateY(-5px); background: #f0f0f0; }
+        .card.on-table { border: 2px solid #27ae60; cursor: default; }
+        .card.on-table:hover { transform: none; }
+
+        /* Form Styling */
+        button { background: #2ecc71; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; cursor: pointer; font-weight: bold; margin-top: 5px; }
+        button:hover { background: #27ae60; }
+        input, select { padding: 12px; width: 90%; margin: 10px 0; border-radius: 5px; border: 1px solid #7f8c8d; background: #ecf0f1; color: #2c3e50; }
     </style>
 </head>
 <body>
 
     <div id="lobby" class="container">
         <h1>🃏 Pangkah Online</h1>
-        <input type="text" id="playerName" placeholder="Nama Anda">
-        <input type="text" id="roomID" placeholder="ID Bilik">
-        <select id="maxP" style="padding:12px; width:100%; margin-bottom:10px; border-radius:5px;">
-            <option value="4">4 Pemain</option>
-            <option value="5">5 Pemain</option>
-            <option value="6">6 Pemain</option>
+        <p>Minimum 4 orang, maksimum 6 orang pemain.</p>
+        <input type="text" id="playerName" placeholder="Nama Anda (cth: Ali)">
+        <input type="text" id="roomID" placeholder="ID Bilik (cth: bilik-raya)">
+        <select id="maxP">
+            <option value="4">4 Orang Pemain</option>
+            <option value="5">5 Orang Pemain</option>
+            <option value="6">6 Orang Pemain</option>
         </select>
-        <button onclick="join(true)">Cipta Bilik & Masuk</button>
+        <button onclick="join(true)">Cipta Bilik Baru</button>
         <button onclick="join(false)" style="background:#2980b9; margin-top:10px;">Join Bilik Kawan</button>
     </div>
 
     <div id="gameArea" class="container" style="display:none;">
-        <div id="turn-announcer" class="others-turn">Menunggu Game Bermula...</div>
+        <div id="status-bar">Menunggu Pemain...</div>
         
         <h3 id="roomDisplay">Bilik: -</h3>
         <div id="playerList"></div>
@@ -57,7 +62,7 @@
         </div>
 
         <div id="myHandArea">
-            <h4>Kad Anda (Klik untuk baling):</h4>
+            <h4>Kad Anda:</h4>
             <div id="myHand"></div>
         </div>
         
@@ -68,7 +73,7 @@
     <script>
         const socket = io();
         let myRoom = "";
-        let players = [];
+        let currentPlayers = [];
 
         function join(isCreate) {
             const name = document.getElementById('playerName').value;
@@ -79,80 +84,108 @@
             socket.emit(isCreate ? 'createRoom' : 'joinRoom', { roomID: room, playerName: name, maxPlayers: max });
         }
 
-        function start() { socket.emit('startGame', myRoom); }
+        function start() {
+            socket.emit('startGame', myRoom);
+        }
 
         socket.on('updatePlayers', (p) => {
-            players = p;
+            currentPlayers = p;
             document.getElementById('lobby').style.display = 'none';
             document.getElementById('gameArea').style.display = 'block';
             document.getElementById('roomDisplay').innerText = "Bilik: " + myRoom;
-            if(p.length >= 4) document.getElementById('startBtn').style.display = 'block';
-            renderPlayers(-1);
+            
+            // Hanya tunjuk butang Start jika cukup 4-6 orang
+            if(p.length >= 4) {
+                document.getElementById('startBtn').style.display = 'block';
+            }
+            renderUI(-1);
         });
 
         socket.on('gameInit', (data) => {
             document.getElementById('startBtn').style.display = 'none';
-            players = data.players;
-            renderHand();
-            renderPlayers(data.turn);
-            updateInfoBox(data.turn);
+            currentPlayers = data.players;
+            renderUI(data.turn);
         });
 
         socket.on('updateTable', (data) => {
-            players = data.players;
+            currentPlayers = data.players;
             const tDiv = document.getElementById('tableCards');
             tDiv.innerHTML = "";
             data.table.forEach(c => {
-                tDiv.innerHTML += `<div class="card"><small>${c.player}</small><br>${c.card.rank}${c.card.suit[0]}</div>`;
+                tDiv.innerHTML += `<div class="card on-table"><small>${c.playerName}</small><br>${c.card.rank}${c.card.suit[0]}</div>`;
             });
-            document.getElementById('suitText').innerText = data.suit;
-            renderHand();
-            renderPlayers(data.turn);
-            updateInfoBox(data.turn);
+            document.getElementById('suitText').innerText = data.suit || "-";
+            renderUI(data.turn);
         });
 
         socket.on('clearTable', (data) => {
+            alert("Pemenang pusingan ini: " + data.winner);
             document.getElementById('tableCards').innerHTML = "";
             document.getElementById('suitText').innerText = "-";
-            renderPlayers(data.turn);
-            updateInfoBox(data.turn);
+            currentPlayers = data.players;
+            renderUI(data.turn);
         });
 
-        function updateInfoBox(tIdx) {
-            const infoBox = document.getElementById('turn-announcer');
-            const activePlayer = players[tIdx];
+        socket.on('gameOver', (data) => {
+            const loserMsg = data.loser !== "Tiada" ? "\n\nPemain terakhir (Kena Pangkah): " + data.loser : "";
+            alert("PERMAINAN TAMAT!" + loserMsg);
             
-            if (activePlayer.id === socket.id) {
-                infoBox.innerText = "GILIRAN ANDA! Sila baling kad.";
-                infoBox.className = "my-turn";
-            } else {
-                infoBox.innerText = "Giliran " + activePlayer.name + "...";
-                infoBox.className = "others-turn";
-            }
-        }
+            let resultText = "MATA AKHIR:\n";
+            data.players.sort((a,b) => b.score - a.score).forEach((p, i) => {
+                resultText += (i+1) + ". " + p.name + ": " + p.score + " mata\n";
+            });
+            alert(resultText);
+            location.reload(); 
+        });
 
-        function renderPlayers(t) {
+        function renderUI(tIdx) {
+            // 1. Render Senarai Pemain & Mata
             const list = document.getElementById('playerList');
             list.innerHTML = "";
-            players.forEach((p, i) => {
-                list.innerHTML += `<div class="player-tag ${i===t?'active':''}">
-                    <span>${i===t?'➡️':''} ${p.name} ${p.id === socket.id ? '(Anda)' : ''}</span>
-                    <span>${p.hand.length} Kad</span>
-                </div>`;
+            currentPlayers.forEach((p, i) => {
+                const isOut = p.hand.length === 0 && tIdx !== -1;
+                const div = document.createElement('div');
+                div.className = 'player-tag' + (i === tIdx ? ' active' : '') + (isOut ? ' out' : '');
+                div.innerHTML = `
+                    <span>${i === tIdx ? '➡️' : '👤'} ${p.name} ${isOut ? '(Habis Kad)' : ''}</span>
+                    <span>Mata: ${p.score} | Kad: ${p.hand.length}</span>
+                `;
+                list.appendChild(div);
             });
-        }
 
-        function renderHand() {
-            const me = players.find(p => p.id === socket.id);
+            // 2. Render Status Bar (Inform turn siapa)
+            const status = document.getElementById('status-bar');
+            if(tIdx !== -1) {
+                if(currentPlayers[tIdx].id === socket.id) {
+                    status.innerText = "GILIRAN ANDA! Sila pilih kad.";
+                    status.className = "my-turn";
+                } else {
+                    status.innerText = "Menunggu " + currentPlayers[tIdx].name + "...";
+                    status.className = "";
+                }
+            }
+
+            // 3. Render Kad di Tangan
+            const me = currentPlayers.find(p => p.id === socket.id);
             const hDiv = document.getElementById('myHand');
             hDiv.innerHTML = "";
-            me.hand.forEach((c, i) => {
-                const btn = document.createElement('div');
-                btn.className = 'card';
-                btn.innerText = c.rank + c.suit[0];
-                btn.onclick = () => socket.emit('playCard', { roomID: myRoom, cardIndex: i });
-                hDiv.appendChild(btn);
-            });
+            if(me && me.hand.length > 0) {
+                me.hand.forEach((c, i) => {
+                    const btn = document.createElement('div');
+                    btn.className = 'card';
+                    btn.innerText = c.rank + c.suit[0];
+                    btn.onclick = () => {
+                        if(currentPlayers[tIdx].id === socket.id) {
+                            socket.emit('playCard', { roomID: myRoom, cardIndex: i });
+                        } else {
+                            alert("Bukan giliran anda!");
+                        }
+                    };
+                    hDiv.appendChild(btn);
+                });
+            } else if (me && me.hand.length === 0 && tIdx !== -1) {
+                hDiv.innerHTML = "<p style='color:#2ecc71;'>Kad anda sudah habis! Menunggu pemain lain selesai.</p>";
+            }
         }
 
         socket.on('errorMsg', m => alert(m));

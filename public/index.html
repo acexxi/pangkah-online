@@ -3,16 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pangkah Online - Full Game</title>
+    <title>Pangkah Online</title>
     <style>
-        body { font-family: sans-serif; background: #1a252f; color: white; text-align: center; }
-        .container { max-width: 600px; margin: 20px auto; background: #2c3e50; padding: 20px; border-radius: 10px; }
-        .card { background: white; color: black; padding: 10px; border-radius: 5px; display: inline-block; margin: 5px; cursor: pointer; font-weight: bold; width: 50px; }
-        .player-tag { padding: 10px; margin: 5px; background: #34495e; border-radius: 5px; display: flex; justify-content: space-between; }
-        .active { border: 2px solid #f1c40f; background: #465a6d; }
-        #table { background: #16a085; padding: 20px; border-radius: 10px; min-height: 120px; margin: 20px 0; }
-        button { background: #27ae60; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
-        input { padding: 10px; width: 80%; margin: 10px 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a252f; color: white; text-align: center; margin: 0; padding: 10px; }
+        .container { max-width: 600px; margin: auto; background: #2c3e50; padding: 20px; border-radius: 12px; }
+        
+        /* Turn Indicator Styling */
+        #turn-announcer { 
+            padding: 15px; border-radius: 8px; margin-bottom: 15px; 
+            font-weight: bold; font-size: 1.2em; transition: 0.3s;
+        }
+        .my-turn { background: #27ae60; animation: pulse 1.5s infinite; }
+        .others-turn { background: #e67e22; }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(39, 174, 96, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }
+        }
+
+        .card { background: white; color: black; padding: 10px; border-radius: 5px; display: inline-block; margin: 5px; cursor: pointer; font-weight: bold; border: 2px solid #ddd; }
+        .player-tag { padding: 10px; margin: 5px; background: #34495e; border-radius: 5px; display: flex; justify-content: space-between; border-left: 5px solid transparent; }
+        .player-tag.active { border-left: 5px solid #f1c40f; background: #465a6d; color: #f1c40f; }
+        #table { background: #16a085; padding: 20px; border-radius: 10px; min-height: 120px; margin: 15px 0; border: 3px dashed rgba(255,255,255,0.2); }
+        button { background: #2ecc71; color: white; padding: 12px; border: none; border-radius: 5px; width: 100%; cursor: pointer; font-weight: bold; }
+        input { padding: 12px; width: 95%; margin: 10px 0; border-radius: 5px; border: none; }
     </style>
 </head>
 <body>
@@ -21,30 +36,32 @@
         <h1>🃏 Pangkah Online</h1>
         <input type="text" id="playerName" placeholder="Nama Anda">
         <input type="text" id="roomID" placeholder="ID Bilik">
-        <select id="maxP" style="padding:10px; width:85%; margin-bottom:10px;">
+        <select id="maxP" style="padding:12px; width:100%; margin-bottom:10px; border-radius:5px;">
             <option value="4">4 Pemain</option>
             <option value="5">5 Pemain</option>
             <option value="6">6 Pemain</option>
         </select>
-        <button onclick="join(true)">Cipta Bilik</button>
-        <button onclick="join(false)" style="background:#2980b9">Join Bilik</button>
+        <button onclick="join(true)">Cipta Bilik & Masuk</button>
+        <button onclick="join(false)" style="background:#2980b9; margin-top:10px;">Join Bilik Kawan</button>
     </div>
 
     <div id="gameArea" class="container" style="display:none;">
-        <h3 id="roomDisplay">Room: -</h3>
+        <div id="turn-announcer" class="others-turn">Menunggu Game Bermula...</div>
+        
+        <h3 id="roomDisplay">Bilik: -</h3>
         <div id="playerList"></div>
         
         <div id="table">
-            <p>Meja (Suit: <span id="suitText">-</span>)</p>
+            <p>Meja (Suit Asal: <span id="suitText">-</span>)</p>
             <div id="tableCards"></div>
         </div>
 
         <div id="myHandArea">
-            <h4>Kad Anda:</h4>
+            <h4>Kad Anda (Klik untuk baling):</h4>
             <div id="myHand"></div>
         </div>
         
-        <button id="startBtn" style="display:none; margin-top:20px;" onclick="start()">MULA GAME</button>
+        <button id="startBtn" style="display:none; background: #e67e22;" onclick="start()">MULA PERMAINAN</button>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -57,7 +74,7 @@
             const name = document.getElementById('playerName').value;
             const room = document.getElementById('roomID').value;
             const max = document.getElementById('maxP').value;
-            if(!name || !room) return alert("Lengkapkan maklumat");
+            if(!name || !room) return alert("Sila isi nama dan ID bilik!");
             myRoom = room;
             socket.emit(isCreate ? 'createRoom' : 'joinRoom', { roomID: room, playerName: name, maxPlayers: max });
         }
@@ -69,7 +86,7 @@
             document.getElementById('lobby').style.display = 'none';
             document.getElementById('gameArea').style.display = 'block';
             document.getElementById('roomDisplay').innerText = "Bilik: " + myRoom;
-            if(p.length >= 4) document.getElementById('startBtn').style.display = 'inline-block';
+            if(p.length >= 4) document.getElementById('startBtn').style.display = 'block';
             renderPlayers(-1);
         });
 
@@ -78,6 +95,7 @@
             players = data.players;
             renderHand();
             renderPlayers(data.turn);
+            updateInfoBox(data.turn);
         });
 
         socket.on('updateTable', (data) => {
@@ -90,21 +108,36 @@
             document.getElementById('suitText').innerText = data.suit;
             renderHand();
             renderPlayers(data.turn);
+            updateInfoBox(data.turn);
         });
 
         socket.on('clearTable', (data) => {
             document.getElementById('tableCards').innerHTML = "";
             document.getElementById('suitText').innerText = "-";
             renderPlayers(data.turn);
+            updateInfoBox(data.turn);
         });
+
+        function updateInfoBox(tIdx) {
+            const infoBox = document.getElementById('turn-announcer');
+            const activePlayer = players[tIdx];
+            
+            if (activePlayer.id === socket.id) {
+                infoBox.innerText = "GILIRAN ANDA! Sila baling kad.";
+                infoBox.className = "my-turn";
+            } else {
+                infoBox.innerText = "Giliran " + activePlayer.name + "...";
+                infoBox.className = "others-turn";
+            }
+        }
 
         function renderPlayers(t) {
             const list = document.getElementById('playerList');
             list.innerHTML = "";
             players.forEach((p, i) => {
                 list.innerHTML += `<div class="player-tag ${i===t?'active':''}">
-                    <span>${i===t?'➡️':''} ${p.name}</span>
-                    <span>${p.id === socket.id ? '(Anda)' : ''}</span>
+                    <span>${i===t?'➡️':''} ${p.name} ${p.id === socket.id ? '(Anda)' : ''}</span>
+                    <span>${p.hand.length} Kad</span>
                 </div>`;
             });
         }

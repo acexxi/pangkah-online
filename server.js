@@ -55,7 +55,6 @@ io.on('connection', (socket) => {
             p.hand = deck.splice(0, cardsPerPlayer);
         });
 
-        // Cari siapa ada King Spades untuk mula
         let starterIdx = 0;
         room.players.forEach((p, index) => {
             if (p.hand.some(c => c.suit === 'Spades' && c.rank === 'K')) starterIdx = index;
@@ -65,65 +64,71 @@ io.on('connection', (socket) => {
         io.to(roomID).emit('gameInit', { players: room.players, turn: room.turn });
     });
 
-    socket.on('playCard', ({ roomID, cardIndex }) => {
+    socket.on('playCard', ({ roomID, cardObject }) => {
         const room = rooms[roomID];
         if (!room || room.players[room.turn].id !== socket.id) return;
 
-        const playedCard = room.players[room.turn].hand.splice(cardIndex, 1)[0];
-        room.table.push({ playerIdx: room.turn, playerName: room.players[room.turn].name, card: playedCard });
+        const player = room.players[room.turn];
+        // Mencari index berdasarkan identiti kad, bukan urutan UI
+        const cardIndex = player.hand.findIndex(c => c.suit === cardObject.suit && c.rank === cardObject.rank);
 
-        if (room.table.length === 1) room.currentSuit = playedCard.suit;
+        if (cardIndex !== -1) {
+            const playedCard = player.hand.splice(cardIndex, 1)[0];
+            room.table.push({ playerIdx: room.turn, playerName: player.name, card: playedCard });
 
-        // Gerak turn ke pemain seterusnya yang masih ada kad
-        let nextTurn = room.turn;
-        let activePlayersCount = room.players.filter(p => p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p))).length;
+            if (room.table.length === 1) room.currentSuit = playedCard.suit;
 
-        if (room.table.length < activePlayersCount) {
-            do {
-                nextTurn = (nextTurn + 1) % room.players.length;
-            } while (room.players[nextTurn].hand.length === 0);
-            room.turn = nextTurn;
-        }
+            let nextTurn = room.turn;
+            let activePlayersCount = room.players.filter(p => p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p))).length;
 
-        io.to(roomID).emit('updateTable', { table: room.table, turn: room.turn, suit: room.currentSuit, players: room.players });
+            if (room.table.length < activePlayersCount) {
+                do {
+                    nextTurn = (nextTurn + 1) % room.players.length;
+                } while (room.players[nextTurn].hand.length === 0);
+                room.turn = nextTurn;
+            }
 
-        // Jika pusingan tamat (semua pemain aktif dah baling)
-        if (room.table.length === activePlayersCount) {
-            setTimeout(() => {
-                let winnerIdx = room.table[0].playerIdx;
-                let bestCard = room.table[0].card;
-                let adaPangkah = false;
+            io.to(roomID).emit('updateTable', { table: room.table, turn: room.turn, suit: room.currentSuit, players: room.players });
 
-                room.table.forEach(item => {
-                    if (item.card.suit !== room.currentSuit) {
-                        if (!adaPangkah || item.card.val > bestCard.val) {
-                            adaPangkah = true;
+            if (room.table.length === activePlayersCount) {
+                setTimeout(() => {
+                    let winnerIdx = room.table[0].playerIdx;
+                    let bestCard = room.table[0].card;
+                    let adaPangkah = false;
+
+                    room.table.forEach(item => {
+                        if (item.card.suit !== room.currentSuit) {
+                            if (!adaPangkah || item.card.val > bestCard.val) {
+                                adaPangkah = true;
+                                bestCard = item.card;
+                                winnerIdx = item.playerIdx;
+                            }
+                        } else if (!adaPangkah && item.card.val > bestCard.val) {
                             bestCard = item.card;
                             winnerIdx = item.playerIdx;
                         }
-                    } else if (!adaPangkah && item.card.val > bestCard.val) {
-                        bestCard = item.card;
-                        winnerIdx = item.playerIdx;
-                    }
-                });
+                    });
 
-                let survivors = room.players.filter(p => p.hand.length > 0);
-                if (survivors.length <= 1) {
-                    io.to(roomID).emit('gameOver', { players: room.players, loser: survivors[0]?.name || "Tiada" });
-                } else {
-                    // Pemenang pusingan mulakan pusingan baru
-                    let nextStarter = winnerIdx;
-                    while (room.players[nextStarter].hand.length === 0) {
-                        nextStarter = (nextStarter + 1) % room.players.length;
+                    let survivors = room.players.filter(p => p.hand.length > 0);
+                    if (survivors.length <= 1) {
+                        io.to(roomID).emit('gameOver', { players: room.players, loser: survivors[0]?.name || "Tiada" });
+                        delete rooms[roomID];
+                    } else {
+                        let nextStarter = winnerIdx;
+                        while (room.players[nextStarter].hand.length === 0) {
+                            nextStarter = (nextStarter + 1) % room.players.length;
+                        }
+                        room.turn = nextStarter;
+                        room.table = [];
+                        room.currentSuit = null;
+                        io.to(roomID).emit('clearTable', { turn: room.turn, winner: room.players[winnerIdx].name, players: room.players });
                     }
-                    room.turn = nextStarter;
-                    room.table = [];
-                    room.currentSuit = null;
-                    io.to(roomID).emit('clearTable', { turn: room.turn, winner: room.players[winnerIdx].name, players: room.players });
-                }
-            }, 3000);
+                }, 3000);
+            }
         }
     });
 });
 
-server.listen(process.env.PORT || 3000, '0.0.0.0');
+server.listen(process.env.PORT || 3000, '0.0.0.0', () => {
+    console.log('Server is live on port 3000');
+});

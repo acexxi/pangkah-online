@@ -13,9 +13,9 @@ let rooms = {};
 function generateDeck() {
     const suits = ['Spades', 'Hearts', 'Diamonds', 'Clubs'];
     const ranks = [
-        {n:'2',v:2},{n:'3',v:3},{n:'4',v:4},{n:'5',v:5},{n:'6',v:6},
-        {n:'7',v:7},{n:'8',v:8},{n:'9',v:9},{n:'10',v:10},
-        {n:'J',v:11},{n:'Q',v:12},{n:'K',v:13},{n:'A',v:14}
+        {n:'A',v:1}, {n:'2',v:2}, {n:'3',v:3}, {n:'4',v:4}, {n:'5',v:5},
+        {n:'6',v:6}, {n:'7',v:7}, {n:'8',v:8}, {n:'9',v:9}, {n:'10',v:10},
+        {n:'J',v:11}, {n:'Q',v:12}, {n:'K',v:13}
     ];
     let deck = [];
     suits.forEach(s => ranks.forEach(r => deck.push({ suit: s, rank: r.n, val: r.v })));
@@ -24,7 +24,7 @@ function generateDeck() {
 
 io.on('connection', (socket) => {
     socket.on('createRoom', ({ roomID, playerName, maxPlayers }) => {
-        if (rooms[roomID]) return socket.emit('errorMsg', 'ID Room sudah wujud!');
+        if (rooms[roomID]) return socket.emit('errorMsg', 'Room ID already exists!');
         rooms[roomID] = {
             id: roomID,
             maxPlayers: parseInt(maxPlayers),
@@ -39,7 +39,7 @@ io.on('connection', (socket) => {
 
     socket.on('joinRoom', ({ roomID, playerName }) => {
         const room = rooms[roomID];
-        if (!room || room.players.length >= room.maxPlayers) return socket.emit('errorMsg', 'Bilik penuh/tidak wujud!');
+        if (!room || room.players.length >= room.maxPlayers) return socket.emit('errorMsg', 'Room full or does not exist!');
         room.players.push({ id: socket.id, name: playerName, hand: [] });
         socket.join(roomID);
         io.to(roomID).emit('updatePlayers', room.players);
@@ -69,7 +69,6 @@ io.on('connection', (socket) => {
         if (!room || room.players[room.turn].id !== socket.id) return;
 
         const player = room.players[room.turn];
-        // Mencari index berdasarkan identiti kad, bukan urutan UI
         const cardIndex = player.hand.findIndex(c => c.suit === cardObject.suit && c.rank === cardObject.rank);
 
         if (cardIndex !== -1) {
@@ -94,16 +93,16 @@ io.on('connection', (socket) => {
                 setTimeout(() => {
                     let winnerIdx = room.table[0].playerIdx;
                     let bestCard = room.table[0].card;
-                    let adaPangkah = false;
+                    let pangkahOccurred = false;
 
                     room.table.forEach(item => {
                         if (item.card.suit !== room.currentSuit) {
-                            if (!adaPangkah || item.card.val > bestCard.val) {
-                                adaPangkah = true;
+                            if (!pangkahOccurred || item.card.val > bestCard.val) {
+                                pangkahOccurred = true;
                                 bestCard = item.card;
                                 winnerIdx = item.playerIdx;
                             }
-                        } else if (!adaPangkah && item.card.val > bestCard.val) {
+                        } else if (!pangkahOccurred && item.card.val > bestCard.val) {
                             bestCard = item.card;
                             winnerIdx = item.playerIdx;
                         }
@@ -111,7 +110,7 @@ io.on('connection', (socket) => {
 
                     let survivors = room.players.filter(p => p.hand.length > 0);
                     if (survivors.length <= 1) {
-                        io.to(roomID).emit('gameOver', { players: room.players, loser: survivors[0]?.name || "Tiada" });
+                        io.to(roomID).emit('gameOver', { players: room.players, loser: survivors[0]?.name || "None" });
                         delete rooms[roomID];
                     } else {
                         let nextStarter = winnerIdx;
@@ -129,6 +128,4 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(process.env.PORT || 3000, '0.0.0.0', () => {
-    console.log('Server is live on port 3000');
-});
+server.listen(process.env.PORT || 3000, '0.0.0.0');

@@ -28,7 +28,7 @@ io.on('connection', (socket) => {
         rooms[roomID] = {
             id: roomID,
             maxPlayers: parseInt(maxPlayers),
-            players: [{ id: socket.id, name: playerName, hand: [] }],
+            players: [{ id: socket.id, name: playerName, hand: [], score: 0, out: false }],
             turn: 0,
             table: [],
             currentSuit: null,
@@ -41,7 +41,7 @@ io.on('connection', (socket) => {
     socket.on('joinRoom', ({ roomID, playerName }) => {
         const room = rooms[roomID];
         if (!room || room.players.length >= room.maxPlayers) return socket.emit('errorMsg', 'Room penuh/tidak wujud!');
-        room.players.push({ id: socket.id, name: playerName, hand: [] });
+        room.players.push({ id: socket.id, name: playerName, hand: [], score: 0, out: false });
         socket.join(roomID);
         io.to(roomID).emit('updatePlayers', room.players);
     });
@@ -53,7 +53,7 @@ io.on('connection', (socket) => {
         let cardsPerPlayer = Math.floor(52 / room.maxPlayers);
         let remainder = 52 % room.maxPlayers;
 
-        room.players.forEach(p => p.hand = deck.splice(0, cardsPerPlayer));
+        room.players.forEach(p => { p.hand = deck.splice(0, cardsPerPlayer); p.score = 0; p.out = false; });
 
         let starterIdx = 0;
         room.players.forEach((p, index) => {
@@ -73,12 +73,17 @@ io.on('connection', (socket) => {
         if (!room || room.players[room.turn].id !== socket.id) return;
 
         const playedCard = room.players[room.turn].hand.splice(cardIndex, 1)[0];
-        room.table.push({ player: room.players[room.turn].name, card: playedCard });
+        room.table.push({ playerIdx: room.turn, playerName: room.players[room.turn].name, card: playedCard });
 
         if (room.table.length === 1) room.currentSuit = playedCard.suit;
 
-        // Pusingan Jam (Clockwise)
-        room.turn = (room.turn + 1) % room.players.length;
+        // Cari pemain seterusnya yang masih ada kad (Clockwise)
+        let nextTurn = room.turn;
+        do {
+            nextTurn = (nextTurn + 1) % room.players.length;
+        } while (room.players[nextTurn].hand.length === 0 && room.table.length < room.players.filter(p => p.hand.length > 0 || room.table.some(tc => tc.playerIdx === room.players.indexOf(p))).length);
+
+        room.turn = nextTurn;
 
         io.to(roomID).emit('updateTable', { 
             table: room.table, 
@@ -87,15 +92,22 @@ io.on('connection', (socket) => {
             players: room.players 
         });
 
-        if (room.table.length === room.players.length) {
+        // Pusingan tamat bila semua pemain yang aktif sudah baling kad
+        const playersWithCards = room.players.filter(p => p.hand.length > 0 || room.table.some(tc => tc.playerIdx === room.players.indexOf(p)));
+        
+        if (room.table.length === playersWithCards.length) {
             setTimeout(() => {
-                room.table = [];
-                room.currentSuit = null;
-                // Selepas satu pusingan meja bersih, giliran tetap diteruskan
-                io.to(roomID).emit('clearTable', { turn: room.turn });
-            }, 3000);
-        }
-    });
-});
+                let winnerIdx = room.table[0].playerIdx;
+                let bestCard = room.table[0].card;
+                let adaPangkah = false;
 
-server.listen(process.env.PORT || 3000);
+                for (let i = 1; i < room.table.length; i++) {
+                    let current = room.table[i];
+                    if (current.card.suit !== room.currentSuit) {
+                        if (!adaPangkah || current.card.val > bestCard.val) {
+                            adaPangkah = true; bestCard = current.card; winnerIdx = current.playerIdx;
+                        }
+                    } else if (!adaPangkah && current.card.val > bestCard.val) {
+                        bestCard = current.card; winnerIdx = current.playerIdx;
+                    }
+                }

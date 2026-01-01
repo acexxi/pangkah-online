@@ -55,7 +55,6 @@ io.on('connection', (socket) => {
 
         room.players.forEach(p => p.hand = deck.splice(0, cardsPerPlayer));
 
-        // Logik: King Spades ambil baki & mula dulu
         let starterIdx = 0;
         room.players.forEach((p, index) => {
             if (p.hand.some(c => c.suit === 'Spades' && c.rank === 'K')) {
@@ -74,12 +73,11 @@ io.on('connection', (socket) => {
         if (!room || room.players[room.turn].id !== socket.id) return;
 
         const playedCard = room.players[room.turn].hand.splice(cardIndex, 1)[0];
-        if (!room.table) room.table = [];
         room.table.push({ player: room.players[room.turn].name, card: playedCard });
 
         if (room.table.length === 1) room.currentSuit = playedCard.suit;
 
-        // Clockwise Turn
+        // Pusingan Jam (Clockwise)
         room.turn = (room.turn + 1) % room.players.length;
 
         io.to(roomID).emit('updateTable', { 
@@ -93,6 +91,7 @@ io.on('connection', (socket) => {
             setTimeout(() => {
                 room.table = [];
                 room.currentSuit = null;
+                // Selepas satu pusingan meja bersih, giliran tetap diteruskan
                 io.to(roomID).emit('clearTable', { turn: room.turn });
             }, 3000);
         }

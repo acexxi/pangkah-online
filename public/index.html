@@ -107,7 +107,12 @@
     
     socket.on('clearTable', d => {
         const popup = document.getElementById('round-popup');
-        document.getElementById('winner-name').innerText = d.winner.toUpperCase();
+        const winnerName = document.getElementById('winner-name');
+        const statusMsg = popup.querySelector('p'); // Elemen <p> dalam popup
+
+        winnerName.innerText = d.winner.toUpperCase();
+        statusMsg.innerText = d.msg; // Akan keluar "Took cards" atau "Discarded"
+        
         popup.style.display = 'block';
         setTimeout(() => {
             popup.style.display = 'none';

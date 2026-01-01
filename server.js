@@ -111,3 +111,28 @@ io.on('connection', (socket) => {
                         bestCard = current.card; winnerIdx = current.playerIdx;
                     }
                 }
+
+                room.players[winnerIdx].score += room.table.length;
+                
+                // Cari siapa lagi yang masih ada kad
+                let activePlayers = room.players.filter(p => p.hand.length > 0);
+                
+                if (activePlayers.length <= 1) {
+                    io.to(roomID).emit('gameOver', { players: room.players, loser: activePlayers.length === 1 ? activePlayers[0].name : "Tiada" });
+                } else {
+                    // Pemenang pusingan jalan dulu, tapi jika dia sudah habis kad, cari orang sebelah dia
+                    let nextStarter = winnerIdx;
+                    while (room.players[nextStarter].hand.length === 0) {
+                        nextStarter = (nextStarter + 1) % room.players.length;
+                    }
+                    room.turn = nextStarter;
+                    room.table = [];
+                    room.currentSuit = null;
+                    io.to(roomID).emit('clearTable', { turn: room.turn, players: room.players, winner: room.players[winnerIdx].name });
+                }
+            }, 3000);
+        }
+    });
+});
+
+server.listen(process.env.PORT || 3000);

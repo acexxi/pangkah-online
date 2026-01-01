@@ -71,25 +71,25 @@ io.on('connection', (socket) => {
             isPangkah = true;
         }
 
+        // Send update immediately so players see the card on the table
         io.to(roomID).emit('updateTable', { table: room.table, turn: room.turn, players: room.players });
 
-        // End round if pangkah happens OR all players played
-        let activePlayers = room.players.filter(p => p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p)));
+        let activePlayersCount = room.players.filter(p => p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p))).length;
         
-        if (isPangkah || room.table.length === activePlayers.length) {
+        if (isPangkah || room.table.length === activePlayersCount) {
             setTimeout(() => {
                 let winnerIdx = room.table[0].playerIdx;
                 let bestCard = room.table[0].card;
-                let pakahWinnerFound = false;
+                let pangkahWinnerFound = false;
 
                 room.table.forEach(item => {
                     if (item.card.suit !== room.currentSuit) {
-                        if (!pakahWinnerFound || item.card.val > bestCard.val) {
-                            pakahWinnerFound = true;
+                        if (!pangkahWinnerFound || item.card.val > bestCard.val) {
+                            pangkahWinnerFound = true;
                             bestCard = item.card;
                             winnerIdx = item.playerIdx;
                         }
-                    } else if (!pakahWinnerFound && item.card.val > bestCard.val) {
+                    } else if (!pangkahWinnerFound && item.card.val > bestCard.val) {
                         bestCard = item.card;
                         winnerIdx = item.playerIdx;
                     }
@@ -106,11 +106,10 @@ io.on('connection', (socket) => {
                 }
             }, 2000);
         } else {
-            // Normal turn rotation
             do {
                 room.turn = (room.turn + 1) % room.players.length;
             } while (room.players[room.turn].hand.length === 0);
-            io.to(roomID).emit('nextTurn', { turn: room.turn, players: room.players });
+            io.to(roomID).emit('nextTurn', { turn: room.turn, players: room.players, table: room.table });
         }
     });
 });

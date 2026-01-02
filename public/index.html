@@ -205,7 +205,11 @@
         render(p, -1);
     });
 
-    socket.on('gameInit', d => { document.getElementById('start-btn').style.display = 'none'; update(d); });
+    socket.on('gameInit', d => { 
+        document.getElementById('start-btn').style.display = 'none'; 
+        isProcessingTurn = false; // Reset lock on start
+        update(d); 
+    });
     
     socket.on('clearTable', d => {
         if(d.msg.toLowerCase() === 'pangkah!') {
@@ -219,16 +223,28 @@
         document.getElementById('pop-title').className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
         document.getElementById('pop-title').innerText = d.msg.toUpperCase();
         document.getElementById('pop-desc').innerText = d.winner + " has the lead."; pop.style.display = 'block';
-        setTimeout(() => { pop.style.display = 'none'; update(d); }, 2000);
+        setTimeout(() => { 
+            pop.style.display = 'none'; 
+            isProcessingTurn = false; // Unlock after animation
+            update(d); 
+        }, 2000);
     });
 
     socket.on('updateTable', d => { 
         sfx.place.play().catch(()=>{}); 
+        isProcessingTurn = false; // Unlock once server accepts play
         update(d); 
     });
     
-    socket.on('nextTurn', d => update(d));
-    socket.on('errorMsg', m => { isProcessingTurn = false; showToast(m); });
+    socket.on('nextTurn', d => {
+        isProcessingTurn = false; // Unlock for next player
+        update(d);
+    });
+
+    socket.on('errorMsg', m => { 
+        isProcessingTurn = false; // Unlock if move was illegal
+        showToast(m); 
+    });
 
     socket.on('roomClosed', () => {
         alert("Sect has been disbanded by the host.");
@@ -236,14 +252,13 @@
     });
 
     function update(d) {
-        isProcessingTurn = false;
         const activePlayers = d.players.filter(p => p.hand.length > 0);
         
-        // BUG FIX: End game if only one player left with cards
+        // Final player check: Return to lobby state if game is over
         if(activePlayers.length <= 1 && d.table.length === 0) {
             showToast("DUEL ENDED", true);
             setTimeout(() => {
-                if(d.players[0].userID === userID) {
+                if(d.players[0] && d.players[0].userID === userID) {
                     document.getElementById('start-btn').style.display = 'block';
                 }
             }, 1000);
@@ -301,8 +316,9 @@
         myCurrentHand.forEach(c => { 
             const el = createCardUI(c); 
             el.onclick = () => {
+                // BUG FIX: Prevent multiple clicks/drops
                 if(!isProcessingTurn) {
-                    isProcessingTurn = true;
+                    isProcessingTurn = true; 
                     socket.emit('playCard', { roomID: myRoom, cardObject: c });
                 }
             };
@@ -327,6 +343,7 @@
     socket.on('receiveSwapRequest', d => { pendingSwapRequest = d.fromUserID; document.getElementById('swap-txt').innerText = d.fromName + " wants your hand!"; document.getElementById('swap-modal').style.display = 'block'; });
     socket.on('swapOccurred', d => { 
         sfx.absorb.play().catch(()=>{}); 
+        isProcessingTurn = false;
         update(d); 
     });
 </script>

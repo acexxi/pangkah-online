@@ -45,7 +45,7 @@
         .safe-wrap { position: relative; width: 100%; height: 100%; max-width: 42vh; max-height: 42vh; aspect-ratio: 1/1; }
         .ring { position: absolute; inset: 0; border-radius: 50%; border: 1px dashed rgba(59, 130, 246, 0.2); }
         
-        /* PLAYER AVATARS (MINIMALIST) */
+        /* PLAYER AVATARS */
         .player { position: absolute; transform: translate(-50%, -50%); text-align: center; z-index: 100; transition: 0.3s; }
         .av { 
             width: 48px; height: 58px; border-radius: 8px; 
@@ -129,6 +129,17 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
     const socket = io();
+
+    // --- SOUND DEFINITIONS ---
+    const sfx = {
+        place: new Audio('https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3'), 
+        sweep: new Audio('https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3'),
+        strike: new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3'),
+        absorb: new Audio('https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3')
+    };
+    sfx.place.volume = 0.5;
+    sfx.strike.volume = 0.9;
+
     let userID = localStorage.getItem('pUserID') || 'uid_' + Math.random().toString(36).substr(2, 9);
     localStorage.setItem('pUserID', userID);
     
@@ -153,6 +164,9 @@
     }
 
     function enter(type) {
+        // Unlock Audio for Mobile
+        Object.values(sfx).forEach(s => { s.play(); s.pause(); s.currentTime = 0; });
+        
         myRoom = document.getElementById('rid').value;
         if(!myRoom) return alert("Room ID Required");
         socket.emit(type === 'create' ? 'createRoom' : 'joinRoom', { roomID: myRoom, playerName: myName, maxPlayers: document.getElementById('maxp').value, userID: userID });
@@ -199,7 +213,12 @@
         document.getElementById('swap-modal').style.display = 'block';
     });
 
-    socket.on('swapOccurred', d => { showToast(d.msg); update(d); });
+    socket.on('swapOccurred', d => { 
+        sfx.absorb.play().catch(e => {});
+        showToast(d.msg); 
+        update(d); 
+    });
+
     socket.on('updatePlayers', p => {
         document.getElementById('lobby').style.display = 'none';
         document.getElementById('room-tag').innerText = "SECT: " + myRoom;
@@ -208,7 +227,13 @@
     });
 
     socket.on('gameInit', d => { document.getElementById('start-btn').style.display = 'none'; showDiscarded(d.discarded); update(d); });
+
     socket.on('clearTable', d => {
+        if(d.msg.toLowerCase() === 'pangkah!') {
+            sfx.strike.play().catch(e => {}); 
+        } else {
+            sfx.sweep.play().catch(e => {});
+        }
         const pop = document.getElementById('round-popup');
         const title = document.getElementById('pop-title');
         title.className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
@@ -227,7 +252,11 @@
         });
     }
 
-    socket.on('updateTable', d => update(d));
+    socket.on('updateTable', d => {
+        sfx.place.play().catch(e => {}); 
+        update(d);
+    });
+
     socket.on('nextTurn', d => update(d));
     socket.on('errorMsg', m => showToast(m));
     socket.on('gameOver', d => { alert("Duel Ended! Loser: " + d.loser); localStorage.removeItem('pUserID'); location.reload(); });

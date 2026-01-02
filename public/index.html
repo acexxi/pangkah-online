@@ -29,7 +29,7 @@
         .bar-fill { height: 100%; background: linear-gradient(90deg, var(--ui-blue), var(--primary-action)); width: 0%; transition: width 0.6s ease; }
         
         #swap-modal { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: var(--glass-heavy); backdrop-filter: blur(20px); padding: 30px; border-radius: 24px; border: 1px solid #f59e0b; z-index: 10001; display: none; text-align: center; width: 300px; }
-        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--glass-heavy); border: 1px solid var(--ui-blue); padding: 40px; border-radius: 24px; text-align: center; z-index: 9999; display: none; }
+        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--glass-heavy); border: 1px solid var(--ui-blue); padding: 40px; border-radius: 24px; text-align: center; z-index: 9999; display: none; min-width: 280px; }
 
         .header { height: 70px; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.1); backdrop-filter: blur(10px); }
         #your-turn-btn { background: var(--primary-action); color: #000; font-size: 11px; font-weight: 900; padding: 8px 18px; border-radius: 25px; border: none; display: none; animation: pulse-glow 1.5s infinite; }
@@ -107,7 +107,10 @@
     </div>
 </div>
 
-<div id="round-popup"><div id="pop-title"></div><div id="pop-desc" style="margin-top:10px; opacity:0.8;"></div></div>
+<div id="round-popup">
+    <div id="pop-title"></div>
+    <div id="pop-desc" style="margin-top:10px; opacity:0.8;"></div>
+</div>
 
 <div class="header">
     <div id="room-tag" style="color:var(--ui-blue); font-weight:800; font-size: 11px;">LOBBY</div>
@@ -143,7 +146,6 @@
         absorb: new Audio('absorb.mp3') 
     };
     
-    // --- IDENTITY & STATS ---
     let userID = localStorage.getItem('pUserID') || 'uid_' + Math.random().toString(36).substr(2, 9);
     localStorage.setItem('pUserID', userID);
     let myName = localStorage.getItem('pName') || 'Disciple' + Math.floor(Math.random()*999);
@@ -160,55 +162,37 @@
         return "ANCIENT ANCESTOR";
     }
 
-    // --- FIX 1: LOBBY UI INITIALIZATION ---
+    // --- UI/LOBBY FUNCTIONS ---
     function updateStatsUI() {
         const level = getLevel();
-        const title = getTitle(level);
+        const dn = document.getElementById('display-name');
+        const lt = document.getElementById('level-title');
+        if(dn) dn.innerText = myName;
+        if(lt) lt.innerText = `LEVEL ${level} - ${getTitle(level)}`;
         
-        // Update Lobby Text
-        const nameEl = document.getElementById('display-name');
-        const levelEl = document.getElementById('level-title');
-        if(nameEl) nameEl.innerText = myName;
-        if(levelEl) levelEl.innerText = `LEVEL ${level} - ${title}`;
-        
-        // Update Profile Modal
         if(document.getElementById('prof-level')) document.getElementById('prof-level').innerText = `LEVEL ${level}`;
-        if(document.getElementById('prof-title')) document.getElementById('prof-title').innerText = title;
+        if(document.getElementById('prof-title')) document.getElementById('prof-title').innerText = getTitle(level);
         if(document.getElementById('prof-points')) document.getElementById('prof-points').innerText = stats.points;
         if(document.getElementById('prof-pangkahs')) document.getElementById('prof-pangkahs').innerText = stats.pangkahs;
         
-        const progress = stats.points % 5;
-        if(document.getElementById('prof-progress-text')) document.getElementById('prof-progress-text').innerText = `Progress: ${progress}/5`;
-        if(document.getElementById('prof-bar-fill')) document.getElementById('prof-bar-fill').style.width = (progress / 5 * 100) + "%";
+        const prog = stats.points % 5;
+        if(document.getElementById('prof-progress-text')) document.getElementById('prof-progress-text').innerText = `Progress: ${prog}/5`;
+        if(document.getElementById('prof-bar-fill')) document.getElementById('prof-bar-fill').style.width = (prog / 5 * 100) + "%";
     }
 
     function editName() { 
-        const n = prompt("Enter your name:", myName); 
-        if(n && n.trim() !== "") { 
+        const n = prompt("Enter Name:", myName); 
+        if(n && n.trim()) { 
             myName = n.trim(); 
             localStorage.setItem('pName', myName); 
             updateStatsUI(); 
         } 
     }
-
-    function openProfile() { 
-        updateStatsUI();
-        document.getElementById('profile-modal').style.display = 'flex'; 
-    }
     
-    function closeProfile() { 
-        document.getElementById('profile-modal').style.display = 'none'; 
-    }
+    function openProfile() { updateStatsUI(); document.getElementById('profile-modal').style.display = 'flex'; }
+    function closeProfile() { document.getElementById('profile-modal').style.display = 'none'; }
+    function showToast(msg, isPos = false) { const t = document.getElementById('toast'); t.innerText = msg; t.style.background = isPos ? 'var(--primary-action)' : 'var(--danger)'; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000); }
 
-    function showToast(msg, isPos = false) { 
-        const t = document.getElementById('toast'); 
-        t.innerText = msg; 
-        t.style.background = isPos ? 'var(--primary-action)' : 'var(--danger)'; 
-        t.style.display = 'block'; 
-        setTimeout(() => t.style.display = 'none', 3000); 
-    }
-
-    // --- ROOM ACTIONS ---
     function enter(type) {
         myRoom = document.getElementById('rid').value;
         if(!myRoom) return alert("Sect ID Required");
@@ -222,8 +206,7 @@
 
     // --- SOCKET LISTENERS ---
     socket.on('roomList', list => {
-        const box = document.getElementById('room-box'); 
-        box.innerHTML = list.length ? "" : '<div style="padding:15px; opacity:0.3;">Searching...</div>';
+        const box = document.getElementById('room-box'); box.innerHTML = list.length ? "" : '<div style="padding:15px; opacity:0.3;">Searching...</div>';
         list.forEach(r => {
             const d = document.createElement('div'); d.className = 'room-item'; d.innerHTML = `<span>#${r.id}</span> <span>${r.count}/${r.max}</span>`;
             d.onclick = () => document.getElementById('rid').value = r.id; box.appendChild(d);
@@ -241,6 +224,7 @@
     });
 
     socket.on('gameInit', d => { 
+        document.getElementById('round-popup').style.display = 'none';
         document.getElementById('start-btn').style.display = 'none'; 
         isProcessingTurn = false;
         update(d); 
@@ -251,12 +235,17 @@
             sfx.strike.play().catch(()=>{}); 
             if(d.winner === myName) { stats.points += 2; stats.pangkahs++; localStorage.setItem('pStats', JSON.stringify(stats)); updateStatsUI(); }
         } else sfx.sweep.play().catch(()=>{});
+        
         const pop = document.getElementById('round-popup');
         document.getElementById('pop-title').className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
         document.getElementById('pop-title').innerText = d.msg.toUpperCase();
         document.getElementById('pop-desc').innerText = d.winner + " has the lead."; 
         pop.style.display = 'block';
-        setTimeout(() => { pop.style.display = 'none'; update(d); }, 2000);
+        setTimeout(() => { 
+            // Only hide if the game hasn't ended during this delay
+            if(pop.querySelector('button') === null) pop.style.display = 'none'; 
+            update(d); 
+        }, 2000);
     });
 
     socket.on('updateTable', d => { sfx.place.play().catch(()=>{}); update(d); });
@@ -264,14 +253,13 @@
     socket.on('errorMsg', m => { isProcessingTurn = false; showToast(m); });
     socket.on('roomClosed', () => { alert("Sect disbanded."); window.location.reload(); });
 
-    // --- FIX 2: PREVENT HANGING & DETECT LOSER ---
-    // --- MAIN GAME LOGIC ---
+    // --- MAIN GAME UPDATE ---
     function update(d) {
         isProcessingTurn = false; // Spam protection unlock
 
         // --- GAME END DETECTION ---
         const playersWithCards = d.players.filter(p => p.hand.length > 0);
-        if(playersWithCards.length <= 1) {
+        if(playersWithCards.length <= 1 && d.table.length === 0) {
             const loserName = playersWithCards.length === 1 ? playersWithCards[0].name : "None";
             const pop = document.getElementById('round-popup');
             const popTitle = document.getElementById('pop-title');
@@ -280,52 +268,28 @@
             popTitle.className = 'pangkah-text';
             popTitle.innerText = "DUEL OVER";
             
-            // Create Host Control UI if current user is the host
             let hostControls = "";
             const isHost = d.players[0] && d.players[0].userID === userID;
             
             if (isHost) {
                 hostControls = `
                     <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
-                        <button class="btn btn-p" style="width:auto; padding:8px 20px;" onclick="start()">RESTART</button>
-                        <button class="btn" style="width:auto; padding:8px 20px; background:var(--danger); color:white;" onclick="closeRoom()">END</button>
+                        <button class="btn btn-p" style="width:auto; padding:8px 20px; font-size:12px;" onclick="start()">RESTART</button>
+                        <button class="btn" style="width:auto; padding:8px 20px; font-size:12px; background:var(--danger); color:white;" onclick="closeRoom()">END</button>
                     </div>
                 `;
+            } else {
+                hostControls = `<div style="margin-top:15px; font-size:11px; opacity:0.6;">Waiting for Sect Leader's decision...</div>`;
             }
 
-            popDesc.innerHTML = `<div>${loserName} is the Loser.</div>${hostControls}`;
+            popDesc.innerHTML = `<div style="font-weight:800;">The Loser is: ${loserName}</div>${hostControls}`;
             pop.style.display = 'block';
-            
-            // Note: Popup stays open until host clicks Restart or End
             return; 
         }
 
         const me = d.players.find(p => p.userID === userID); 
         if(me) myCurrentHand = me.hand;
-        const activeP = d.players[d.turn];
-        document.getElementById('your-turn-btn').style.display = (activeP && activeP.userID === userID) ? 'block' : 'none';
         
-        const sInd = document.getElementById('suit-indicator'); 
-        if (d.table && d.table.length > 0) {
-            sInd.style.display = 'flex'; 
-            document.getElementById('suit-symbol').innerText = icons[d.table[0].card.suit];
-            document.getElementById('suit-symbol').style.color = ['Hearts','Diamonds'].includes(d.table[0].card.suit) ? 'var(--danger)' : 'white';
-        } else sInd.style.display = 'none';
-
-        render(d.players, d.turn, d.table || []);
-        if(d.discarded) showDiscarded(d.discarded);
-    }
-
-    // Ensure gameInit hides the popup if it was open from a previous round
-    socket.on('gameInit', d => { 
-        document.getElementById('round-popup').style.display = 'none';
-        document.getElementById('start-btn').style.display = 'none'; 
-        isProcessingTurn = false;
-        update(d); 
-    });
-
-        const me = d.players.find(p => p.userID === userID); 
-        if(me) myCurrentHand = me.hand;
         const activeP = d.players[d.turn];
         document.getElementById('your-turn-btn').style.display = (activeP && activeP.userID === userID) ? 'block' : 'none';
         
@@ -356,10 +320,8 @@
                 if(i === nextValid) swapBtnHTML = `<button class="btn-swap" onclick="socket.emit('sendSwapRequest', {roomID:myRoom, fromUserID:'${userID}'})">TAKE HAND</button>`;
             }
 
-            const div = document.createElement('div'); 
-            div.className = `player ${i === turn ? 'active' : ''}`;
-            div.style.left = `calc(50% + ${x}px)`; 
-            div.style.top = `calc(50% + ${y}px)`;
+            const div = document.createElement('div'); div.className = `player ${i === turn ? 'active' : ''}`;
+            div.style.left = `calc(50% + ${x}px)`; div.style.top = `calc(50% + ${y}px)`;
             div.innerHTML = `${swapBtnHTML}<div class="av"><span>🎴 ${p.hand.length}</span></div><div style="font-size:10px; margin-top:8px; color:${p.userID === userID ? 'var(--ui-blue)':'white'}">${p.name}</div>`;
             pLayer.appendChild(div);
         });
@@ -373,17 +335,11 @@
         });
     }
 
-    // --- FIX 3: SPAM PROTECTION ---
     function renderHand() {
         const hDiv = document.getElementById('my-cards'); hDiv.innerHTML = "";
         myCurrentHand.forEach(c => { 
             const el = createCardUI(c); 
-            el.onclick = () => { 
-                if(!isProcessingTurn) { 
-                    isProcessingTurn = true; // LOCK
-                    socket.emit('playCard', { roomID: myRoom, cardObject: c }); 
-                } 
-            };
+            el.onclick = () => { if(!isProcessingTurn) { isProcessingTurn = true; socket.emit('playCard', { roomID: myRoom, cardObject: c }); } };
             hDiv.appendChild(el); 
         });
     }
@@ -402,7 +358,6 @@
     socket.on('receiveSwapRequest', d => { pendingSwapRequest = d.fromUserID; document.getElementById('swap-txt').innerText = d.fromName + " wants your hand!"; document.getElementById('swap-modal').style.display = 'block'; });
     socket.on('swapOccurred', d => { sfx.absorb.play().catch(()=>{}); update(d); });
 
-    // BOOTSTRAP LOBBY
     updateStatsUI();
 </script>
 </body>

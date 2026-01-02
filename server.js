@@ -32,12 +32,10 @@ const broadcastRooms = () => {
 io.on('connection', (socket) => {
     broadcastRooms();
 
-    // Reconnection Check
     socket.on('checkSession', ({ userID }) => {
         for (let rid in rooms) {
             let pIdx = rooms[rid].players.findIndex(p => p.userID === userID);
             if (pIdx !== -1) {
-                // Update socket ID to the new one
                 rooms[rid].players[pIdx].id = socket.id;
                 socket.join(rid);
                 socket.emit('reconnectSuccess', { 
@@ -54,7 +52,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('createRoom', ({ roomID, playerName, maxPlayers, userID }) => {
-        if (rooms[roomID]) return socket.emit('errorMsg', 'Room ID already exists!');
+        if (rooms[roomID]) return socket.emit('errorMsg', 'Room ID exists!');
         rooms[roomID] = {
             id: roomID, maxPlayers: parseInt(maxPlayers),
             players: [{ id: socket.id, name: playerName, userID: userID, hand: [] }],
@@ -68,18 +66,15 @@ io.on('connection', (socket) => {
     socket.on('joinRoom', ({ roomID, playerName, userID }) => {
         const room = rooms[roomID];
         if (!room) return socket.emit('errorMsg', 'Room not found!');
-        
-        // If player already in room (reconnecting via Join button)
         let existing = room.players.find(p => p.userID === userID);
         if (existing) {
             existing.id = socket.id;
             socket.join(roomID);
         } else {
-            if (room.players.length >= room.maxPlayers) return socket.emit('errorMsg', 'Room full!');
+            if (room.players.length >= room.maxPlayers) return socket.emit('errorMsg', 'Full!');
             room.players.push({ id: socket.id, name: playerName, userID: userID, hand: [] });
             socket.join(roomID);
         }
-        
         io.to(roomID).emit('updatePlayers', room.players);
         broadcastRooms();
     });
@@ -91,7 +86,7 @@ io.on('connection', (socket) => {
         let deck = generateDeck();
         room.discarded = [];
 
-        if (room.maxPlayers === 5 || room.maxPlayers === 6) {
+        if (room.maxPlayers >= 5) {
             const discardCount = room.maxPlayers === 5 ? 2 : 4;
             let aceIndices = [];
             deck.forEach((card, idx) => { if (card.rank === 'A') aceIndices.push(idx); });
@@ -102,63 +97,72 @@ io.on('connection', (socket) => {
 
         let cardsPerPlayer = Math.floor(deck.length / room.maxPlayers);
         room.players.forEach(p => { p.hand = deck.splice(0, cardsPerPlayer); });
-
         let starterIdx = room.players.findIndex(p => p.hand.some(c => c.suit === 'Spades' && c.rank === 'K'));
         room.turn = starterIdx !== -1 ? starterIdx : 0;
         room.isFirstMove = true;
         io.to(roomID).emit('gameInit', { players: room.players, turn: room.turn, discarded: room.discarded });
     });
 
+    socket.on('requestSwap', ({ roomID, userID }) => {
+        const room = rooms[roomID];
+        if (!room || !room.gameStarted) return;
+        const myIdx = room.players.findIndex(p => p.userID === userID);
+        let targetIdx = (myIdx + 1) % room.players.length;
+        while (room.players[targetIdx].hand.length === 0 && targetIdx !== myIdx) {
+            targetIdx = (targetIdx + 1) % room.players.length;
+        }
+        if (targetIdx === myIdx) return;
+        
+        const target = room.players[targetIdx];
+        const me = room.players[myIdx];
+        let temp = [...me.hand];
+        me.hand = [...target.hand];
+        target.hand = temp;
+
+        io.to(roomID).emit('swapOccurred', { 
+            msg: `${me.name} swapped with ${target.name}!`, 
+            players: room.players,
+            table: room.table,
+            turn: room.turn
+        });
+    });
+
     socket.on('playCard', ({ roomID, cardObject }) => {
         const room = rooms[roomID];
         if (!room || room.players[room.turn].id !== socket.id) return;
-
         const player = room.players[room.turn];
         const cardIndex = player.hand.findIndex(c => c.suit === cardObject.suit && c.rank === cardObject.rank);
         if (cardIndex === -1) return;
-        
         const playedCard = player.hand[cardIndex];
 
-        if (room.isFirstMove && (playedCard.suit !== 'Spades' || playedCard.rank !== 'K')) {
-            return socket.emit('errorMsg', "First move must be King of Spades!");
-        }
-
-        if (room.table.length > 0 && playedCard.suit !== room.currentSuit) {
-            if (player.hand.some(c => c.suit === room.currentSuit)) {
-                return socket.emit('errorMsg', `Must follow suit: ${room.currentSuit}`);
-            }
-        }
+        if (room.isFirstMove && (playedCard.suit !== 'Spades' || playedCard.rank !== 'K')) return socket.emit('errorMsg', "Play King of Spades!");
+        if (room.table.length > 0 && playedCard.suit !== room.currentSuit && player.hand.some(c => c.suit === room.currentSuit)) return socket.emit('errorMsg', `Follow suit: ${room.currentSuit}`);
 
         room.isFirstMove = false;
         player.hand.splice(cardIndex, 1);
-        room.table.push({ playerIdx: room.turn, playerName: player.name, card: playedCard });
+        room.table.push({ playerIdx: room.turn, card: playedCard });
         if (room.table.length === 1) room.currentSuit = playedCard.suit;
 
         io.to(roomID).emit('updateTable', { table: room.table, turn: room.turn, players: room.players });
 
         let isPangkah = playedCard.suit !== room.currentSuit;
-        let activeCount = room.players.filter(p => p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p))).length;
+        let activePlayers = room.players.filter(p => p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p)));
 
-        if (isPangkah || room.table.length === activeCount) {
+        if (isPangkah || room.table.length === activePlayers.length) {
             setTimeout(() => {
-                let winnerIdx = -1; let highVal = -1;
-                room.table.forEach(t => {
-                    if (t.card.suit === room.currentSuit && t.card.val > highVal) {
-                        highVal = t.card.val; winnerIdx = t.playerIdx;
-                    }
-                });
-                if (isPangkah) room.players[winnerIdx].hand.push(...room.table.map(t => t.card));
+                let winIdx = -1; let high = -1;
+                room.table.forEach(t => { if(t.card.suit === room.currentSuit && t.card.val > high) { high = t.card.val; winIdx = t.playerIdx; } });
+                if (isPangkah) room.players[winIdx].hand.push(...room.table.map(t => t.card));
                 
                 let survivors = room.players.filter(p => p.hand.length > 0);
                 if (survivors.length <= 1) {
                     io.to(roomID).emit('gameOver', { loser: survivors[0]?.name || 'None' });
                     delete rooms[roomID];
-                    broadcastRooms();
                 } else {
-                    room.turn = winnerIdx; room.table = []; room.currentSuit = null;
-                    io.to(roomID).emit('clearTable', { turn: room.turn, winner: room.players[winnerIdx].name, players: room.players, msg: isPangkah ? "Pangkah!" : "Clean" });
+                    room.turn = winIdx; room.table = []; room.currentSuit = null;
+                    io.to(roomID).emit('clearTable', { turn: room.turn, winner: room.players[winIdx].name, players: room.players, msg: isPangkah ? "Pangkah!" : "Clean" });
                 }
-            }, 1500);
+            }, 1200);
         } else {
             do { room.turn = (room.turn + 1) % room.players.length; } while (room.players[room.turn].hand.length === 0);
             io.to(roomID).emit('nextTurn', { turn: room.turn, players: room.players, table: room.table });
@@ -166,5 +170,4 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server active on port ${PORT}`));
+server.listen(3000, () => console.log('Server Port 3000'));

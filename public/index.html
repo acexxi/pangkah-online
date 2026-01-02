@@ -3,26 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pangkah Elite</title>
+    <title>Pangkah Emerald</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         :root { --primary: #10b981; --bg: #020617; --glass: rgba(255,255,255,0.03); --border: rgba(255,255,255,0.1); }
         * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
         body { margin: 0; height: 100vh; overflow: hidden; background: radial-gradient(circle at 50% -20%, #064e3b, #020617 80%); color: white; display: flex; flex-direction: column; }
 
-        /* POPUP & UI */
+        /* LOBBY & POPUPS */
         #lobby { position: fixed; inset: 0; z-index: 5000; backdrop-filter: blur(40px); background: rgba(2,6,23,0.9); display: flex; align-items: center; justify-content: center; }
-        .panel { width: 90%; max-width: 400px; padding: 30px; border-radius: 28px; background: var(--glass); border: 1px solid var(--border); text-align: center; }
-        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(2,6,23,0.95); border: 2px solid var(--primary); padding: 30px; border-radius: 20px; text-align: center; z-index: 9999; display: none; }
+        .panel { width: 90%; max-width: 380px; padding: 30px; border-radius: 28px; background: var(--glass); border: 1px solid var(--border); text-align: center; }
+        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(2,6,23,0.95); border: 2px solid var(--primary); padding: 30px; border-radius: 20px; text-align: center; z-index: 9999; display: none; box-shadow: 0 0 50px rgba(16,185,129,0.3); }
         .pangkah-text { color: #f43f5e; font-size: 2rem; font-weight: 800; }
         .clean-text { color: var(--primary); font-size: 2rem; font-weight: 800; }
 
-        /* HEADER */
+        /* UI ELEMENTS */
         .header { height: 60px; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
         #suit-indicator { background: rgba(255,255,255,0.05); padding: 5px 12px; border-radius: 10px; border: 1px solid var(--border); font-weight: 800; display: none; }
         .suit-red { color: #f43f5e; }
 
-        /* GAME BOARD */
         #game-view { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
         .safe-wrap { position: relative; width: 100%; height: 100%; max-width: 42vh; max-height: 42vh; }
         .player { position: absolute; transform: translate(-50%, -50%); text-align: center; transition: 0.3s; z-index: 10; }
@@ -36,24 +35,29 @@
         .hand-flex { display: flex; gap: 8px; justify-content: center; }
         .card { width: 50px; height: 75px; background: white; color: black; border-radius: 8px; padding: 5px; font-weight: 800; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 1px solid #ddd; }
         .card.red { color: #f43f5e !important; }
-        .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none;}
+        .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
 
-        .btn-swap { position: absolute; top: -30px; left: 50%; transform: translateX(-50%); background: #f59e0b; color: #000; border: none; border-radius: 4px; font-size: 7px; font-weight: 900; padding: 3px 6px; cursor: pointer; }
-        input, select { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 10px; background: #000; color: #fff; border: 1px solid var(--border); }
+        /* BUTTONS */
+        .btn-swap { position: absolute; top: -32px; left: 50%; transform: translateX(-50%); background: #f59e0b; color: #000; border: none; border-radius: 4px; font-size: 7px; font-weight: 900; padding: 3px 6px; cursor: pointer; box-shadow: 0 0 10px rgba(245, 158, 11, 0.4); }
         .btn-p { background: var(--primary); color: #022c22; padding: 12px; border-radius: 10px; font-weight: 800; width: 100%; border: none; cursor: pointer; }
+        input, select { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 10px; background: #000; color: #fff; border: 1px solid var(--border); }
     </style>
 </head>
 <body>
 
 <div id="lobby">
     <div class="panel">
-        <h2 style="color:var(--primary)">Pangkah Emerald</h2>
-        <div id="user-info" style="margin-bottom:15px; font-weight:800;">Player</div>
-        <div id="room-box" style="margin:10px 0; max-height:100px; overflow:auto; background:rgba(0,0,0,0.3); border-radius:8px;"></div>
+        <h2 style="color:var(--primary); margin-bottom: 5px;">Pangkah Emerald</h2>
+        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; margin-bottom: 15px; border: 1px solid var(--border);">
+            <div style="font-size: 0.6rem; opacity: 0.5; text-transform: uppercase;">Playing As</div>
+            <div id="display-name" style="font-size: 1.1rem; font-weight: 800; margin: 4px 0;"></div>
+            <button onclick="editName()" style="background: var(--primary); color: #000; border: none; padding: 3px 10px; border-radius: 5px; font-size: 9px; font-weight: 800; cursor: pointer;">EDIT NAME ✎</button>
+        </div>
+        <div id="room-box" style="margin:10px 0; max-height:80px; overflow:auto; background:rgba(0,0,0,0.3); border-radius:8px;"></div>
         <input id="rid" placeholder="Room ID">
         <select id="maxp"><option value="4">4 Players</option><option value="5">5 Players</option><option value="6">6 Players</option></select>
         <button class="btn-p" onclick="enter('create')">CREATE ROOM</button>
-        <button class="btn-p" style="background:transparent; color:#fff; border:1px solid var(--border); margin-top:5px" onclick="enter('join')">JOIN ROOM</button>
+        <button class="btn-p" style="background:transparent; color:#fff; border:1px solid var(--border); margin-top:8px" onclick="enter('join')">JOIN ROOM</button>
     </div>
 </div>
 
@@ -69,12 +73,12 @@
     <div class="safe-wrap" id="table-wrap">
         <div id="p-layer"></div>
         <div id="t-layer"></div>
-        <button id="start-btn" class="btn-p" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:auto;" onclick="start()">START</button>
+        <button id="start-btn" class="btn-p" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:auto;" onclick="start()">START MATCH</button>
     </div>
 </div>
 
 <div id="hand-area">
-    <div style="text-align:center; margin-bottom:8px;"><button style="background:rgba(255,255,255,0.1); color:#fff; border:none; padding:4px 10px; border-radius:4px; font-size:10px;" onclick="sortHand()">SORT CARDS ⇅</button></div>
+    <div style="text-align:center; margin-bottom:8px;"><button style="background:rgba(255,255,255,0.1); color:#fff; border:none; padding:4px 10px; border-radius:4px; font-size:10px; cursor:pointer;" onclick="sortHand()">SORT CARDS ⇅</button></div>
     <div class="hand-flex" id="my-cards"></div>
 </div>
 
@@ -88,15 +92,27 @@
     let myHand = [];
     const icons = { 'Spades': '♠', 'Hearts': '♥', 'Diamonds': '♦', 'Clubs': '♣' };
 
-    document.getElementById('user-info').innerText = myName;
+    document.getElementById('display-name').innerText = myName;
     socket.emit('checkSession', { userID });
+
+    function editName() {
+        const n = prompt("Change name:", myName);
+        if (n && n.trim()) {
+            myName = n.trim().substring(0, 12);
+            localStorage.setItem('pName', myName);
+            document.getElementById('display-name').innerText = myName;
+            if (myRoom) socket.emit('updateName', { roomID: myRoom, userID, newName: myName });
+        }
+    }
 
     function enter(type) {
         myRoom = document.getElementById('rid').value;
-        socket.emit(type === 'create' ? 'createRoom' : 'joinRoom', { roomID: myRoom, playerName: myName, maxPlayers: document.getElementById('maxp').value, userID: userID });
+        if (!myRoom) return alert("Enter Room ID");
+        socket.emit(type === 'create' ? 'createRoom' : 'joinRoom', { roomID: myRoom, playerName: myName, maxPlayers: document.getElementById('maxp').value, userID });
     }
 
     function start() { socket.emit('startGame', myRoom); }
+
     function sortHand() {
         const order = { 'Spades': 4, 'Hearts': 3, 'Diamonds': 2, 'Clubs': 1 };
         myHand.sort((a, b) => (order[b.suit] - order[a.suit]) || (b.val - a.val));
@@ -111,30 +127,42 @@
 
     socket.on('updatePlayers', p => {
         document.getElementById('lobby').style.display = 'none';
+        document.getElementById('room-tag').innerText = "ROOM: " + myRoom;
         if(p.length >= 4) document.getElementById('start-btn').style.display = 'block';
         render(p, -1);
     });
 
     socket.on('gameInit', d => { document.getElementById('start-btn').style.display = 'none'; update(d); });
+
     socket.on('clearTable', d => {
         const pop = document.getElementById('round-popup');
         document.getElementById('pop-title').innerText = d.msg.toUpperCase();
         document.getElementById('pop-title').className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
-        document.getElementById('pop-desc').innerText = d.winner + " starts next.";
+        document.getElementById('pop-desc').innerText = d.winner + " lead next.";
         pop.style.display = 'block'; setTimeout(() => { pop.style.display = 'none'; update(d); }, 1500);
     });
 
     socket.on('swapOccurred', d => {
         const pop = document.getElementById('round-popup');
-        document.getElementById('pop-title').innerText = "HAND SWAP!";
+        document.getElementById('pop-title').innerText = "SWAP!";
         document.getElementById('pop-desc').innerText = d.msg;
         pop.style.display = 'block'; setTimeout(() => { pop.style.display = 'none'; update(d); }, 1500);
+    });
+
+    socket.on('roomList', list => {
+        const box = document.getElementById('room-box'); box.innerHTML = "";
+        list.forEach(r => {
+            const d = document.createElement('div'); d.style = "padding:8px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; cursor:pointer; font-size:10px;";
+            d.innerHTML = `<span>#${r.id}</span> <span>${r.count}/${r.max}</span>`;
+            d.onclick = () => document.getElementById('rid').value = r.id;
+            box.appendChild(d);
+        });
     });
 
     socket.on('updateTable', update);
     socket.on('nextTurn', update);
     socket.on('errorMsg', alert);
-    socket.on('gameOver', d => { alert("Loser: " + d.loser); location.reload(); });
+    socket.on('gameOver', d => { alert("Game Over! Loser: " + d.loser); location.reload(); });
 
     function update(d) {
         const me = d.players.find(p => p.userID === userID);
@@ -142,10 +170,10 @@
         const sInd = document.getElementById('suit-indicator');
         if (d.table && d.table.length > 0) {
             sInd.style.display = 'block';
-            const first = d.table[0].card.suit;
-            document.getElementById('suit-symbol').innerText = icons[first];
-            document.getElementById('suit-symbol').className = ['Hearts','Diamonds'].includes(first) ? 'suit-red' : '';
-        } else { sInd.style.display = 'none'; }
+            const s = d.table[0].card.suit;
+            document.getElementById('suit-symbol').innerText = icons[s];
+            document.getElementById('suit-symbol').className = ['Hearts','Diamonds'].includes(s) ? 'suit-red' : '';
+        } else sInd.style.display = 'none';
         render(d.players, d.turn, d.table || []);
     }
 
@@ -155,23 +183,23 @@
         const myIdx = players.findIndex(p => p.userID === userID);
 
         players.forEach((p, i) => {
-            const angle = (i * (360 / players.length) - 90) * (Math.PI / 180);
-            const x = Math.cos(angle) * (radius + 20);
-            const y = Math.sin(angle) * (radius + 20);
+            const rad = (i * (360 / players.length) - 90) * (Math.PI / 180);
+            const x = Math.cos(rad) * (radius + 20);
+            const y = Math.sin(rad) * (radius + 20);
             const isMe = p.userID === userID;
 
             let isTarget = false;
             if (myIdx !== -1 && !isMe && p.hand.length > 0) {
-                let next = (myIdx + 1) % players.length;
-                while (players[next].hand.length === 0 && next !== myIdx) next = (next + 1) % players.length;
-                if (i === next) isTarget = true;
+                let n = (myIdx + 1) % players.length;
+                while (players[n].hand.length === 0 && n !== myIdx) n = (n + 1) % players.length;
+                if (i === n) isTarget = true;
             }
 
             const div = document.createElement('div'); div.className = `player ${i === turn ? 'active' : ''}`;
             div.style.left = `calc(50% + ${x}px)`; div.style.top = `calc(50% + ${y}px)`;
             div.innerHTML = `
                 <div class="turn-label">Your Turn</div>
-                ${isTarget ? `<button class="btn-swap" onclick="socket.emit('requestSwap', {roomID:myRoom, userID:userID})">TAKE HAND</button>` : ''}
+                ${isTarget ? `<button class="btn-swap" onclick="socket.emit('requestSwap', {roomID:myRoom, userID})">TAKE HAND</button>` : ''}
                 <div class="av">
                     <span style="font-weight:800;">${p.name[0]}</span>
                     <div style="position:absolute; top:-5px; right:-5px; background:var(--primary); color:#000; font-size:9px; padding:2px 5px; border-radius:10px;">${p.hand.length}</div>

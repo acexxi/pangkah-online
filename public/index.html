@@ -16,10 +16,10 @@
         .room-list { height: 100px; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 12px; margin: 15px 0; border: 1px solid var(--border); }
         .room-item { padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; cursor: pointer; font-size: 0.8rem; }
 
-        /* POPUPS & TOASTS */
-        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(2,6,23,0.95); border: 2px solid var(--primary); padding: 30px; border-radius: 20px; text-align: center; z-index: 9999; display: none; box-shadow: 0 0 50px rgba(16,185,129,0.3); }
+        /* TOAST & MODALS */
         #toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #f43f5e; padding: 10px 20px; border-radius: 10px; z-index: 10000; display: none; font-weight: 800; font-size: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         #swap-modal { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: #1e293b; padding: 25px; border-radius: 20px; border: 2px solid #f59e0b; z-index: 10001; display: none; text-align: center; width: 280px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(2,6,23,0.95); border: 2px solid var(--primary); padding: 30px; border-radius: 20px; text-align: center; z-index: 9999; display: none; box-shadow: 0 0 50px rgba(16,185,129,0.3); }
 
         /* HEADER */
         .header { height: 60px; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); position: relative; }
@@ -34,30 +34,38 @@
         }
         @keyframes blinker { 50% { opacity: 0.3; } }
 
-        /* GAME UI */
+        /* GAME BOARD */
         #game-view { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
         .safe-wrap { position: relative; width: 100%; height: 100%; max-width: 42vh; max-height: 42vh; aspect-ratio: 1/1; }
         .ring { position: absolute; inset: 0; border-radius: 50%; border: 1px dashed rgba(16,185,129,0.2); }
+        
+        /* PLAYER AVATARS (MINIMALIST) */
         .player { position: absolute; transform: translate(-50%, -50%); text-align: center; z-index: 100; transition: 0.3s; }
-        .av { width: 50px; height: 50px; border-radius: 50%; background: #0f172a; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; position: relative; }
-        .active .av { border-color: var(--primary); box-shadow: 0 0 20px var(--primary); animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+        .av { 
+            width: 48px; height: 58px; border-radius: 8px; 
+            background: #0f172a; border: 1px solid var(--border); 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            position: relative; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+        .active .av { border-color: var(--primary); box-shadow: 0 0 20px var(--primary); }
+        .card-icon-min { font-size: 16px; margin-bottom: 2px; }
+        .card-count-min { font-size: 16px; font-weight: 800; color: var(--primary); }
 
         /* CARDS */
-        #hand-area { height: 22vh; background: rgba(0,0,0,0.4); border-top: 1px solid var(--border); padding: 10px; overflow-x: auto; }
-        .hand-flex { display: flex; gap: 8px; justify-content: center; }
-        .card { width: 50px; height: 75px; background: white; color: black; border-radius: 8px; padding: 5px; font-weight: 800; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 1px solid #ddd; }
+        #hand-area { height: 22vh; background: rgba(0,0,0,0.4); border-top: 1px solid var(--border); padding: 10px; overflow-y: auto; }
+        .hand-flex { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+        .card { width: 50px; height: 75px; background: white; color: black; border-radius: 8px; padding: 5px; font-weight: 800; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 1px solid #ddd; position: relative; }
         .card.red { color: #f43f5e !important; }
-        .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 
-        .btn-swap { background: #f59e0b; color: #000; border: none; border-radius: 4px; font-size: 7px; font-weight: 900; padding: 3px 6px; cursor: pointer; margin-bottom: 4px; }
-        #discard-area { position: absolute; left: 10px; top: 70px; display: flex; flex-direction: column; gap: 4px; }
-        .mini { width: 25px; height: 35px; background: white; color: black; border-radius: 4px; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
-        
-        input, select { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 10px; background: #000; color: #fff; border: 1px solid var(--border); }
+        /* BUTTONS */
+        .btn-swap { background: #f59e0b; color: #000; border: none; border-radius: 4px; font-size: 7px; font-weight: 900; padding: 3px 6px; cursor: pointer; margin-bottom: 4px; position: absolute; top: -25px; left: 50%; transform: translateX(-50%); width: 60px; }
         .btn { padding: 12px; border-radius: 10px; font-weight: 800; cursor: pointer; width: 100%; border: none; }
         .btn-p { background: var(--primary); color: #022c22; }
         
+        #discard-area { position: absolute; left: 10px; top: 70px; display: flex; flex-direction: column; gap: 4px; }
+        .mini { width: 25px; height: 35px; background: white; color: black; border-radius: 4px; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+        input, select { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 10px; background: #000; color: #fff; border: 1px solid var(--border); }
         .pangkah-text { color: #f43f5e; font-size: 2rem; font-weight: 800; }
         .clean-text { color: var(--primary); font-size: 2rem; font-weight: 800; }
     </style>
@@ -67,7 +75,7 @@
 <div id="toast">MESSAGE</div>
 
 <div id="swap-modal">
-    <div id="swap-txt" style="font-size: 13px; margin-bottom: 15px;">Player wants to swap!</div>
+    <div id="swap-txt" style="font-size: 13px; margin-bottom: 15px;">Player wants to TAKE your hand!</div>
     <div style="display: flex; gap: 10px;">
         <button class="btn btn-p" onclick="answerSwap(true)" style="padding: 8px;">ACCEPT</button>
         <button class="btn" onclick="answerSwap(false)" style="padding: 8px; background: #334155; color: white;">DECLINE</button>
@@ -163,18 +171,13 @@
         myRoom = d.roomID;
         document.getElementById('lobby').style.display = 'none';
         document.getElementById('room-tag').innerText = "ROOM: " + myRoom;
-        if(d.gameStarted) {
-            showDiscarded(d.discarded);
-            update(d);
-        } else {
-            render(d.players, -1);
-            if(d.players.length >= 4) document.getElementById('start-btn').style.display = 'block';
-        }
+        if(d.gameStarted) { showDiscarded(d.discarded); update(d); }
+        else { render(d.players, -1); if(d.players.length >= 4) document.getElementById('start-btn').style.display = 'block'; }
     });
 
     socket.on('roomList', list => {
         const box = document.getElementById('room-box');
-        box.innerHTML = list.length ? "" : '<div style="padding:15px; opacity:0.3; font-size:0.7rem;">No rooms.</div>';
+        box.innerHTML = list.length ? "" : '<div style="padding:15px; opacity:0.3; font-size:0.7rem;">No rooms available.</div>';
         list.forEach(r => {
             const d = document.createElement('div'); d.className = 'room-item';
             d.innerHTML = `<span>#${r.id}</span> <span>${r.count}/${r.max}</span>`;
@@ -185,7 +188,7 @@
 
     socket.on('receiveSwapRequest', d => {
         pendingSwapRequest = d.fromUserID;
-        document.getElementById('swap-txt').innerText = d.fromName + " wants to TAKE your hand!";
+        document.getElementById('swap-txt').innerText = d.fromName + " wants your cards!";
         document.getElementById('swap-modal').style.display = 'block';
     });
 
@@ -212,14 +215,14 @@
         const title = document.getElementById('pop-title');
         title.className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
         title.innerText = d.msg.toUpperCase();
-        document.getElementById('pop-desc').innerText = d.winner + " starts next.";
+        document.getElementById('pop-desc').innerText = d.winner + " starts the next round.";
         pop.style.display = 'block';
         setTimeout(() => { pop.style.display = 'none'; update(d); }, 2000);
     });
 
     function showDiscarded(list) {
         const dArea = document.getElementById('discard-area');
-        dArea.innerHTML = list && list.length ? '<div style="font-size:8px; opacity:0.5;">OUT</div>' : '';
+        dArea.innerHTML = list && list.length ? '<div style="font-size:8px; opacity:0.5;">REMOVED</div>' : '';
         if(list) list.forEach(c => {
             const div = document.createElement('div'); div.className = `mini ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
             div.innerHTML = icons[c.suit]; dArea.appendChild(div);
@@ -236,8 +239,8 @@
         if(me) myCurrentHand = me.hand;
         
         const turnBtn = document.getElementById('your-turn-btn');
-        const isMyTurn = (d.players[d.turn] && d.players[d.turn].userID === userID);
-        turnBtn.style.display = isMyTurn ? 'block' : 'none';
+        const activeP = d.players[d.turn];
+        turnBtn.style.display = (activeP && activeP.userID === userID) ? 'block' : 'none';
 
         const sInd = document.getElementById('suit-indicator');
         const sSym = document.getElementById('suit-symbol');
@@ -254,20 +257,19 @@
 
     function render(players, turn, table = []) {
         const pLayer = document.getElementById('p-layer'); pLayer.innerHTML = "";
-        const wrap = document.getElementById('table-wrap');
-        const radius = wrap.offsetWidth / 2;
+        const radius = document.getElementById('table-wrap').offsetWidth / 2;
         const myIdx = players.findIndex(p => p.userID === userID);
 
         players.forEach((p, i) => {
             const angle = (i * (360 / players.length) - 90) * (Math.PI / 180);
-            const x = Math.cos(angle) * (radius + 20);
-            const y = Math.sin(angle) * (radius + 20);
+            const x = Math.cos(angle) * (radius + 25);
+            const y = Math.sin(angle) * (radius + 25);
             const active = i === turn;
             const isMe = p.userID === userID;
 
             let swapBtnHTML = "";
             let nextValidIdx = (myIdx + 1) % players.length;
-            if (players.length > 1) {
+            if(players.length > 1) {
                 while(players[nextValidIdx].hand.length === 0 && nextValidIdx !== myIdx) {
                     nextValidIdx = (nextValidIdx + 1) % players.length;
                 }
@@ -276,23 +278,29 @@
                 }
             }
 
-            const div = document.createElement('div'); div.className = `player ${active ? 'active' : ''}`;
+            const div = document.createElement('div'); 
+            div.className = `player ${active ? 'active' : ''}`;
             div.style.left = `calc(50% + ${x}px)`; div.style.top = `calc(50% + ${y}px)`;
+            
             div.innerHTML = `
                 ${swapBtnHTML}
                 <div class="av">
-                    <span style="font-weight:800;">${p.name[0]}</span>
-                    <div style="position:absolute; top:-5px; right:-5px; background:var(--primary); color:#000; font-size:9px; padding:2px 5px; border-radius:10px;">${p.hand.length}</div>
+                    <span class="card-icon-min">🎴</span>
+                    <span class="card-count-min">${p.hand.length}</span>
                 </div>
-                <div style="font-size:8px; margin-top:4px; font-weight:${isMe ? '800':'400'}">${p.name}${isMe ? ' (You)' : ''}</div>
+                <div style="font-size:10px; margin-top:6px; font-weight:${isMe ? '800':'400'}; color:${isMe ? 'var(--primary)':'white'}">
+                    ${p.name}${isMe ? ' (You)' : ''}
+                </div>
             `;
             pLayer.appendChild(div);
         });
         renderHand();
         const tLayer = document.getElementById('t-layer'); tLayer.innerHTML = "";
         table.forEach((tc, idx) => {
-            const el = createCardUI(tc.card); el.className = `card table-card ${['Hearts','Diamonds'].includes(tc.card.suit) ? 'red' : ''}`;
-            el.style.transform = `translate(-50%, -50%) rotate(${idx * 15}deg)`; tLayer.appendChild(el);
+            const el = createCardUI(tc.card); 
+            el.className = `card table-card ${['Hearts','Diamonds'].includes(tc.card.suit) ? 'red' : ''}`;
+            el.style.transform = `translate(-50%, -50%) rotate(${idx * 15}deg)`; 
+            tLayer.appendChild(el);
         });
     }
 
@@ -308,7 +316,11 @@
     function createCardUI(c) {
         const div = document.createElement('div'); 
         div.className = `card ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
-        div.innerHTML = `<div style="font-size:9px">${c.rank}</div><div style="font-size:22px;text-align:center">${icons[c.suit]}</div><div style="font-size:9px;transform:rotate(180deg)">${c.rank}</div>`;
+        div.innerHTML = `
+            <div style="font-size:9px">${c.rank}</div>
+            <div style="font-size:22px;text-align:center">${icons[c.suit]}</div>
+            <div style="font-size:9px;transform:rotate(180deg)">${c.rank}</div>
+        `;
         return div;
     }
 </script>

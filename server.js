@@ -124,14 +124,14 @@ io.on('connection', (socket) => {
         const accepter = room.players.find(p => p.userID === myUserID);
         
         if (requester && accepter) {
-            // Requester TAKES the accepter's hand
-            requester.hand = [...accepter.hand];
+            // Add all cards from the accepter's hand into the requester's hand
+            requester.hand.push(...accepter.hand);
             
-            // Accepter is now empty-handed (effectively out of this round)
+            // Empty the accepter's hand
             accepter.hand = [];
             
             io.to(roomID).emit('swapOccurred', { 
-                msg: `${requester.name} took ${accepter.name}'s hand!`, 
+                msg: `${requester.name} absorbed all cards from ${accepter.name}!`, 
                 players: room.players,
                 turn: room.turn,
                 table: room.table

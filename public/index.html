@@ -143,6 +143,7 @@
         absorb: new Audio('absorb.mp3') 
     };
     
+    // --- IDENTITY & STATS ---
     let userID = localStorage.getItem('pUserID') || 'uid_' + Math.random().toString(36).substr(2, 9);
     localStorage.setItem('pUserID', userID);
     let myName = localStorage.getItem('pName') || 'Disciple' + Math.floor(Math.random()*999);
@@ -159,35 +160,55 @@
         return "ANCIENT ANCESTOR";
     }
 
-    // --- UI & LOBBY LOGIC ---
+    // --- FIX 1: LOBBY UI INITIALIZATION ---
     function updateStatsUI() {
         const level = getLevel();
-        // Update Lobby
-        document.getElementById('display-name').innerText = myName;
-        document.getElementById('level-title').innerText = `LEVEL ${level} - ${getTitle(level)}`;
-        // Update Profile
-        document.getElementById('prof-level').innerText = `LEVEL ${level}`;
-        document.getElementById('prof-title').innerText = getTitle(level);
-        document.getElementById('prof-points').innerText = stats.points;
-        document.getElementById('prof-pangkahs').innerText = stats.pangkahs;
-        const prog = stats.points % 5;
-        document.getElementById('prof-progress-text').innerText = `Progress: ${prog}/5`;
-        document.getElementById('prof-bar-fill').style.width = (prog / 5 * 100) + "%";
+        const title = getTitle(level);
+        
+        // Update Lobby Text
+        const nameEl = document.getElementById('display-name');
+        const levelEl = document.getElementById('level-title');
+        if(nameEl) nameEl.innerText = myName;
+        if(levelEl) levelEl.innerText = `LEVEL ${level} - ${title}`;
+        
+        // Update Profile Modal
+        if(document.getElementById('prof-level')) document.getElementById('prof-level').innerText = `LEVEL ${level}`;
+        if(document.getElementById('prof-title')) document.getElementById('prof-title').innerText = title;
+        if(document.getElementById('prof-points')) document.getElementById('prof-points').innerText = stats.points;
+        if(document.getElementById('prof-pangkahs')) document.getElementById('prof-pangkahs').innerText = stats.pangkahs;
+        
+        const progress = stats.points % 5;
+        if(document.getElementById('prof-progress-text')) document.getElementById('prof-progress-text').innerText = `Progress: ${progress}/5`;
+        if(document.getElementById('prof-bar-fill')) document.getElementById('prof-bar-fill').style.width = (progress / 5 * 100) + "%";
     }
 
     function editName() { 
-        const n = prompt("Enter Name:", myName); 
-        if(n && n.trim()) { 
+        const n = prompt("Enter your name:", myName); 
+        if(n && n.trim() !== "") { 
             myName = n.trim(); 
             localStorage.setItem('pName', myName); 
             updateStatsUI(); 
         } 
     }
-    
-    function openProfile() { updateStatsUI(); document.getElementById('profile-modal').style.display = 'flex'; }
-    function closeProfile() { document.getElementById('profile-modal').style.display = 'none'; }
-    function showToast(msg, isPos = false) { const t = document.getElementById('toast'); t.innerText = msg; t.style.background = isPos ? 'var(--primary-action)' : 'var(--danger)'; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000); }
 
+    function openProfile() { 
+        updateStatsUI();
+        document.getElementById('profile-modal').style.display = 'flex'; 
+    }
+    
+    function closeProfile() { 
+        document.getElementById('profile-modal').style.display = 'none'; 
+    }
+
+    function showToast(msg, isPos = false) { 
+        const t = document.getElementById('toast'); 
+        t.innerText = msg; 
+        t.style.background = isPos ? 'var(--primary-action)' : 'var(--danger)'; 
+        t.style.display = 'block'; 
+        setTimeout(() => t.style.display = 'none', 3000); 
+    }
+
+    // --- ROOM ACTIONS ---
     function enter(type) {
         myRoom = document.getElementById('rid').value;
         if(!myRoom) return alert("Sect ID Required");
@@ -199,8 +220,10 @@
     function sortHand() { const order = { 'Spades': 4, 'Hearts': 3, 'Diamonds': 2, 'Clubs': 1 }; myCurrentHand.sort((a, b) => (order[b.suit] - order[a.suit]) || (b.val - a.val)); renderHand(); }
     function answerSwap(accept) { document.getElementById('swap-modal').style.display = 'none'; if(accept && pendingSwapRequest) socket.emit('acceptSwap', { roomID: myRoom, fromUserID: pendingSwapRequest, myUserID: userID }); pendingSwapRequest = null; }
 
+    // --- SOCKET LISTENERS ---
     socket.on('roomList', list => {
-        const box = document.getElementById('room-box'); box.innerHTML = list.length ? "" : '<div style="padding:15px; opacity:0.3;">Searching...</div>';
+        const box = document.getElementById('room-box'); 
+        box.innerHTML = list.length ? "" : '<div style="padding:15px; opacity:0.3;">Searching...</div>';
         list.forEach(r => {
             const d = document.createElement('div'); d.className = 'room-item'; d.innerHTML = `<span>#${r.id}</span> <span>${r.count}/${r.max}</span>`;
             d.onclick = () => document.getElementById('rid').value = r.id; box.appendChild(d);
@@ -217,18 +240,22 @@
         render(p, -1);
     });
 
-    socket.on('gameInit', d => { document.getElementById('start-btn').style.display = 'none'; update(d); });
+    socket.on('gameInit', d => { 
+        document.getElementById('start-btn').style.display = 'none'; 
+        isProcessingTurn = false;
+        update(d); 
+    });
     
     socket.on('clearTable', d => {
         if(d.msg.toLowerCase() === 'pangkah!') {
             sfx.strike.play().catch(()=>{}); 
             if(d.winner === myName) { stats.points += 2; stats.pangkahs++; localStorage.setItem('pStats', JSON.stringify(stats)); updateStatsUI(); }
         } else sfx.sweep.play().catch(()=>{});
-        
         const pop = document.getElementById('round-popup');
         document.getElementById('pop-title').className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
         document.getElementById('pop-title').innerText = d.msg.toUpperCase();
-        document.getElementById('pop-desc').innerText = d.winner + " has the lead."; pop.style.display = 'block';
+        document.getElementById('pop-desc').innerText = d.winner + " has the lead."; 
+        pop.style.display = 'block';
         setTimeout(() => { pop.style.display = 'none'; update(d); }, 2000);
     });
 
@@ -237,26 +264,32 @@
     socket.on('errorMsg', m => { isProcessingTurn = false; showToast(m); });
     socket.on('roomClosed', () => { alert("Sect disbanded."); window.location.reload(); });
 
-    // --- MAIN GAME LOGIC ---
+    // --- FIX 2: PREVENT HANGING & DETECT LOSER ---
     function update(d) {
-        isProcessingTurn = false; // Spam Lock Unlock
+        isProcessingTurn = false; // Always unlock when receiving data
 
-        // BUG FIX: LOSER DETECTION
-        const activePs = d.players.filter(p => p.hand.length > 0);
-        if(activePs.length === 1 && d.table.length === 0) {
-            const loser = activePs[0];
+        const playersWithCards = d.players.filter(p => p.hand.length > 0);
+        
+        // Check if game is over (1 or 0 players with cards left)
+        if(playersWithCards.length <= 1) {
+            const loserName = playersWithCards.length === 1 ? playersWithCards[0].name : "None";
             const pop = document.getElementById('round-popup');
             document.getElementById('pop-title').className = 'pangkah-text';
-            document.getElementById('pop-title').innerText = "DUEL ENDED";
-            document.getElementById('pop-desc').innerText = loser.name + " is the Loser.";
+            document.getElementById('pop-title').innerText = "DUEL OVER";
+            document.getElementById('pop-desc').innerText = loserName + " is the Loser.";
             pop.style.display = 'block';
+            
             setTimeout(() => {
                 pop.style.display = 'none';
-                if(d.players[0] && d.players[0].userID === userID) document.getElementById('start-btn').style.display = 'block';
+                // Show start button only to host
+                if(d.players[0] && d.players[0].userID === userID) {
+                    document.getElementById('start-btn').style.display = 'block';
+                }
             }, 5000);
         }
 
-        const me = d.players.find(p => p.userID === userID); if(me) myCurrentHand = me.hand;
+        const me = d.players.find(p => p.userID === userID); 
+        if(me) myCurrentHand = me.hand;
         const activeP = d.players[d.turn];
         document.getElementById('your-turn-btn').style.display = (activeP && activeP.userID === userID) ? 'block' : 'none';
         
@@ -279,7 +312,6 @@
         players.forEach((p, i) => {
             const angle = (i * (360 / players.length) - 90) * (Math.PI / 180);
             const x = Math.cos(angle) * (radius + 25); const y = Math.sin(angle) * (radius + 25);
-            const isMe = p.userID === userID;
             
             let swapBtnHTML = ""; 
             if(players.length > 1 && i !== myIdx && p.hand.length > 0) {
@@ -288,9 +320,11 @@
                 if(i === nextValid) swapBtnHTML = `<button class="btn-swap" onclick="socket.emit('sendSwapRequest', {roomID:myRoom, fromUserID:'${userID}'})">TAKE HAND</button>`;
             }
 
-            const div = document.createElement('div'); div.className = `player ${i === turn ? 'active' : ''}`;
-            div.style.left = `calc(50% + ${x}px)`; div.style.top = `calc(50% + ${y}px)`;
-            div.innerHTML = `${swapBtnHTML}<div class="av"><span>🎴 ${p.hand.length}</span></div><div style="font-size:10px; margin-top:8px; color:${isMe ? 'var(--ui-blue)':'white'}">${p.name}</div>`;
+            const div = document.createElement('div'); 
+            div.className = `player ${i === turn ? 'active' : ''}`;
+            div.style.left = `calc(50% + ${x}px)`; 
+            div.style.top = `calc(50% + ${y}px)`;
+            div.innerHTML = `${swapBtnHTML}<div class="av"><span>🎴 ${p.hand.length}</span></div><div style="font-size:10px; margin-top:8px; color:${p.userID === userID ? 'var(--ui-blue)':'white'}">${p.name}</div>`;
             pLayer.appendChild(div);
         });
         renderHand();
@@ -303,11 +337,17 @@
         });
     }
 
+    // --- FIX 3: SPAM PROTECTION ---
     function renderHand() {
         const hDiv = document.getElementById('my-cards'); hDiv.innerHTML = "";
         myCurrentHand.forEach(c => { 
             const el = createCardUI(c); 
-            el.onclick = () => { if(!isProcessingTurn) { isProcessingTurn = true; socket.emit('playCard', { roomID: myRoom, cardObject: c }); } };
+            el.onclick = () => { 
+                if(!isProcessingTurn) { 
+                    isProcessingTurn = true; // LOCK
+                    socket.emit('playCard', { roomID: myRoom, cardObject: c }); 
+                } 
+            };
             hDiv.appendChild(el); 
         });
     }
@@ -326,7 +366,7 @@
     socket.on('receiveSwapRequest', d => { pendingSwapRequest = d.fromUserID; document.getElementById('swap-txt').innerText = d.fromName + " wants your hand!"; document.getElementById('swap-modal').style.display = 'block'; });
     socket.on('swapOccurred', d => { sfx.absorb.play().catch(()=>{}); update(d); });
 
-    // BOOTSTRAP
+    // BOOTSTRAP LOBBY
     updateStatsUI();
 </script>
 </body>

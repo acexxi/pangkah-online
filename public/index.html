@@ -91,9 +91,10 @@
         <h3 style="color: var(--ui-blue); margin-top: 0;">CULTIVATION JOURNEY</h3>
         <div id="prof-level" style="font-size: 24px; font-weight: 800;">LEVEL 1</div>
         <div id="prof-title" style="color: var(--primary-action); letter-spacing: 2px; margin-bottom: 20px;">APPRENTICE</div>
+        <div id="prof-progress" style="font-size: 10px; color: #aaa; margin-bottom: 5px;">Points to next Level: 0/5</div>
         <hr style="border: 0; border-top: 1px solid var(--border); margin: 20px 0;">
         <div style="display: flex; justify-content: space-around; margin-bottom: 30px;">
-            <div><div style="font-size: 20px; font-weight: 800;" id="prof-wins">0</div><div style="font-size: 10px; opacity: 0.6;">WINS</div></div>
+            <div><div style="font-size: 20px; font-weight: 800;" id="prof-points">0</div><div style="font-size: 10px; opacity: 0.6;">CULTIVATION</div></div>
             <div><div style="font-size: 20px; font-weight: 800;" id="prof-pangkahs">0</div><div style="font-size: 10px; opacity: 0.6;">PANGKAHS</div></div>
         </div>
         <button class="btn btn-p" onclick="closeProfile()">RETURN</button>
@@ -161,7 +162,6 @@
 <script>
     const socket = io();
 
-    // SOUNDS
     const sfx = {
         place: new Audio('place.mp3'), 
         sweep: new Audio('sweep.mp3'),
@@ -171,22 +171,24 @@
     sfx.place.volume = 0.5;
     sfx.strike.volume = 0.9;
 
-    // PERSISTENT DATA
     let userID = localStorage.getItem('pUserID') || 'uid_' + Math.random().toString(36).substr(2, 9);
     localStorage.setItem('pUserID', userID);
     let myName = localStorage.getItem('pName') || 'Disciple' + Math.floor(Math.random()*999);
     
-    // PLAYER STATS
-    let stats = JSON.parse(localStorage.getItem('pStats')) || { wins: 0, pangkahs: 0 };
+    // PLAYER STATS - points is the new currency for levels
+    let stats = JSON.parse(localStorage.getItem('pStats')) || { points: 0, pangkahs: 0 };
     
     let myRoom = "";
     let myCurrentHand = [];
     let pendingSwapRequest = null;
     const icons = { 'Spades': '♠', 'Hearts': '♥', 'Diamonds': '♦', 'Clubs': '♣' };
 
-    // INIT UI
     updateStatsUI();
     socket.emit('checkSession', { userID });
+
+    function getLevel() {
+        return Math.floor(stats.points / 5) + 1;
+    }
 
     function getTitle(lvl) {
         if (lvl <= 5) return "APPRENTICE";
@@ -202,11 +204,13 @@
     }
 
     function openProfile() {
-        const level = stats.wins + 1;
+        const level = getLevel();
+        const ptsInLevel = stats.points % 5;
         document.getElementById('prof-level').innerText = `LEVEL ${level}`;
         document.getElementById('prof-title').innerText = getTitle(level);
-        document.getElementById('prof-wins').innerText = stats.wins;
+        document.getElementById('prof-points').innerText = stats.points;
         document.getElementById('prof-pangkahs').innerText = stats.pangkahs;
+        document.getElementById('prof-progress').innerText = `Progress: ${ptsInLevel}/5 to Level ${level + 1}`;
         document.getElementById('profile-modal').style.display = 'flex';
     }
 
@@ -215,10 +219,9 @@
     }
 
     function updateStatsUI() {
-        const level = stats.wins + 1;
-        const title = getTitle(level);
+        const level = getLevel();
         document.getElementById('display-name').innerText = myName;
-        document.getElementById('level-title').innerText = `LEVEL ${level} - ${title}`;
+        document.getElementById('level-title').innerText = `LEVEL ${level} - ${getTitle(level)}`;
     }
 
     function saveStats() {
@@ -231,10 +234,10 @@
         if(n) { myName = n; localStorage.setItem('pName', n); updateStatsUI(); }
     }
 
-    function showToast(msg, isLevelUp = false) {
+    function showToast(msg, isPos = false) {
         const t = document.getElementById('toast');
         t.innerText = msg;
-        t.style.background = isLevelUp ? 'var(--primary-action)' : '#f43f5e';
+        t.style.background = isPos ? 'var(--primary-action)' : '#f43f5e';
         t.style.display = 'block';
         setTimeout(() => t.style.display = 'none', 3000);
     }
@@ -300,7 +303,7 @@
 
     socket.on('swapOccurred', d => { 
         sfx.absorb.play().catch(e => {});
-        showToast(d.msg); 
+        showToast(d.msg, true); 
         update(d); 
     });
 
@@ -352,9 +355,19 @@
     socket.on('errorMsg', m => showToast(m));
     
     socket.on('gameOver', d => { 
+        const oldLvl = getLevel();
         if(d.loser !== myName) {
-            stats.wins++;
+            stats.points++;
             saveStats();
+            const newLvl = getLevel();
+            if(newLvl > oldLvl) setTimeout(() => showToast(`RANK UP: ${getTitle(newLvl)}`, true), 500);
+            else setTimeout(() => showToast(`CULTIVATION +1`, true), 500);
+        } else {
+            if(stats.points > 0) stats.points--;
+            saveStats();
+            const newLvl = getLevel();
+            if(newLvl < oldLvl) setTimeout(() => showToast(`RANK DEGRADED: ${getTitle(newLvl)}`, false), 500);
+            else setTimeout(() => showToast(`CULTIVATION -1`, false), 500);
         }
         alert("Duel Ended! Loser: " + d.loser); 
         location.reload(); 

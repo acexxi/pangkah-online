@@ -25,6 +25,8 @@
         /* PROFILE MODAL */
         #profile-modal { position: fixed; inset: 0; z-index: 6000; background: rgba(2, 6, 23, 0.95); display: none; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
         .profile-card { width: 85%; max-width: 320px; padding: 40px 20px; background: var(--glass); border: 1px solid var(--ui-blue); border-radius: 30px; text-align: center; }
+        .bar-container { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 10px; margin: 10px 0; overflow: hidden; border: 1px solid var(--border); }
+        .bar-fill { height: 100%; background: var(--primary-action); width: 0%; transition: width 0.5s ease; box-shadow: 0 0 10px var(--primary-action); }
 
         /* TOAST & MODALS */
         #toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #f43f5e; padding: 10px 20px; border-radius: 10px; z-index: 10000; display: none; font-weight: 800; font-size: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); text-align: center; min-width: 200px; }
@@ -90,8 +92,9 @@
     <div class="profile-card">
         <h3 style="color: var(--ui-blue); margin-top: 0;">CULTIVATION JOURNEY</h3>
         <div id="prof-level" style="font-size: 24px; font-weight: 800;">LEVEL 1</div>
-        <div id="prof-title" style="color: var(--primary-action); letter-spacing: 2px; margin-bottom: 20px;">APPRENTICE</div>
-        <div id="prof-progress" style="font-size: 10px; color: #aaa; margin-bottom: 5px;">Points to next Level: 0/5</div>
+        <div id="prof-title" style="color: var(--primary-action); letter-spacing: 2px; margin-bottom: 10px;">APPRENTICE</div>
+        <div style="text-align: right; font-size: 9px; color: #aaa; margin-bottom: 2px;" id="prof-progress-text">Progress: 0/5</div>
+        <div class="bar-container"><div id="prof-bar-fill" class="bar-fill"></div></div>
         <hr style="border: 0; border-top: 1px solid var(--border); margin: 20px 0;">
         <div style="display: flex; justify-content: space-around; margin-bottom: 30px;">
             <div><div style="font-size: 20px; font-weight: 800;" id="prof-points">0</div><div style="font-size: 10px; opacity: 0.6;">CULTIVATION</div></div>
@@ -112,7 +115,6 @@
 <div id="lobby">
     <div class="panel">
         <h2 style="color:var(--ui-blue); letter-spacing: 2px;">PANGKAH MURIM</h2>
-        
         <div id="user-info" style="margin-bottom:15px; font-weight:800; font-size: 0.9rem;">
             <div style="display: flex; justify-content: center; align-items: center; gap: 8px;">
                 <span id="display-name" style="color: var(--ui-blue);"></span> 
@@ -121,7 +123,6 @@
             <div id="level-title" style="color: var(--primary-action); font-size: 12px; margin-top: 4px; letter-spacing: 1px;">LEVEL 1 - APPRENTICE</div>
             <button class="btn btn-s" onclick="openProfile()">VIEW PROFILE 📜</button>
         </div>
-
         <div class="room-list" id="room-box"></div>
         <input id="rid" placeholder="Enter Room ID">
         <select id="maxp"><option value="4">4 Players</option><option value="5">5 Players</option><option value="6">6 Players</option></select>
@@ -134,9 +135,7 @@
 
 <div class="header">
     <div id="room-tag" style="color:var(--ui-blue); font-weight:800; font-size: 10px;">LOBBY</div>
-    <div class="header-center">
-        <button id="your-turn-btn">YOUR TURN</button>
-    </div>
+    <div class="header-center"><button id="your-turn-btn">YOUR TURN</button></div>
     <div style="display: flex; align-items: center; gap: 10px;">
         <button id="close-room-btn" onclick="closeRoom()" style="display:none; background: #f43f5e; color: white; border: none; padding: 4px 8px; border-radius: 6px; font-size: 9px; font-weight: 800; cursor: pointer;">CLOSE ROOM</button>
         <div id="suit-indicator"><span id="suit-symbol" style="font-size: 1.2rem;"></span></div>
@@ -161,30 +160,22 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
     const socket = io();
-
-    const sfx = {
-        place: new Audio('place.mp3'), 
-        sweep: new Audio('sweep.mp3'),
-        strike: new Audio('strike.mp3'),
-        absorb: new Audio('absorb.mp3')
-    };
-    sfx.place.volume = 0.5;
-    sfx.strike.volume = 0.9;
+    const sfx = { place: new Audio('place.mp3'), sweep: new Audio('sweep.mp3'), strike: new Audio('strike.mp3'), absorb: new Audio('absorb.mp3') };
+    sfx.place.volume = 0.5; sfx.strike.volume = 0.9;
 
     let userID = localStorage.getItem('pUserID') || 'uid_' + Math.random().toString(36).substr(2, 9);
     localStorage.setItem('pUserID', userID);
     let myName = localStorage.getItem('pName') || 'Disciple' + Math.floor(Math.random()*999);
     
-    // PLAYER STATS - points is the new currency for levels
+    // FIX: Ensure stats.points is always treated as a number
     let stats = JSON.parse(localStorage.getItem('pStats')) || { points: 0, pangkahs: 0 };
+    stats.points = parseInt(stats.points) || 0;
+    stats.pangkahs = parseInt(stats.pangkahs) || 0;
     
     let myRoom = "";
     let myCurrentHand = [];
     let pendingSwapRequest = null;
     const icons = { 'Spades': '♠', 'Hearts': '♥', 'Diamonds': '♦', 'Clubs': '♣' };
-
-    updateStatsUI();
-    socket.emit('checkSession', { userID });
 
     function getLevel() {
         return Math.floor(stats.points / 5) + 1;
@@ -203,44 +194,32 @@
         return "ANCIENT ANCESTOR";
     }
 
-    function openProfile() {
-        const level = getLevel();
-        const ptsInLevel = stats.points % 5;
-        document.getElementById('prof-level').innerText = `LEVEL ${level}`;
-        document.getElementById('prof-title').innerText = getTitle(level);
-        document.getElementById('prof-points').innerText = stats.points;
-        document.getElementById('prof-pangkahs').innerText = stats.pangkahs;
-        document.getElementById('prof-progress').innerText = `Progress: ${ptsInLevel}/5 to Level ${level + 1}`;
-        document.getElementById('profile-modal').style.display = 'flex';
-    }
-
-    function closeProfile() {
-        document.getElementById('profile-modal').style.display = 'none';
-    }
-
     function updateStatsUI() {
         const level = getLevel();
         document.getElementById('display-name').innerText = myName;
         document.getElementById('level-title').innerText = `LEVEL ${level} - ${getTitle(level)}`;
     }
 
-    function saveStats() {
-        localStorage.setItem('pStats', JSON.stringify(stats));
-        updateStatsUI();
+    updateStatsUI();
+    socket.emit('checkSession', { userID });
+
+    function openProfile() {
+        const level = getLevel();
+        const ptsInLevel = stats.points % 5;
+        const progressPercent = (ptsInLevel / 5) * 100;
+        document.getElementById('prof-level').innerText = `LEVEL ${level}`;
+        document.getElementById('prof-title').innerText = getTitle(level);
+        document.getElementById('prof-points').innerText = stats.points;
+        document.getElementById('prof-pangkahs').innerText = stats.pangkahs;
+        document.getElementById('prof-progress-text').innerText = `Progress: ${ptsInLevel}/5`;
+        document.getElementById('prof-bar-fill').style.width = progressPercent + "%";
+        document.getElementById('profile-modal').style.display = 'flex';
     }
 
-    function editName() {
-        const n = prompt("Disciple Name:", myName);
-        if(n) { myName = n; localStorage.setItem('pName', n); updateStatsUI(); }
-    }
-
-    function showToast(msg, isPos = false) {
-        const t = document.getElementById('toast');
-        t.innerText = msg;
-        t.style.background = isPos ? 'var(--primary-action)' : '#f43f5e';
-        t.style.display = 'block';
-        setTimeout(() => t.style.display = 'none', 3000);
-    }
+    function closeProfile() { document.getElementById('profile-modal').style.display = 'none'; }
+    function saveStats() { localStorage.setItem('pStats', JSON.stringify(stats)); updateStatsUI(); }
+    function editName() { const n = prompt("Disciple Name:", myName); if(n) { myName = n; localStorage.setItem('pName', n); updateStatsUI(); } }
+    function showToast(msg, isPos = false) { const t = document.getElementById('toast'); t.innerText = msg; t.style.background = isPos ? 'var(--primary-action)' : '#f43f5e'; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000); }
 
     function enter(type) {
         Object.values(sfx).forEach(s => { s.play(); s.pause(); s.currentTime = 0; });
@@ -250,141 +229,74 @@
     }
 
     function start() { socket.emit('startGame', myRoom); }
+    function closeRoom() { if(confirm("Disband this sect and kick all disciples?")) { socket.emit('requestCloseRoom', { roomID: myRoom }); } }
+    function sortHand() { const order = { 'Spades': 4, 'Hearts': 3, 'Diamonds': 2, 'Clubs': 1 }; myCurrentHand.sort((a, b) => (order[b.suit] - order[a.suit]) || (b.val - a.val)); renderHand(); }
+    function answerSwap(accept) { document.getElementById('swap-modal').style.display = 'none'; if(accept && pendingSwapRequest) { socket.emit('acceptSwap', { roomID: myRoom, fromUserID: pendingSwapRequest, myUserID: userID }); } pendingSwapRequest = null; }
 
-    function closeRoom() {
-        if(confirm("Disband this sect and kick all disciples?")) {
-            socket.emit('requestCloseRoom', { roomID: myRoom });
-        }
-    }
-
-    function sortHand() {
-        const order = { 'Spades': 4, 'Hearts': 3, 'Diamonds': 2, 'Clubs': 1 };
-        myCurrentHand.sort((a, b) => (order[b.suit] - order[a.suit]) || (b.val - a.val));
-        renderHand();
-    }
-
-    function answerSwap(accept) {
-        document.getElementById('swap-modal').style.display = 'none';
-        if(accept && pendingSwapRequest) {
-            socket.emit('acceptSwap', { roomID: myRoom, fromUserID: pendingSwapRequest, myUserID: userID });
-        }
-        pendingSwapRequest = null;
-    }
-
-    socket.on('roomClosed', () => {
-        alert("The Sect Leader has disbanded the room.");
-        location.reload();
-    });
-
+    socket.on('roomClosed', () => { alert("The Sect Leader has disbanded the room."); location.reload(); });
     socket.on('reconnectSuccess', d => {
-        myRoom = d.roomID;
-        document.getElementById('lobby').style.display = 'none';
-        document.getElementById('room-tag').innerText = "SECT: " + myRoom;
+        myRoom = d.roomID; document.getElementById('lobby').style.display = 'none'; document.getElementById('room-tag').innerText = "SECT: " + myRoom;
         if(d.gameStarted) { showDiscarded(d.discarded); update(d); }
         else { render(d.players, -1); if(d.players.length >= 4) document.getElementById('start-btn').style.display = 'block'; }
     });
 
     socket.on('roomList', list => {
-        const box = document.getElementById('room-box');
-        box.innerHTML = list.length ? "" : '<div style="padding:15px; opacity:0.3; font-size:0.7rem;">Searching for sects...</div>';
+        const box = document.getElementById('room-box'); box.innerHTML = list.length ? "" : '<div style="padding:15px; opacity:0.3; font-size:0.7rem;">Searching for sects...</div>';
         list.forEach(r => {
-            const d = document.createElement('div'); d.className = 'room-item';
-            d.innerHTML = `<span>#${r.id}</span> <span>${r.count}/${r.max}</span>`;
-            d.onclick = () => document.getElementById('rid').value = r.id;
-            box.appendChild(d);
+            const d = document.createElement('div'); d.className = 'room-item'; d.innerHTML = `<span>#${r.id}</span> <span>${r.count}/${r.max}</span>`;
+            d.onclick = () => document.getElementById('rid').value = r.id; box.appendChild(d);
         });
     });
 
-    socket.on('receiveSwapRequest', d => {
-        pendingSwapRequest = d.fromUserID;
-        document.getElementById('swap-txt').innerText = d.fromName + " requests your techniques!";
-        document.getElementById('swap-modal').style.display = 'block';
-    });
-
-    socket.on('swapOccurred', d => { 
-        sfx.absorb.play().catch(e => {});
-        showToast(d.msg, true); 
-        update(d); 
-    });
-
+    socket.on('receiveSwapRequest', d => { pendingSwapRequest = d.fromUserID; document.getElementById('swap-txt').innerText = d.fromName + " requests your techniques!"; document.getElementById('swap-modal').style.display = 'block'; });
+    socket.on('swapOccurred', d => { sfx.absorb.play().catch(e => {}); showToast(d.msg, true); update(d); });
     socket.on('updatePlayers', p => {
-        document.getElementById('lobby').style.display = 'none';
-        document.getElementById('room-tag').innerText = "SECT: " + myRoom;
+        document.getElementById('lobby').style.display = 'none'; document.getElementById('room-tag').innerText = "SECT: " + myRoom;
         if(p.length >= 4) document.getElementById('start-btn').style.display = 'block';
         if(p.length > 0 && p[0].userID === userID) document.getElementById('close-room-btn').style.display = 'block';
         render(p, -1);
     });
 
-    socket.on('gameInit', d => { 
-        document.getElementById('start-btn').style.display = 'none'; 
-        showDiscarded(d.discarded); 
-        update(d); 
-    });
-
+    socket.on('gameInit', d => { document.getElementById('start-btn').style.display = 'none'; showDiscarded(d.discarded); update(d); });
     socket.on('clearTable', d => {
-        if(d.winner === myName && d.msg.toLowerCase() === 'pangkah!') {
-            stats.pangkahs++;
-            saveStats();
-        }
-        if(d.msg.toLowerCase() === 'pangkah!') { sfx.strike.play().catch(e => {}); } 
-        else { sfx.sweep.play().catch(e => {}); }
-        const pop = document.getElementById('round-popup');
-        const title = document.getElementById('pop-title');
-        title.className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
-        title.innerText = d.msg.toUpperCase();
-        document.getElementById('pop-desc').innerText = d.winner + " takes the lead.";
-        pop.style.display = 'block';
+        if(d.winner === myName && d.msg.toLowerCase() === 'pangkah!') { stats.pangkahs++; saveStats(); }
+        if(d.msg.toLowerCase() === 'pangkah!') { sfx.strike.play().catch(e => {}); } else { sfx.sweep.play().catch(e => {}); }
+        const pop = document.getElementById('round-popup'); const title = document.getElementById('pop-title');
+        title.className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text'; title.innerText = d.msg.toUpperCase();
+        document.getElementById('pop-desc').innerText = d.winner + " takes the lead."; pop.style.display = 'block';
         setTimeout(() => { pop.style.display = 'none'; update(d); }, 2000);
     });
 
     function showDiscarded(list) {
-        const dArea = document.getElementById('discard-area');
-        dArea.innerHTML = list && list.length ? '<div style="font-size:8px; opacity:0.5;">FATE</div>' : '';
-        if(list) list.forEach(c => {
-            const div = document.createElement('div'); div.className = `mini ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
-            div.innerHTML = icons[c.suit]; dArea.appendChild(div);
-        });
+        const dArea = document.getElementById('discard-area'); dArea.innerHTML = list && list.length ? '<div style="font-size:8px; opacity:0.5;">FATE</div>' : '';
+        if(list) list.forEach(c => { const div = document.createElement('div'); div.className = `mini ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`; div.innerHTML = icons[c.suit]; dArea.appendChild(div); });
     }
 
-    socket.on('updateTable', d => {
-        sfx.place.play().catch(e => {}); 
-        update(d);
-    });
-
+    socket.on('updateTable', d => { sfx.place.play().catch(e => {}); update(d); });
     socket.on('nextTurn', d => update(d));
     socket.on('errorMsg', m => showToast(m));
     
     socket.on('gameOver', d => { 
         const oldLvl = getLevel();
         if(d.loser !== myName) {
-            stats.points++;
-            saveStats();
-            const newLvl = getLevel();
+            stats.points++; saveStats(); const newLvl = getLevel();
             if(newLvl > oldLvl) setTimeout(() => showToast(`RANK UP: ${getTitle(newLvl)}`, true), 500);
             else setTimeout(() => showToast(`CULTIVATION +1`, true), 500);
         } else {
-            if(stats.points > 0) stats.points--;
-            saveStats();
-            const newLvl = getLevel();
+            if(stats.points > 0) stats.points--; saveStats(); const newLvl = getLevel();
             if(newLvl < oldLvl) setTimeout(() => showToast(`RANK DEGRADED: ${getTitle(newLvl)}`, false), 500);
             else setTimeout(() => showToast(`CULTIVATION -1`, false), 500);
         }
-        alert("Duel Ended! Loser: " + d.loser); 
-        location.reload(); 
+        alert("Duel Ended! Loser: " + d.loser); location.reload(); 
     });
 
     function update(d) {
-        const me = d.players.find(p => p.userID === userID);
-        if(me) myCurrentHand = me.hand;
-        const turnBtn = document.getElementById('your-turn-btn');
-        const activeP = d.players[d.turn];
+        const me = d.players.find(p => p.userID === userID); if(me) myCurrentHand = me.hand;
+        const turnBtn = document.getElementById('your-turn-btn'); const activeP = d.players[d.turn];
         turnBtn.style.display = (activeP && activeP.userID === userID) ? 'block' : 'none';
-        const sInd = document.getElementById('suit-indicator');
-        const sSym = document.getElementById('suit-symbol');
+        const sInd = document.getElementById('suit-indicator'); const sSym = document.getElementById('suit-symbol');
         if (d.table && d.table.length > 0) {
-            const firstCard = d.table[0].card;
-            sInd.style.display = 'flex';
-            sSym.innerText = icons[firstCard.suit];
+            const firstCard = d.table[0].card; sInd.style.display = 'flex'; sSym.innerText = icons[firstCard.suit];
             sSym.className = ['Hearts','Diamonds'].includes(firstCard.suit) ? 'suit-red' : '';
         } else { sInd.style.display = 'none'; }
         render(d.players, d.turn, d.table || []);
@@ -394,62 +306,35 @@
         const pLayer = document.getElementById('p-layer'); pLayer.innerHTML = "";
         const radius = document.getElementById('table-wrap').offsetWidth / 2;
         const myIdx = players.findIndex(p => p.userID === userID);
-
         players.forEach((p, i) => {
             const angle = (i * (360 / players.length) - 90) * (Math.PI / 180);
-            const x = Math.cos(angle) * (radius + 25);
-            const y = Math.sin(angle) * (radius + 25);
-            const active = i === turn;
-            const isMe = p.userID === userID;
-
-            let swapBtnHTML = "";
-            let nextValidIdx = (myIdx + 1) % players.length;
+            const x = Math.cos(angle) * (radius + 25); const y = Math.sin(angle) * (radius + 25);
+            const active = i === turn; const isMe = p.userID === userID;
+            let swapBtnHTML = ""; let nextValidIdx = (myIdx + 1) % players.length;
             if(players.length > 1) {
-                while(players[nextValidIdx].hand.length === 0 && nextValidIdx !== myIdx) {
-                    nextValidIdx = (nextValidIdx + 1) % players.length;
-                }
-                if(i === nextValidIdx && !isMe && p.hand.length > 0) {
-                    swapBtnHTML = `<button class="btn-swap" onclick="socket.emit('sendSwapRequest', {roomID:myRoom, fromUserID:'${userID}'})">TAKE HAND</button>`;
-                }
+                while(players[nextValidIdx].hand.length === 0 && nextValidIdx !== myIdx) { nextValidIdx = (nextValidIdx + 1) % players.length; }
+                if(i === nextValidIdx && !isMe && p.hand.length > 0) { swapBtnHTML = `<button class="btn-swap" onclick="socket.emit('sendSwapRequest', {roomID:myRoom, fromUserID:'${userID}'})">TAKE HAND</button>`; }
             }
-
-            const div = document.createElement('div'); 
-            div.className = `player ${active ? 'active' : ''}`;
+            const div = document.createElement('div'); div.className = `player ${active ? 'active' : ''}`;
             div.style.left = `calc(50% + ${x}px)`; div.style.top = `calc(50% + ${y}px)`;
-            div.innerHTML = `
-                ${swapBtnHTML}
-                <div class="av">
-                    <span class="card-icon-min" style="opacity:0.6;">🎴</span>
-                    <span class="card-count-min">${p.hand.length}</span>
-                </div>
-                <div style="font-size:10px; margin-top:6px; font-weight:${isMe ? '800':'400'}; color:${isMe ? 'var(--ui-blue)':'white'}">
-                    ${p.name}${isMe ? ' (You)' : ''}
-                </div>
-            `;
+            div.innerHTML = `${swapBtnHTML}<div class="av"><span class="card-icon-min" style="opacity:0.6;">🎴</span><span class="card-count-min">${p.hand.length}</span></div><div style="font-size:10px; margin-top:6px; font-weight:${isMe ? '800':'400'}; color:${isMe ? 'var(--ui-blue)':'white'}">${p.name}${isMe ? ' (You)' : ''}</div>`;
             pLayer.appendChild(div);
         });
         renderHand();
         const tLayer = document.getElementById('t-layer'); tLayer.innerHTML = "";
         table.forEach((tc, idx) => {
-            const el = createCardUI(tc.card); 
-            el.className = `card table-card ${['Hearts','Diamonds'].includes(tc.card.suit) ? 'red' : ''}`;
-            el.style.transform = `translate(-50%, -50%) rotate(${idx * 15}deg)`; 
-            tLayer.appendChild(el);
+            const el = createCardUI(tc.card); el.className = `card table-card ${['Hearts','Diamonds'].includes(tc.card.suit) ? 'red' : ''}`;
+            el.style.transform = `translate(-50%, -50%) rotate(${idx * 15}deg)`; tLayer.appendChild(el);
         });
     }
 
     function renderHand() {
         const hDiv = document.getElementById('my-cards'); hDiv.innerHTML = "";
-        myCurrentHand.forEach(c => {
-            const el = createCardUI(c);
-            el.onclick = () => socket.emit('playCard', { roomID: myRoom, cardObject: c });
-            hDiv.appendChild(el);
-        });
+        myCurrentHand.forEach(c => { const el = createCardUI(c); el.onclick = () => socket.emit('playCard', { roomID: myRoom, cardObject: c }); hDiv.appendChild(el); });
     }
 
     function createCardUI(c) {
-        const div = document.createElement('div'); 
-        div.className = `card ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
+        const div = document.createElement('div'); div.className = `card ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
         div.innerHTML = `<div style="font-size:9px">${c.rank}</div><div style="font-size:22px;text-align:center">${icons[c.suit]}</div><div style="font-size:9px;transform:rotate(180deg)">${c.rank}</div>`;
         return div;
     }

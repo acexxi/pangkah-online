@@ -92,7 +92,15 @@
 <div id="lobby">
     <div class="panel">
         <h2 style="color:var(--ui-blue); letter-spacing: 2px;">PANGKAH MURIM</h2>
-        <div id="user-info" style="margin-bottom:15px; font-weight:800; font-size: 0.9rem;">Player <span onclick="editName()" style="color:var(--ui-blue); cursor:pointer; font-size:0.7rem;">[EDIT NAME]</span></div>
+        
+        <div id="user-info" style="margin-bottom:15px; font-weight:800; font-size: 0.9rem;">
+            <span id="display-name"></span> 
+            <span onclick="editName()" style="color:var(--ui-blue); cursor:pointer; font-size:0.7rem; opacity:0.6;">[EDIT]</span>
+            <div id="stats-display" style="font-size: 10px; margin-top: 5px; opacity: 0.8; color: var(--primary-action);">
+                Record: 0 Wins | 0 Pangkahs
+            </div>
+        </div>
+
         <div class="room-list" id="room-box"></div>
         <input id="rid" placeholder="Enter Room ID">
         <select id="maxp"><option value="4">4 Players</option><option value="5">5 Players</option><option value="6">6 Players</option></select>
@@ -133,7 +141,7 @@
 <script>
     const socket = io();
 
-    // SOUNDS (Assumes files are in /public folder)
+    // SOUNDS
     const sfx = {
         place: new Audio('place.mp3'), 
         sweep: new Audio('sweep.mp3'),
@@ -143,20 +151,36 @@
     sfx.place.volume = 0.5;
     sfx.strike.volume = 0.9;
 
+    // PERSISTENT DATA
     let userID = localStorage.getItem('pUserID') || 'uid_' + Math.random().toString(36).substr(2, 9);
     localStorage.setItem('pUserID', userID);
     let myName = localStorage.getItem('pName') || 'Disciple' + Math.floor(Math.random()*999);
+    
+    // PLAYER STATS
+    let stats = JSON.parse(localStorage.getItem('pStats')) || { wins: 0, pangkahs: 0 };
+    
     let myRoom = "";
     let myCurrentHand = [];
     let pendingSwapRequest = null;
     const icons = { 'Spades': '♠', 'Hearts': '♥', 'Diamonds': '♦', 'Clubs': '♣' };
 
-    document.getElementById('user-info').firstChild.textContent = myName + " ";
+    // INIT UI
+    updateStatsUI();
     socket.emit('checkSession', { userID });
+
+    function updateStatsUI() {
+        document.getElementById('display-name').innerText = myName;
+        document.getElementById('stats-display').innerText = `Record: ${stats.wins} Wins | ${stats.pangkahs} Pangkahs`;
+    }
+
+    function saveStats() {
+        localStorage.setItem('pStats', JSON.stringify(stats));
+        updateStatsUI();
+    }
 
     function editName() {
         const n = prompt("Disciple Name:", myName);
-        if(n) { myName = n; localStorage.setItem('pName', n); location.reload(); }
+        if(n) { myName = n; localStorage.setItem('pName', n); updateStatsUI(); }
     }
 
     function showToast(msg) {
@@ -194,6 +218,7 @@
         pendingSwapRequest = null;
     }
 
+    // SOCKET LISTENERS
     socket.on('roomClosed', () => {
         alert("The Sect Leader has disbanded the room.");
         location.reload();
@@ -245,8 +270,15 @@
     });
 
     socket.on('clearTable', d => {
+        // Track Pangkah Stats
+        if(d.winner === myName && d.msg.toLowerCase() === 'pangkah!') {
+            stats.pangkahs++;
+            saveStats();
+        }
+
         if(d.msg.toLowerCase() === 'pangkah!') { sfx.strike.play().catch(e => {}); } 
         else { sfx.sweep.play().catch(e => {}); }
+        
         const pop = document.getElementById('round-popup');
         const title = document.getElementById('pop-title');
         title.className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
@@ -272,7 +304,16 @@
 
     socket.on('nextTurn', d => update(d));
     socket.on('errorMsg', m => showToast(m));
-    socket.on('gameOver', d => { alert("Duel Ended! Loser: " + d.loser); localStorage.removeItem('pUserID'); location.reload(); });
+    
+    socket.on('gameOver', d => { 
+        // Track Win Stats
+        if(d.loser !== myName) {
+            stats.wins++;
+            saveStats();
+        }
+        alert("Duel Ended! Loser: " + d.loser); 
+        location.reload(); 
+    });
 
     function update(d) {
         const me = d.players.find(p => p.userID === userID);

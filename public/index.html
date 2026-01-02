@@ -7,8 +7,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         :root { 
-            --primary-action: #10b981; /* Emerald Green for Actions */
-            --ui-blue: #3b82f6; /* Royal Blue */
+            --primary-action: #10b981; 
+            --ui-blue: #3b82f6; 
             --bg-gradient: radial-gradient(circle at 50% -20%, #1e3a8a, #020617 80%);
             --glass: rgba(59, 130, 246, 0.05);
             --border: rgba(59, 130, 246, 0.2); 
@@ -108,7 +108,10 @@
     <div class="header-center">
         <button id="your-turn-btn">YOUR TURN</button>
     </div>
-    <div id="suit-indicator"><span id="suit-symbol" style="font-size: 1.2rem;"></span></div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <button id="close-room-btn" onclick="closeRoom()" style="display:none; background: #f43f5e; color: white; border: none; padding: 4px 8px; border-radius: 6px; font-size: 9px; font-weight: 800; cursor: pointer;">CLOSE ROOM</button>
+        <div id="suit-indicator"><span id="suit-symbol" style="font-size: 1.2rem;"></span></div>
+    </div>
 </div>
 
 <div id="game-view">
@@ -130,19 +133,18 @@
 <script>
     const socket = io();
 
-    // --- SOUND DEFINITIONS ---
+    // SOUNDS (Assumes files are in /public folder)
     const sfx = {
-        place: new Audio('https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3'), 
-        sweep: new Audio('https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3'),
-        strike: new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3'),
-        absorb: new Audio('https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3')
+        place: new Audio('place.mp3'), 
+        sweep: new Audio('sweep.mp3'),
+        strike: new Audio('strike.mp3'),
+        absorb: new Audio('absorb.mp3')
     };
     sfx.place.volume = 0.5;
     sfx.strike.volume = 0.9;
 
     let userID = localStorage.getItem('pUserID') || 'uid_' + Math.random().toString(36).substr(2, 9);
     localStorage.setItem('pUserID', userID);
-    
     let myName = localStorage.getItem('pName') || 'Disciple' + Math.floor(Math.random()*999);
     let myRoom = "";
     let myCurrentHand = [];
@@ -164,15 +166,19 @@
     }
 
     function enter(type) {
-        // Unlock Audio for Mobile
         Object.values(sfx).forEach(s => { s.play(); s.pause(); s.currentTime = 0; });
-        
         myRoom = document.getElementById('rid').value;
         if(!myRoom) return alert("Room ID Required");
         socket.emit(type === 'create' ? 'createRoom' : 'joinRoom', { roomID: myRoom, playerName: myName, maxPlayers: document.getElementById('maxp').value, userID: userID });
     }
 
     function start() { socket.emit('startGame', myRoom); }
+
+    function closeRoom() {
+        if(confirm("Disband this sect and kick all disciples?")) {
+            socket.emit('requestCloseRoom', { roomID: myRoom });
+        }
+    }
 
     function sortHand() {
         const order = { 'Spades': 4, 'Hearts': 3, 'Diamonds': 2, 'Clubs': 1 };
@@ -187,6 +193,11 @@
         }
         pendingSwapRequest = null;
     }
+
+    socket.on('roomClosed', () => {
+        alert("The Sect Leader has disbanded the room.");
+        location.reload();
+    });
 
     socket.on('reconnectSuccess', d => {
         myRoom = d.roomID;
@@ -223,17 +234,19 @@
         document.getElementById('lobby').style.display = 'none';
         document.getElementById('room-tag').innerText = "SECT: " + myRoom;
         if(p.length >= 4) document.getElementById('start-btn').style.display = 'block';
+        if(p.length > 0 && p[0].userID === userID) document.getElementById('close-room-btn').style.display = 'block';
         render(p, -1);
     });
 
-    socket.on('gameInit', d => { document.getElementById('start-btn').style.display = 'none'; showDiscarded(d.discarded); update(d); });
+    socket.on('gameInit', d => { 
+        document.getElementById('start-btn').style.display = 'none'; 
+        showDiscarded(d.discarded); 
+        update(d); 
+    });
 
     socket.on('clearTable', d => {
-        if(d.msg.toLowerCase() === 'pangkah!') {
-            sfx.strike.play().catch(e => {}); 
-        } else {
-            sfx.sweep.play().catch(e => {});
-        }
+        if(d.msg.toLowerCase() === 'pangkah!') { sfx.strike.play().catch(e => {}); } 
+        else { sfx.sweep.play().catch(e => {}); }
         const pop = document.getElementById('round-popup');
         const title = document.getElementById('pop-title');
         title.className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';

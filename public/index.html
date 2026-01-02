@@ -9,74 +9,89 @@
         :root { 
             --primary-action: #10b981; 
             --ui-blue: #3b82f6; 
-            --bg-solid: #020617;
-            --panel-solid: #1e293b;
-            --border: #334155; 
+            --bg-gradient: radial-gradient(circle at 50% -20%, #1e3a8a, #020617 90%);
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-heavy: rgba(15, 23, 42, 0.8);
+            --border: rgba(255, 255, 255, 0.1); 
             --danger: #f43f5e;
         }
         * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { margin: 0; height: 100vh; overflow: hidden; background: var(--bg-solid); color: white; display: flex; flex-direction: column; }
+        body { margin: 0; height: 100vh; overflow: hidden; background: var(--bg-gradient); color: white; display: flex; flex-direction: column; }
 
-        /* LOBBY & PROFILE - SOLID COLORS */
-        #lobby { position: fixed; inset: 0; z-index: 5000; background: var(--bg-solid); display: flex; align-items: center; justify-content: center; }
-        .panel { width: 90%; max-width: 400px; padding: 30px; border-radius: 20px; background: var(--panel-solid); border: 2px solid var(--border); text-align: center; }
-        .room-list { height: 100px; overflow-y: auto; background: #0f172a; border-radius: 12px; margin: 15px 0; border: 1px solid var(--border); }
-        .room-item { padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; cursor: pointer; font-size: 0.8rem; }
+        /* GLASSMORPHISM PANELS */
+        #lobby { position: fixed; inset: 0; z-index: 5000; backdrop-filter: blur(20px); background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
+        .panel { 
+            width: 90%; max-width: 400px; padding: 35px; border-radius: 30px; 
+            background: var(--glass); border: 1px solid var(--border); 
+            backdrop-filter: blur(10px); text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        .room-list { height: 100px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 15px; margin: 15px 0; border: 1px solid var(--border); }
+        .room-item { padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; cursor: pointer; font-size: 0.85rem; }
         
-        #profile-modal { position: fixed; inset: 0; z-index: 6000; background: var(--bg-solid); display: none; align-items: center; justify-content: center; }
-        .profile-card { width: 85%; max-width: 320px; padding: 40px 20px; background: var(--panel-solid); border: 2px solid var(--ui-blue); border-radius: 20px; text-align: center; }
-        
-        .bar-container { width: 100%; height: 8px; background: #0f172a; border-radius: 10px; margin: 10px 0; overflow: hidden; border: 1px solid var(--border); }
-        .bar-fill { height: 100%; background: var(--primary-action); width: 0%; transition: width 0.5s ease; }
+        #profile-modal { position: fixed; inset: 0; z-index: 6000; background: rgba(2, 6, 23, 0.85); backdrop-filter: blur(15px); display: none; align-items: center; justify-content: center; }
+        .profile-card { width: 85%; max-width: 340px; padding: 40px 20px; background: var(--glass); border: 1px solid var(--ui-blue); border-radius: 32px; text-align: center; }
+        .bar-container { width: 100%; height: 10px; background: rgba(255,255,255,0.05); border-radius: 20px; margin: 15px 0; overflow: hidden; border: 1px solid var(--border); }
+        .bar-fill { height: 100%; background: linear-gradient(90deg, var(--ui-blue), var(--primary-action)); width: 0%; transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
-        /* POPUPS */
-        #toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: var(--danger); padding: 10px 20px; border-radius: 10px; z-index: 10000; display: none; font-weight: 800; font-size: 12px; text-align: center; min-width: 200px; }
-        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #0f172a; border: 2px solid var(--ui-blue); padding: 30px; border-radius: 20px; text-align: center; z-index: 9999; display: none; }
+        /* TOAST & POPUPS */
+        #toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: var(--danger); padding: 12px 24px; border-radius: 12px; z-index: 10000; display: none; font-weight: 800; box-shadow: 0 10px 30px rgba(244, 63, 94, 0.4); }
+        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--glass-heavy); border: 1px solid var(--ui-blue); backdrop-filter: blur(20px); padding: 40px; border-radius: 24px; text-align: center; z-index: 9999; display: none; box-shadow: 0 0 100px rgba(59, 130, 246, 0.2); }
 
         /* HEADER */
-        .header { height: 60px; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: #0f172a; position: relative; z-index: 1001; }
-        .header-center { position: absolute; left: 50%; transform: translateX(-50%); }
-        #your-turn-btn { background: var(--primary-action); color: #000; font-size: 10px; font-weight: 900; padding: 6px 15px; border-radius: 20px; border: none; display: none; animation: blinker 1s linear infinite; }
-        @keyframes blinker { 50% { opacity: 0.3; } }
+        .header { height: 70px; padding: 0 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.1); backdrop-filter: blur(5px); position: relative; z-index: 1001; }
+        #your-turn-btn { background: var(--primary-action); color: #000; font-size: 11px; font-weight: 900; padding: 8px 18px; border-radius: 25px; border: none; display: none; animation: pulse-glow 1.5s infinite; }
+        @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px var(--primary-action); } 50% { box-shadow: 0 0 20px var(--primary-action); opacity: 0.8; } }
 
-        /* BOARD */
-        #game-view { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; z-index: 100; }
-        .safe-wrap { position: relative; width: 100%; height: 100%; max-width: 42vh; max-height: 42vh; aspect-ratio: 1/1; }
-        .ring { position: absolute; inset: 0; border-radius: 50%; border: 1px dashed var(--border); pointer-events: none; }
-        .player { position: absolute; transform: translate(-50%, -50%); text-align: center; z-index: 100; transition: 0.3s; }
-        .av { width: 48px; height: 58px; border-radius: 8px; background: #020617; border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
-        .active .av { border-color: var(--primary-action); box-shadow: 0 0 15px var(--primary-action); border-width: 2px; }
+        /* GAME BOARD */
+        #game-view { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
+        .safe-wrap { position: relative; width: 100%; height: 100%; max-width: 45vh; max-height: 45vh; aspect-ratio: 1/1; }
+        .ring { position: absolute; inset: 0; border-radius: 50%; border: 1px dashed rgba(255,255,255,0.05); pointer-events: none; }
         
-        .last-card-alert .av { border-color: var(--danger) !important; animation: pulse-danger 0.8s infinite; border-width: 2px; }
-        @keyframes pulse-danger { 0%, 100% { box-shadow: 0 0 0px var(--danger); } 50% { box-shadow: 0 0 15px var(--danger); } }
+        /* PLAYER AVATARS */
+        .player { position: absolute; transform: translate(-50%, -50%); text-align: center; z-index: 100; transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .av { width: 52px; height: 64px; border-radius: 12px; background: #0f172a; border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+        .active .av { border-color: var(--primary-action); box-shadow: 0 0 25px var(--primary-action); border-width: 2px; }
+        
+        /* LAST CARD ALERT */
+        .last-card-alert .av { border-color: var(--danger) !important; animation: danger-flash 0.8s infinite; border-width: 2px; }
+        @keyframes danger-flash { 0%, 100% { box-shadow: 0 0 5px var(--danger); } 50% { box-shadow: 0 0 20px var(--danger); } }
 
-        .card-count-min { font-size: 16px; font-weight: 800; color: var(--ui-blue); }
+        .card-count-min { font-size: 18px; font-weight: 800; color: var(--ui-blue); }
 
         /* HAND AREA */
-        #hand-area { height: 25vh; background: #000000; border-top: 2px solid var(--border); padding: 15px 10px; overflow-x: hidden; overflow-y: auto; z-index: 2000; position: relative; }
-        .hand-flex { display: flex; justify-content: center; flex-wrap: wrap; width: 100%; max-width: 600px; margin: 0 auto; }
-        .card { 
-            width: 48px; height: 72px; background: white; color: black; border-radius: 6px; padding: 4px; font-weight: 800; 
-            display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 1px solid #999; 
-            position: relative; transition: transform 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        #hand-area { 
+            height: 28vh; background: rgba(2, 6, 23, 0.8); 
+            backdrop-filter: blur(25px); border-top: 1px solid var(--border); 
+            padding: 20px 10px; overflow-x: hidden; overflow-y: auto; z-index: 2000; 
         }
-        .card.fanned { margin-left: -22px; }
-        .card.fanned:first-child { margin-left: 0; }
+        .hand-flex { display: flex; justify-content: center; flex-wrap: wrap; width: 100%; max-width: 650px; margin: 0 auto; }
+        .card { 
+            width: 50px; height: 75px; background: #fff; color: #000; 
+            border-radius: 8px; padding: 5px; font-weight: 800; 
+            display: flex; flex-direction: column; justify-content: space-between; 
+            cursor: pointer; border: 1px solid #ddd; position: relative; 
+            transition: all 0.2s ease; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .card.fanned { margin-left: -24px; }
+        .card:hover { transform: translateY(-10px); z-index: 5000 !important; }
         .card.red { color: var(--danger) !important; }
 
-        /* BIGGER TABLE CARDS */
+        /* TABLE CARDS */
         .table-card { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            width: 62px; height: 92px; pointer-events: none; z-index: 50;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.8); border: 1px solid #fff;
+            width: 65px; height: 95px; pointer-events: none; z-index: 50;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6); border: 2px solid #fff;
         }
 
-        .btn { padding: 12px; border-radius: 10px; font-weight: 800; cursor: pointer; width: 100%; border: none; }
-        .btn-p { background: var(--ui-blue); color: #fff; }
-        .btn-s { background: transparent; border: 1px solid var(--border); color: #fff; font-size: 10px; margin-top: 5px; }
-        input, select { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 10px; background: #0f172a; color: #fff; border: 1px solid var(--border); }
-        .pangkah-text { color: var(--danger); font-size: 2rem; font-weight: 800; }
-        .clean-text { color: var(--ui-blue); font-size: 2rem; font-weight: 800; }
+        /* BUTTONS */
+        .btn { padding: 14px; border-radius: 14px; font-weight: 800; cursor: pointer; width: 100%; border: none; transition: 0.2s; }
+        .btn-p { background: linear-gradient(135deg, var(--ui-blue), #2563eb); color: #fff; box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3); }
+        .btn-p:active { transform: scale(0.96); }
+        .btn-s { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: #fff; font-size: 11px; margin-top: 8px; }
+        #edit-name-btn { color: var(--primary-action); font-size: 10px; margin-left: 10px; cursor: pointer; opacity: 0.8; }
+        input, select { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 14px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid var(--border); outline: none; }
+        .pangkah-text { color: var(--danger); font-size: 2.2rem; font-weight: 900; text-shadow: 0 0 20px rgba(244, 63, 94, 0.5); }
+        .clean-text { color: var(--ui-blue); font-size: 2.2rem; font-weight: 900; }
     </style>
 </head>
 <body>
@@ -85,42 +100,45 @@
 
 <div id="profile-modal">
     <div class="profile-card">
-        <h3>CULTIVATION</h3>
-        <div id="prof-level" style="font-size: 24px; font-weight: 800;">LEVEL 1</div>
-        <div id="prof-title" style="color: var(--primary-action); letter-spacing: 2px; margin-bottom: 10px;">APPRENTICE</div>
-        <div style="text-align: right; font-size: 9px; color: #aaa; margin-bottom: 2px;" id="prof-progress-text">Progress: 0/5</div>
+        <h3 style="letter-spacing: 3px; color: var(--ui-blue);">CULTIVATION</h3>
+        <div id="prof-level" style="font-size: 28px; font-weight: 800;">LEVEL 1</div>
+        <div id="prof-title" style="color: var(--primary-action); letter-spacing: 2px; margin-bottom: 15px;">APPRENTICE</div>
+        <div style="text-align: right; font-size: 10px; color: #aaa;" id="prof-progress-text">0/5</div>
         <div class="bar-container"><div id="prof-bar-fill" class="bar-fill"></div></div>
-        <div style="display: flex; justify-content: space-around; margin: 20px 0;">
-            <div><div style="font-size: 20px; font-weight: 800;" id="prof-points">0</div><div style="font-size: 10px; opacity: 0.6;">POINTS</div></div>
-            <div><div style="font-size: 20px; font-weight: 800;" id="prof-pangkahs">0</div><div style="font-size: 10px; opacity: 0.6;">PANGKAHS</div></div>
+        <div style="display: flex; justify-content: space-around; margin: 25px 0;">
+            <div><div style="font-size: 22px; font-weight: 800;" id="prof-points">0</div><div style="font-size: 10px; opacity: 0.5;">POINTS</div></div>
+            <div><div style="font-size: 22px; font-weight: 800;" id="prof-pangkahs">0</div><div style="font-size: 10px; opacity: 0.5;">PANGKAHS</div></div>
         </div>
-        <button class="btn btn-p" onclick="closeProfile()">RETURN</button>
+        <button class="btn btn-p" onclick="closeProfile()">CLOSE SCROLL</button>
     </div>
 </div>
 
 <div id="lobby">
     <div class="panel">
-        <h2 style="color:var(--ui-blue); margin-top:0;">PANGKAH MURIM</h2>
-        <div style="margin-bottom:15px; font-weight:800;">
-            <div id="display-name" style="color: var(--ui-blue); font-size: 1.1rem;"></div>
-            <div id="level-title" style="color: var(--primary-action); font-size: 12px; margin-top:4px;">LEVEL 1 - APPRENTICE</div>
-            <button class="btn btn-s" onclick="openProfile()">VIEW PROFILE 📜</button>
+        <h2 style="color:var(--ui-blue); margin-bottom:20px; letter-spacing:1px;">PANGKAH MURIM</h2>
+        <div style="margin-bottom:20px; padding: 15px; background: rgba(255,255,255,0.03); border-radius: 20px;">
+            <div style="display: flex; align-items: center; justify-content: center;">
+                <span id="display-name" style="color: var(--ui-blue); font-size: 1.2rem; font-weight: 800;"></span>
+                <span id="edit-name-btn" onclick="editName()">[EDIT]</span>
+            </div>
+            <div id="level-title" style="color: var(--primary-action); font-size: 12px; margin-top:5px;">APPRENTICE</div>
+            <button class="btn btn-s" onclick="openProfile()">STATS 📜</button>
         </div>
         <div class="room-list" id="room-box"></div>
-        <input id="rid" placeholder="Room ID">
+        <input id="rid" placeholder="Enter Sect ID">
         <select id="maxp"><option value="4">4 Players</option><option value="5">5 Players</option><option value="6">6 Players</option></select>
         <button class="btn btn-p" onclick="enter('create')">CREATE SECT</button>
         <button class="btn btn-s" onclick="enter('join')">JOIN SECT</button>
     </div>
 </div>
 
-<div id="round-popup"><div id="pop-title"></div><div id="pop-desc"></div></div>
+<div id="round-popup"><div id="pop-title"></div><div id="pop-desc" style="margin-top:10px; opacity:0.8;"></div></div>
 
 <div class="header">
-    <div id="room-tag" style="color:var(--ui-blue); font-weight:800; font-size: 10px;">LOBBY</div>
+    <div id="room-tag" style="color:var(--ui-blue); font-weight:800; font-size: 11px; letter-spacing:1px;">LOBBY</div>
     <div class="header-center"><button id="your-turn-btn">YOUR TURN</button></div>
-    <div style="display: flex; align-items: center; gap: 10px;">
-        <button id="close-room-btn" onclick="closeRoom()" style="display:none; background: var(--danger); color: white; border: none; padding: 4px 8px; border-radius: 6px; font-size: 9px; font-weight: 800;">CLOSE</button>
+    <div style="display: flex; align-items: center; gap: 15px;">
+        <button id="close-room-btn" onclick="closeRoom()" style="display:none; background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 10px; font-weight: 800; cursor:pointer;">DISBAND</button>
     </div>
 </div>
 
@@ -129,12 +147,12 @@
         <div class="ring"></div>
         <div id="p-layer"></div>
         <div id="t-layer"></div>
-        <button id="start-btn" class="btn" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:auto; background: var(--primary-action); color:#000;" onclick="start()">START MATCH</button>
+        <button id="start-btn" class="btn" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:auto; padding: 15px 30px; background: var(--primary-action); color:#000;" onclick="start()">BEGIN DUEL</button>
     </div>
 </div>
 
 <div id="hand-area">
-    <div style="text-align:center; margin-bottom:8px;"><button class="btn" style="width:auto; padding:4px 12px; font-size:10px; background:#1e293b; color:#fff; border: 1px solid var(--border);" onclick="sortHand()">SORT TECHNIQUE ⇅</button></div>
+    <div style="text-align:center; margin-bottom:12px;"><button class="btn" style="width:auto; padding:6px 18px; font-size:11px; background:rgba(255,255,255,0.05); color:#fff; border: 1px solid var(--border);" onclick="sortHand()">SORT TECHNIQUES ⇅</button></div>
     <div class="hand-flex" id="my-cards"></div>
 </div>
 
@@ -146,8 +164,6 @@
     let userID = localStorage.getItem('pUserID') || 'uid_' + Math.random().toString(36).substr(2, 9);
     localStorage.setItem('pUserID', userID);
     let myName = localStorage.getItem('pName') || 'Disciple' + Math.floor(Math.random()*999);
-    localStorage.setItem('pName', myName); // Fix name choice
-    
     let stats = JSON.parse(localStorage.getItem('pStats')) || { points: 0, pangkahs: 0 };
     stats.points = parseInt(stats.points) || 0;
     
@@ -159,7 +175,16 @@
     function getTitle(lvl) {
         if (lvl <= 5) return "APPRENTICE"; if (lvl <= 10) return "WARRIOR";
         if (lvl <= 15) return "MASTER"; if (lvl <= 20) return "GRANDMASTER";
-        return "ANCIENT ANCESTOR";
+        return "ELDER";
+    }
+
+    function editName() {
+        let n = prompt("Enter Name:", myName);
+        if(n && n.trim().length > 0) {
+            myName = n.trim().substring(0,12);
+            localStorage.setItem('pName', myName);
+            updateStatsUI();
+        }
     }
 
     function updateStatsUI() {
@@ -179,13 +204,14 @@
     function closeRoom() { if(confirm("Disband sect?")) socket.emit('requestCloseRoom', { roomID: myRoom }); }
     function sortHand() { const order = { 'Spades': 4, 'Hearts': 3, 'Diamonds': 2, 'Clubs': 1 }; myCurrentHand.sort((a, b) => (order[b.suit] - order[a.suit]) || (b.val - a.val)); renderHand(); }
     function saveStats() { localStorage.setItem('pStats', JSON.stringify(stats)); updateStatsUI(); }
+    
     function openProfile() {
         const level = getLevel(); const ptsInLevel = stats.points % 5;
         document.getElementById('prof-level').innerText = `LEVEL ${level}`;
         document.getElementById('prof-title').innerText = getTitle(level);
         document.getElementById('prof-points').innerText = stats.points;
         document.getElementById('prof-pangkahs').innerText = stats.pangkahs;
-        document.getElementById('prof-progress-text').innerText = `Progress: ${ptsInLevel}/5`;
+        document.getElementById('prof-progress-text').innerText = `${ptsInLevel}/5 EXP`;
         document.getElementById('prof-bar-fill').style.width = (ptsInLevel / 5) * 100 + "%";
         document.getElementById('profile-modal').style.display = 'flex';
     }
@@ -204,14 +230,14 @@
         const pop = document.getElementById('round-popup');
         document.getElementById('pop-title').className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
         document.getElementById('pop-title').innerText = d.msg.toUpperCase();
-        document.getElementById('pop-desc').innerText = d.winner + " takes the lead.";
+        document.getElementById('pop-desc').innerText = d.winner + " has the upper hand.";
         pop.style.display = 'block'; setTimeout(() => { pop.style.display = 'none'; update(d); }, 2000);
     });
 
     socket.on('gameOver', d => { 
         if(d.loser !== myName) { stats.points++; saveStats(); } 
         else { if(stats.points > 0) stats.points--; saveStats(); }
-        alert("Duel Ended! Loser: " + d.loser); location.reload(); 
+        alert("Duel Ended! Defeated: " + d.loser); location.reload(); 
     });
 
     socket.on('updateTable', d => { sfx.place.play().catch(e=>{}); update(d); });
@@ -231,7 +257,7 @@
         const radius = document.getElementById('table-wrap').offsetWidth / 2;
         players.forEach((p, i) => {
             const angle = (i * (360 / players.length) - 90) * (Math.PI / 180);
-            const x = Math.cos(angle) * (radius + 25); const y = Math.sin(angle) * (radius + 25);
+            const x = Math.cos(angle) * (radius + 28); const y = Math.sin(angle) * (radius + 28);
             const active = i === turn; const isMe = p.userID === userID;
             
             const hasOne = p.hand.length === 1;
@@ -243,7 +269,7 @@
             const div = document.createElement('div'); 
             div.className = `player ${active ? 'active' : ''} ${hasOne ? 'last-card-alert' : ''}`;
             div.style.left = `calc(50% + ${x}px)`; div.style.top = `calc(50% + ${y}px)`;
-            div.innerHTML = `<div class="av"><span class="card-count-min">${p.hand.length}</span></div><div style="font-size:10px; margin-top:6px; color:${isMe ? 'var(--ui-blue)':'white'}">${p.name}</div>`;
+            div.innerHTML = `<div class="av"><span class="card-count-min">${p.hand.length}</span></div><div style="font-size:10px; margin-top:8px; font-weight:600; color:${isMe ? 'var(--ui-blue)':'white'}">${p.name}</div>`;
             pLayer.appendChild(div);
         });
         renderHand();
@@ -251,7 +277,7 @@
         table.forEach((tc, idx) => {
             const el = createCardUI(tc.card); 
             el.className = `card table-card ${['Hearts','Diamonds'].includes(tc.card.suit) ? 'red' : ''}`;
-            el.style.transform = `translate(-50%, -50%) rotate(${idx * 15}deg)`; 
+            el.style.transform = `translate(-50%, -50%) rotate(${idx * 12}deg)`; 
             tLayer.appendChild(el);
         });
     }
@@ -274,7 +300,7 @@
 
     function createCardUI(c) {
         const div = document.createElement('div'); div.className = `card ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
-        div.innerHTML = `<div style="font-size:9px">${c.rank}</div><div style="font-size:22px;text-align:center">${icons[c.suit]}</div><div style="font-size:9px;transform:rotate(180deg)">${c.rank}</div>`;
+        div.innerHTML = `<div style="font-size:10px">${c.rank}</div><div style="font-size:24px;text-align:center">${icons[c.suit]}</div><div style="font-size:10px;transform:rotate(180deg)">${c.rank}</div>`;
         return div;
     }
 </script>

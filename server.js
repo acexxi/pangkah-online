@@ -51,6 +51,22 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- ADD THIS NEW BLOCK BELOW ---
+    socket.on('requestCloseRoom', ({ roomID }) => {
+        if (rooms[roomID]) {
+            // Send signal to everyone in the room to kick them to lobby
+            io.to(roomID).emit('roomClosed');
+            
+            // Delete the room from server memory
+            delete rooms[roomID];
+            
+            // Update the lobby list for everyone else
+            broadcastRooms();
+            console.log(`Room ${roomID} disbanded.`);
+        }
+    });
+    // --- END OF NEW BLOCK ---
+
     socket.on('createRoom', ({ roomID, playerName, maxPlayers, userID }) => {
         if (rooms[roomID]) return socket.emit('errorMsg', 'Room ID already exists!');
         rooms[roomID] = {

@@ -24,7 +24,7 @@ function generateDeck() {
 
 io.on('connection', (socket) => {
     socket.on('createRoom', ({ roomID, playerName, maxPlayers }) => {
-        if (rooms[roomID]) return socket.emit('errorMsg', 'Room ID sudah wujud!');
+        if (rooms[roomID]) return socket.emit('errorMsg', 'Room ID already exists!');
         rooms[roomID] = {
             id: roomID, maxPlayers: parseInt(maxPlayers),
             players: [{ id: socket.id, name: playerName, hand: [] }],
@@ -36,7 +36,7 @@ io.on('connection', (socket) => {
 
     socket.on('joinRoom', ({ roomID, playerName }) => {
         const room = rooms[roomID];
-        if (!room || room.players.length >= room.maxPlayers) return socket.emit('errorMsg', 'Bilik penuh atau tidak wujud!');
+        if (!room || room.players.length >= room.maxPlayers) return socket.emit('errorMsg', 'Room full or not found!');
         room.players.push({ id: socket.id, name: playerName, hand: [] });
         socket.join(roomID);
         io.to(roomID).emit('updatePlayers', room.players);
@@ -49,7 +49,6 @@ io.on('connection', (socket) => {
         let cardsPerPlayer = Math.floor(52 / room.maxPlayers);
         room.players.forEach(p => p.hand = deck.splice(0, cardsPerPlayer));
         
-        // Pemain yang ada King Spades mulakan dulu
         let starterIdx = room.players.findIndex(p => p.hand.some(c => c.suit === 'Spades' && c.rank === 'K'));
         room.turn = starterIdx !== -1 ? starterIdx : 0;
         io.to(roomID).emit('gameInit', { players: room.players, turn: room.turn });
@@ -65,15 +64,13 @@ io.on('connection', (socket) => {
 
         const playedCard = player.hand[cardIndex];
 
-        // --- SEKATAN PANGKAH HARAM ---
         if (room.table.length > 0 && playedCard.suit !== room.currentSuit) {
             const hasSuitInHand = player.hand.some(c => c.suit === room.currentSuit);
             if (hasSuitInHand) {
-                return socket.emit('errorMsg', `Langkah tidak sah! Anda masih ada kad ${room.currentSuit}.`);
+                return socket.emit('errorMsg', `Invalid move! You still have ${room.currentSuit} in hand.`);
             }
         }
 
-        // Jalankan kad
         player.hand.splice(cardIndex, 1);
         room.table.push({ playerIdx: room.turn, playerName: player.name, card: playedCard });
 
@@ -93,7 +90,6 @@ io.on('connection', (socket) => {
                 let leadWinnerIdx = -1;
                 let highestLeadVal = -1;
 
-                // Cari pemilik kad terbesar dalam suit asal
                 room.table.forEach(item => {
                     if (item.card.suit === room.currentSuit) {
                         if (item.card.val > highestLeadVal) {
@@ -103,19 +99,16 @@ io.on('connection', (socket) => {
                     }
                 });
 
-                let msg = "";
+                let msg = isPangkah ? `${room.players[leadWinnerIdx].name} took all cards! (Pangkah Penalty)` : `Round cleared. Cards discarded.`;
+                
                 if (isPangkah) {
-                    // Mangsa (pemilik kad terbesar suit asal) ambil semua kad
                     const cardsToTake = room.table.map(t => t.card);
                     room.players[leadWinnerIdx].hand.push(...cardsToTake);
-                    msg = `${room.players[leadWinnerIdx].name} terpaksa ambil semua kad! (Kena Pangkah)`;
-                } else {
-                    msg = `Pusingan selesai. Kad dibuang.`;
                 }
 
                 let survivors = room.players.filter(p => p.hand.length > 0);
                 if (survivors.length <= 1) {
-                    io.to(roomID).emit('gameOver', { loser: survivors[0]?.name || "Tiada" });
+                    io.to(roomID).emit('gameOver', { loser: survivors[0]?.name || "None" });
                     delete rooms[roomID];
                 } else {
                     room.turn = leadWinnerIdx;
@@ -130,7 +123,6 @@ io.on('connection', (socket) => {
                 }
             }, 2000);
         } else {
-            // Tukar giliran ke pemain seterusnya yang ada kad
             do {
                 room.turn = (room.turn + 1) % room.players.length;
             } while (room.players[room.turn].hand.length === 0);

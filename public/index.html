@@ -3,42 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pangkah Emerald</title>
+    <title>Pangkah Elite</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         :root { --primary: #10b981; --bg: #020617; --glass: rgba(255,255,255,0.03); --border: rgba(255,255,255,0.1); }
         * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
         body { margin: 0; height: 100vh; overflow: hidden; background: radial-gradient(circle at 50% -20%, #064e3b, #020617 80%); color: white; display: flex; flex-direction: column; }
 
-        /* LOBBY & POPUPS */
+        /* LOBBY & UI */
         #lobby { position: fixed; inset: 0; z-index: 5000; backdrop-filter: blur(40px); background: rgba(2,6,23,0.9); display: flex; align-items: center; justify-content: center; }
         .panel { width: 90%; max-width: 380px; padding: 30px; border-radius: 28px; background: var(--glass); border: 1px solid var(--border); text-align: center; }
-        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(2,6,23,0.95); border: 2px solid var(--primary); padding: 30px; border-radius: 20px; text-align: center; z-index: 9999; display: none; box-shadow: 0 0 50px rgba(16,185,129,0.3); }
-        .pangkah-text { color: #f43f5e; font-size: 2rem; font-weight: 800; }
-        .clean-text { color: var(--primary); font-size: 2rem; font-weight: 800; }
+        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(2,6,23,0.95); border: 2px solid var(--primary); padding: 30px; border-radius: 20px; text-align: center; z-index: 9999; display: none; }
+        
+        /* HEADER */
+        .header { height: 60px; padding: 0 15px; display: flex; align-items: center; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.3); position: relative; }
+        .header-left { flex: 1; font-weight: 800; font-size: 0.7rem; color: var(--primary); }
+        .header-center { flex: 2; display: flex; justify-content: center; }
+        .header-right { flex: 1; display: flex; justify-content: flex-end; }
+        
+        #your-turn-indicator { 
+            background: var(--primary); color: #000; font-size: 10px; font-weight: 900; 
+            padding: 6px 15px; border-radius: 20px; border: none;
+            display: none; animation: blinker 1s linear infinite; box-shadow: 0 0 15px var(--primary);
+        }
+        @keyframes blinker { 50% { opacity: 0.3; } }
 
-        /* UI ELEMENTS */
-        .header { height: 60px; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
-        #suit-indicator { background: rgba(255,255,255,0.05); padding: 5px 12px; border-radius: 10px; border: 1px solid var(--border); font-weight: 800; display: none; }
+        #suit-indicator { background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border); display: none; }
         .suit-red { color: #f43f5e; }
 
+        /* GAME BOARD */
         #game-view { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
         .safe-wrap { position: relative; width: 100%; height: 100%; max-width: 42vh; max-height: 42vh; }
-        .player { position: absolute; transform: translate(-50%, -50%); text-align: center; transition: 0.3s; z-index: 10; }
+        .player { position: absolute; transform: translate(-50%, -50%); text-align: center; z-index: 10; }
         .av { width: 50px; height: 50px; border-radius: 50%; background: #0f172a; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; position: relative; }
-        .active .av { border-color: var(--primary); box-shadow: 0 0 20px var(--primary); }
-        .turn-label { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); background: var(--primary); color: #000; font-size: 8px; font-weight: 900; padding: 2px 8px; border-radius: 4px; display: none; white-space: nowrap; }
-        .active .turn-label { display: block; }
+        .active .av { border-color: var(--primary); box-shadow: 0 0 15px var(--primary); }
 
         /* CARDS */
         #hand-area { height: 22vh; background: rgba(0,0,0,0.4); border-top: 1px solid var(--border); padding: 10px; overflow-x: auto; }
         .hand-flex { display: flex; gap: 8px; justify-content: center; }
-        .card { width: 50px; height: 75px; background: white; color: black; border-radius: 8px; padding: 5px; font-weight: 800; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 1px solid #ddd; }
+        .card { width: 50px; height: 75px; background: white; color: black; border-radius: 8px; padding: 5px; font-weight: 800; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; }
         .card.red { color: #f43f5e !important; }
         .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
 
-        /* BUTTONS */
-        .btn-swap { position: absolute; top: -32px; left: 50%; transform: translateX(-50%); background: #f59e0b; color: #000; border: none; border-radius: 4px; font-size: 7px; font-weight: 900; padding: 3px 6px; cursor: pointer; box-shadow: 0 0 10px rgba(245, 158, 11, 0.4); }
+        .btn-swap { position: absolute; top: -30px; left: 50%; transform: translateX(-50%); background: #f59e0b; color: #000; border: none; border-radius: 4px; font-size: 7px; font-weight: 900; padding: 3px 6px; }
         .btn-p { background: var(--primary); color: #022c22; padding: 12px; border-radius: 10px; font-weight: 800; width: 100%; border: none; cursor: pointer; }
         input, select { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 10px; background: #000; color: #fff; border: 1px solid var(--border); }
     </style>
@@ -49,8 +56,7 @@
     <div class="panel">
         <h2 style="color:var(--primary); margin-bottom: 5px;">Pangkah Emerald</h2>
         <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; margin-bottom: 15px; border: 1px solid var(--border);">
-            <div style="font-size: 0.6rem; opacity: 0.5; text-transform: uppercase;">Playing As</div>
-            <div id="display-name" style="font-size: 1.1rem; font-weight: 800; margin: 4px 0;"></div>
+            <div id="display-name" style="font-size: 1.1rem; font-weight: 800; margin-bottom: 5px;"></div>
             <button onclick="editName()" style="background: var(--primary); color: #000; border: none; padding: 3px 10px; border-radius: 5px; font-size: 9px; font-weight: 800; cursor: pointer;">EDIT NAME ✎</button>
         </div>
         <div id="room-box" style="margin:10px 0; max-height:80px; overflow:auto; background:rgba(0,0,0,0.3); border-radius:8px;"></div>
@@ -61,11 +67,16 @@
     </div>
 </div>
 
-<div id="round-popup"><div id="pop-title"></div><div id="pop-desc"></div></div>
+<div id="round-popup"><div id="pop-title" style="font-weight:800; font-size:1.5rem;"></div><div id="pop-desc"></div></div>
 
 <div class="header">
-    <div id="room-tag" style="color:var(--primary); font-weight:800; font-size:0.8rem;">LOBBY</div>
-    <div id="suit-indicator"><span id="suit-symbol" style="font-size: 1.2rem;"></span></div>
+    <div class="header-left" id="room-tag">LOBBY</div>
+    <div class="header-center">
+        <button id="your-turn-indicator">YOUR TURN</button>
+    </div>
+    <div class="header-right">
+        <div id="suit-indicator"><span id="suit-symbol" style="font-size: 1.1rem;"></span></div>
+    </div>
 </div>
 
 <div id="game-view">
@@ -78,7 +89,7 @@
 </div>
 
 <div id="hand-area">
-    <div style="text-align:center; margin-bottom:8px;"><button style="background:rgba(255,255,255,0.1); color:#fff; border:none; padding:4px 10px; border-radius:4px; font-size:10px; cursor:pointer;" onclick="sortHand()">SORT CARDS ⇅</button></div>
+    <div style="text-align:center; margin-bottom:8px;"><button style="background:rgba(255,255,255,0.1); color:#fff; border:none; padding:4px 10px; border-radius:4px; font-size:10px;" onclick="sortHand()">SORT CARDS ⇅</button></div>
     <div class="hand-flex" id="my-cards"></div>
 </div>
 
@@ -96,10 +107,9 @@
     socket.emit('checkSession', { userID });
 
     function editName() {
-        const n = prompt("Change name:", myName);
+        const n = prompt("Name:", myName);
         if (n && n.trim()) {
-            myName = n.trim().substring(0, 12);
-            localStorage.setItem('pName', myName);
+            myName = n.trim().substring(0, 12); localStorage.setItem('pName', myName);
             document.getElementById('display-name').innerText = myName;
             if (myRoom) socket.emit('updateName', { roomID: myRoom, userID, newName: myName });
         }
@@ -107,12 +117,11 @@
 
     function enter(type) {
         myRoom = document.getElementById('rid').value;
-        if (!myRoom) return alert("Enter Room ID");
+        if (!myRoom) return alert("Room ID required");
         socket.emit(type === 'create' ? 'createRoom' : 'joinRoom', { roomID: myRoom, playerName: myName, maxPlayers: document.getElementById('maxp').value, userID });
     }
 
     function start() { socket.emit('startGame', myRoom); }
-
     function sortHand() {
         const order = { 'Spades': 4, 'Hearts': 3, 'Diamonds': 2, 'Clubs': 1 };
         myHand.sort((a, b) => (order[b.suit] - order[a.suit]) || (b.val - a.val));
@@ -137,22 +146,14 @@
     socket.on('clearTable', d => {
         const pop = document.getElementById('round-popup');
         document.getElementById('pop-title').innerText = d.msg.toUpperCase();
-        document.getElementById('pop-title').className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
         document.getElementById('pop-desc').innerText = d.winner + " lead next.";
-        pop.style.display = 'block'; setTimeout(() => { pop.style.display = 'none'; update(d); }, 1500);
-    });
-
-    socket.on('swapOccurred', d => {
-        const pop = document.getElementById('round-popup');
-        document.getElementById('pop-title').innerText = "SWAP!";
-        document.getElementById('pop-desc').innerText = d.msg;
         pop.style.display = 'block'; setTimeout(() => { pop.style.display = 'none'; update(d); }, 1500);
     });
 
     socket.on('roomList', list => {
         const box = document.getElementById('room-box'); box.innerHTML = "";
         list.forEach(r => {
-            const d = document.createElement('div'); d.style = "padding:8px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; cursor:pointer; font-size:10px;";
+            const d = document.createElement('div'); d.style = "padding:8px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; cursor:pointer; font-size:10px;";
             d.innerHTML = `<span>#${r.id}</span> <span>${r.count}/${r.max}</span>`;
             d.onclick = () => document.getElementById('rid').value = r.id;
             box.appendChild(d);
@@ -162,11 +163,21 @@
     socket.on('updateTable', update);
     socket.on('nextTurn', update);
     socket.on('errorMsg', alert);
-    socket.on('gameOver', d => { alert("Game Over! Loser: " + d.loser); location.reload(); });
+    socket.on('gameOver', d => { alert("Loser: " + d.loser); location.reload(); });
 
     function update(d) {
         const me = d.players.find(p => p.userID === userID);
         if(me) myHand = me.hand;
+
+        // Header Indicator Logic
+        const turnInd = document.getElementById('your-turn-indicator');
+        const activePlayer = d.players[d.turn];
+        if(activePlayer && activePlayer.userID === userID && d.gameStarted !== false) {
+            turnInd.style.display = 'block';
+        } else {
+            turnInd.style.display = 'none';
+        }
+
         const sInd = document.getElementById('suit-indicator');
         if (d.table && d.table.length > 0) {
             sInd.style.display = 'block';
@@ -174,6 +185,7 @@
             document.getElementById('suit-symbol').innerText = icons[s];
             document.getElementById('suit-symbol').className = ['Hearts','Diamonds'].includes(s) ? 'suit-red' : '';
         } else sInd.style.display = 'none';
+
         render(d.players, d.turn, d.table || []);
     }
 
@@ -198,7 +210,6 @@
             const div = document.createElement('div'); div.className = `player ${i === turn ? 'active' : ''}`;
             div.style.left = `calc(50% + ${x}px)`; div.style.top = `calc(50% + ${y}px)`;
             div.innerHTML = `
-                <div class="turn-label">Your Turn</div>
                 ${isTarget ? `<button class="btn-swap" onclick="socket.emit('requestSwap', {roomID:myRoom, userID})">TAKE HAND</button>` : ''}
                 <div class="av">
                     <span style="font-weight:800;">${p.name[0]}</span>

@@ -230,37 +230,52 @@
         update(d); 
     });
     
+    // 1. Replace your clearTable listener
     socket.on('clearTable', d => {
         if(d.msg.toLowerCase() === 'pangkah!') {
             sfx.strike.play().catch(()=>{}); 
-            if(d.winner === myName) { stats.points += 2; stats.pangkahs++; localStorage.setItem('pStats', JSON.stringify(stats)); updateStatsUI(); }
-        } else sfx.sweep.play().catch(()=>{});
+            if(d.winner === myName) { 
+                stats.points += 2; 
+                stats.pangkahs++; 
+                localStorage.setItem('pStats', JSON.stringify(stats)); 
+                updateStatsUI(); 
+            }
+        } else {
+            sfx.sweep.play().catch(()=>{});
+        }
         
         const pop = document.getElementById('round-popup');
         document.getElementById('pop-title').className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
         document.getElementById('pop-title').innerText = d.msg.toUpperCase();
         document.getElementById('pop-desc').innerText = d.winner + " has the lead."; 
         pop.style.display = 'block';
-        setTimeout(() => { 
-            // Only hide if the game hasn't ended during this delay
-            if(pop.querySelector('button') === null) pop.style.display = 'none'; 
-            update(d); 
-        }, 2000);
+
+        // Check if this was the final round of the game
+        const playersWithCards = d.players.filter(p => p.hand.length > 0);
+        if (playersWithCards.length <= 1) {
+            // Delay slightly so users see the "Pangkah/Clean" message first
+            setTimeout(() => update(d), 1500); 
+        } else {
+            // Normal round: hide popup after 2 seconds
+            setTimeout(() => { 
+                pop.style.display = 'none'; 
+                update(d); 
+            }, 2000);
+        }
     });
 
-    socket.on('updateTable', d => { sfx.place.play().catch(()=>{}); update(d); });
-    socket.on('nextTurn', d => update(d));
-    socket.on('errorMsg', m => { isProcessingTurn = false; showToast(m); });
-    socket.on('roomClosed', () => { alert("Sect disbanded."); window.location.reload(); });
-
-    // --- MAIN GAME UPDATE ---
+    // 2. Replace your entire update(d) function
     function update(d) {
-        isProcessingTurn = false; // Spam protection unlock
+        isProcessingTurn = false; 
 
-        // --- GAME END DETECTION ---
+        // --- FINAL DUEL CHECK ---
         const playersWithCards = d.players.filter(p => p.hand.length > 0);
-        if(playersWithCards.length <= 1 && d.table.length === 0) {
-            const loserName = playersWithCards.length === 1 ? playersWithCards[0].name : "None";
+        
+        // Trigger if only one player is left with cards
+        if(playersWithCards.length <= 1) {
+            const loser = playersWithCards[0];
+            const loserName = loser ? loser.name : "None";
+            
             const pop = document.getElementById('round-popup');
             const popTitle = document.getElementById('pop-title');
             const popDesc = document.getElementById('pop-desc');
@@ -268,25 +283,28 @@
             popTitle.className = 'pangkah-text';
             popTitle.innerText = "DUEL OVER";
             
-            let hostControls = "";
             const isHost = d.players[0] && d.players[0].userID === userID;
+            let controls = "";
             
             if (isHost) {
-                hostControls = `
+                controls = `
                     <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
-                        <button class="btn btn-p" style="width:auto; padding:8px 20px; font-size:12px;" onclick="start()">RESTART</button>
-                        <button class="btn" style="width:auto; padding:8px 20px; font-size:12px; background:var(--danger); color:white;" onclick="closeRoom()">END</button>
+                        <button class="btn btn-p" style="width:auto; padding:10px 20px; font-size:12px;" onclick="start()">RESTART</button>
+                        <button class="btn" style="width:auto; padding:10px 20px; font-size:12px; background:var(--danger); color:white;" onclick="closeRoom()">END</button>
                     </div>
                 `;
             } else {
-                hostControls = `<div style="margin-top:15px; font-size:11px; opacity:0.6;">Waiting for Sect Leader's decision...</div>`;
+                controls = `<div style="margin-top:15px; font-size:11px; opacity:0.6;">Waiting for Sect Leader to decide...</div>`;
             }
 
-            popDesc.innerHTML = `<div style="font-weight:800;">The Loser is: ${loserName}</div>${hostControls}`;
+            popDesc.innerHTML = `<div style="font-weight:800; font-size:1.2rem;">${loserName} IS THE LOSER</div>${controls}`;
             pop.style.display = 'block';
-            return; 
+            
+            render(d.players, d.turn, d.table || []);
+            return; // Stop execution here so popup doesn't close
         }
 
+        // --- NORMAL GAME UPDATE ---
         const me = d.players.find(p => p.userID === userID); 
         if(me) myCurrentHand = me.hand;
         
@@ -303,7 +321,6 @@
         render(d.players, d.turn, d.table || []);
         if(d.discarded) showDiscarded(d.discarded);
     }
-
     function render(players, turn, table = []) {
         const pLayer = document.getElementById('p-layer'); pLayer.innerHTML = "";
         const radius = document.getElementById('table-wrap').offsetWidth / 2;

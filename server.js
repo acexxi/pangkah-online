@@ -32,24 +32,54 @@ const broadcastRooms = () => {
 io.on('connection', (socket) => {
     broadcastRooms();
 
-    socket.on('createRoom', ({ roomID, playerName, maxPlayers }) => {
+    // Reconnection Check
+    socket.on('checkSession', ({ userID }) => {
+        for (let rid in rooms) {
+            let pIdx = rooms[rid].players.findIndex(p => p.userID === userID);
+            if (pIdx !== -1) {
+                // Update socket ID to the new one
+                rooms[rid].players[pIdx].id = socket.id;
+                socket.join(rid);
+                socket.emit('reconnectSuccess', { 
+                    roomID: rid, 
+                    players: rooms[rid].players, 
+                    turn: rooms[rid].turn, 
+                    table: rooms[rid].table,
+                    discarded: rooms[rid].discarded,
+                    gameStarted: rooms[rid].gameStarted
+                });
+                return;
+            }
+        }
+    });
+
+    socket.on('createRoom', ({ roomID, playerName, maxPlayers, userID }) => {
         if (rooms[roomID]) return socket.emit('errorMsg', 'Room ID already exists!');
         rooms[roomID] = {
             id: roomID, maxPlayers: parseInt(maxPlayers),
-            players: [{ id: socket.id, name: playerName, hand: [] }],
-            turn: 0, table: [], currentSuit: null, isFirstMove: true, discarded: []
+            players: [{ id: socket.id, name: playerName, userID: userID, hand: [] }],
+            turn: 0, table: [], currentSuit: null, isFirstMove: true, discarded: [], gameStarted: false
         };
         socket.join(roomID);
         io.to(roomID).emit('updatePlayers', rooms[roomID].players);
         broadcastRooms();
     });
 
-    socket.on('joinRoom', ({ roomID, playerName }) => {
+    socket.on('joinRoom', ({ roomID, playerName, userID }) => {
         const room = rooms[roomID];
         if (!room) return socket.emit('errorMsg', 'Room not found!');
-        if (room.players.length >= room.maxPlayers) return socket.emit('errorMsg', 'Room full!');
-        room.players.push({ id: socket.id, name: playerName, hand: [] });
-        socket.join(roomID);
+        
+        // If player already in room (reconnecting via Join button)
+        let existing = room.players.find(p => p.userID === userID);
+        if (existing) {
+            existing.id = socket.id;
+            socket.join(roomID);
+        } else {
+            if (room.players.length >= room.maxPlayers) return socket.emit('errorMsg', 'Room full!');
+            room.players.push({ id: socket.id, name: playerName, userID: userID, hand: [] });
+            socket.join(roomID);
+        }
+        
         io.to(roomID).emit('updatePlayers', room.players);
         broadcastRooms();
     });
@@ -57,10 +87,10 @@ io.on('connection', (socket) => {
     socket.on('startGame', (roomID) => {
         const room = rooms[roomID];
         if (!room) return;
+        room.gameStarted = true;
         let deck = generateDeck();
         room.discarded = [];
 
-        // BALANCE LOGIC: Discard Aces for 5 or 6 players
         if (room.maxPlayers === 5 || room.maxPlayers === 6) {
             const discardCount = room.maxPlayers === 5 ? 2 : 4;
             let aceIndices = [];
@@ -85,6 +115,8 @@ io.on('connection', (socket) => {
 
         const player = room.players[room.turn];
         const cardIndex = player.hand.findIndex(c => c.suit === cardObject.suit && c.rank === cardObject.rank);
+        if (cardIndex === -1) return;
+        
         const playedCard = player.hand[cardIndex];
 
         if (room.isFirstMove && (playedCard.suit !== 'Spades' || playedCard.rank !== 'K')) {

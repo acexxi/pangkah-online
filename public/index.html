@@ -252,17 +252,48 @@
     });
 
     function update(d) {
-        const activePlayers = d.players.filter(p => p.hand.length > 0);
+        isProcessingTurn = false; // Fixes the "multiple card drop" bug by unlocking the click
+
+        // --- BUG FIX: DETECT LOSER ---
+        const playersWithCards = d.players.filter(p => p.hand.length > 0);
         
-        // Final player check: Return to lobby state if game is over
-        if(activePlayers.length <= 1 && d.table.length === 0) {
-            showToast("DUEL ENDED", true);
+        // If only 1 player remains with cards, the game is over
+        if(playersWithCards.length === 1 && d.table.length === 0) {
+            const loser = playersWithCards[0];
+            
+            const pop = document.getElementById('round-popup');
+            document.getElementById('pop-title').className = 'pangkah-text';
+            document.getElementById('pop-title').innerText = "DUEL ENDED";
+            document.getElementById('pop-desc').innerText = loser.name + " is the Loser.";
+            pop.style.display = 'block';
+            
+            // Return to lobby state after 5 seconds
             setTimeout(() => {
+                pop.style.display = 'none';
+                // Only the host (first player in list) sees the Start button
                 if(d.players[0] && d.players[0].userID === userID) {
                     document.getElementById('start-btn').style.display = 'block';
                 }
-            }, 1000);
+            }, 5000);
         }
+        // --- END FIX ---
+
+        const me = d.players.find(p => p.userID === userID); 
+        if(me) myCurrentHand = me.hand;
+        
+        const activeP = d.players[d.turn];
+        document.getElementById('your-turn-btn').style.display = (activeP && activeP.userID === userID) ? 'block' : 'none';
+        
+        const sInd = document.getElementById('suit-indicator'); 
+        if (d.table && d.table.length > 0) {
+            sInd.style.display = 'flex'; 
+            document.getElementById('suit-symbol').innerText = icons[d.table[0].card.suit];
+            document.getElementById('suit-symbol').style.color = ['Hearts','Diamonds'].includes(d.table[0].card.suit) ? 'var(--danger)' : 'white';
+        } else sInd.style.display = 'none';
+
+        render(d.players, d.turn, d.table || []);
+        if(d.discarded) showDiscarded(d.discarded);
+    }
 
         const me = d.players.find(p => p.userID === userID); if(me) myCurrentHand = me.hand;
         const activeP = d.players[d.turn];

@@ -24,7 +24,7 @@ function generateDeck() {
 
 io.on('connection', (socket) => {
     socket.on('createRoom', ({ roomID, playerName, maxPlayers }) => {
-        if (rooms[roomID]) return socket.emit('errorMsg', 'Room ID exists!');
+        if (rooms[roomID]) return socket.emit('errorMsg', 'Room ID sudah wujud!');
         rooms[roomID] = {
             id: roomID, maxPlayers: parseInt(maxPlayers),
             players: [{ id: socket.id, name: playerName, hand: [] }],
@@ -36,7 +36,7 @@ io.on('connection', (socket) => {
 
     socket.on('joinRoom', ({ roomID, playerName }) => {
         const room = rooms[roomID];
-        if (!room || room.players.length >= room.maxPlayers) return socket.emit('errorMsg', 'Room full/not found!');
+        if (!room || room.players.length >= room.maxPlayers) return socket.emit('errorMsg', 'Bilik penuh atau tidak wujud!');
         room.players.push({ id: socket.id, name: playerName, hand: [] });
         socket.join(roomID);
         io.to(roomID).emit('updatePlayers', room.players);
@@ -48,6 +48,8 @@ io.on('connection', (socket) => {
         let deck = generateDeck();
         let cardsPerPlayer = Math.floor(52 / room.maxPlayers);
         room.players.forEach(p => p.hand = deck.splice(0, cardsPerPlayer));
+        
+        // Pemain yang ada King Spades mulakan dulu
         let starterIdx = room.players.findIndex(p => p.hand.some(c => c.suit === 'Spades' && c.rank === 'K'));
         room.turn = starterIdx !== -1 ? starterIdx : 0;
         io.to(roomID).emit('gameInit', { players: room.players, turn: room.turn });
@@ -61,63 +63,74 @@ io.on('connection', (socket) => {
         const cardIndex = player.hand.findIndex(c => c.suit === cardObject.suit && c.rank === cardObject.rank);
         if (cardIndex === -1) return;
 
-        const playedCard = player.hand.splice(cardIndex, 1)[0];
+        const playedCard = player.hand[cardIndex];
+
+        // --- SEKATAN PANGKAH HARAM ---
+        if (room.table.length > 0 && playedCard.suit !== room.currentSuit) {
+            const hasSuitInHand = player.hand.some(c => c.suit === room.currentSuit);
+            if (hasSuitInHand) {
+                return socket.emit('errorMsg', `Langkah tidak sah! Anda masih ada kad ${room.currentSuit}.`);
+            }
+        }
+
+        // Jalankan kad
+        player.hand.splice(cardIndex, 1);
         room.table.push({ playerIdx: room.turn, playerName: player.name, card: playedCard });
 
-        let isPangkahTriggered = false;
+        let isPangkah = false;
         if (room.table.length === 1) {
             room.currentSuit = playedCard.suit;
         } else if (playedCard.suit !== room.currentSuit) {
-            isPangkahTriggered = true;
+            isPangkah = true;
         }
 
         io.to(roomID).emit('updateTable', { table: room.table, turn: room.turn, players: room.players });
 
         let activeInRound = room.players.filter(p => p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p))).length;
 
-        if (isPangkahTriggered || room.table.length === activeInRound) {
+        if (isPangkah || room.table.length === activeInRound) {
             setTimeout(() => {
-                // LOGIK PEMENANG: Sentiasa cari kad terbesar dalam LEAD SUIT (Suit Asal)
-                let leadSuitWinnerIdx = -1;
+                let leadWinnerIdx = -1;
                 let highestLeadVal = -1;
 
+                // Cari pemilik kad terbesar dalam suit asal
                 room.table.forEach(item => {
                     if (item.card.suit === room.currentSuit) {
                         if (item.card.val > highestLeadVal) {
                             highestLeadVal = item.card.val;
-                            leadSuitWinnerIdx = item.playerIdx;
+                            leadWinnerIdx = item.playerIdx;
                         }
                     }
                 });
 
-                let logMsg = "";
-                if (isPangkahTriggered) {
-                    // Jika kena pangkah, pemilik kad lead suit tertinggi kena ambil semua kad
-                    const cardsFromTable = room.table.map(t => t.card);
-                    room.players[leadSuitWinnerIdx].hand.push(...cardsFromTable);
-                    logMsg = `${room.players[leadSuitWinnerIdx].name} had the highest ${room.currentSuit} and was PUNISHED!`;
+                let msg = "";
+                if (isPangkah) {
+                    // Mangsa (pemilik kad terbesar suit asal) ambil semua kad
+                    const cardsToTake = room.table.map(t => t.card);
+                    room.players[leadWinnerIdx].hand.push(...cardsToTake);
+                    msg = `${room.players[leadWinnerIdx].name} terpaksa ambil semua kad! (Kena Pangkah)`;
                 } else {
-                    // Jika pusingan lengkap tanpa pangkah, kad dibakar
-                    logMsg = `Clean round. Cards discarded.`;
+                    msg = `Pusingan selesai. Kad dibuang.`;
                 }
 
                 let survivors = room.players.filter(p => p.hand.length > 0);
                 if (survivors.length <= 1) {
-                    io.to(roomID).emit('gameOver', { loser: survivors[0]?.name || "None" });
+                    io.to(roomID).emit('gameOver', { loser: survivors[0]?.name || "Tiada" });
                     delete rooms[roomID];
                 } else {
-                    room.turn = leadSuitWinnerIdx; // Pemilik kad terbesar mulakan round baru (walaupun dia kena ambil kad)
+                    room.turn = leadWinnerIdx;
                     room.table = [];
                     room.currentSuit = null;
                     io.to(roomID).emit('clearTable', { 
                         turn: room.turn, 
-                        winner: room.players[leadSuitWinnerIdx].name, 
-                        players: room.players,
-                        msg: logMsg
+                        winner: room.players[leadWinnerIdx].name, 
+                        players: room.players, 
+                        msg: msg 
                     });
                 }
             }, 2000);
         } else {
+            // Tukar giliran ke pemain seterusnya yang ada kad
             do {
                 room.turn = (room.turn + 1) % room.players.length;
             } while (room.players[room.turn].hand.length === 0);

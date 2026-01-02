@@ -208,12 +208,11 @@
     socket.on('gameInit', d => { document.getElementById('start-btn').style.display = 'none'; update(d); });
     
     socket.on('clearTable', d => {
-        // Correct Sound Logic:
         if(d.msg.toLowerCase() === 'pangkah!') {
-            sfx.strike.play().catch(()=>{}); // Pangkah -> Strike
+            sfx.strike.play().catch(()=>{}); 
             if(d.winner === myName) { stats.pangkahs++; localStorage.setItem('pStats', JSON.stringify(stats)); }
         } else {
-            sfx.sweep.play().catch(()=>{}); // Clean -> Sweep
+            sfx.sweep.play().catch(()=>{}); 
         }
         
         const pop = document.getElementById('round-popup');
@@ -224,14 +223,13 @@
     });
 
     socket.on('updateTable', d => { 
-        sfx.place.play().catch(()=>{}); // Drop card -> Place
+        sfx.place.play().catch(()=>{}); 
         update(d); 
     });
     
     socket.on('nextTurn', d => update(d));
     socket.on('errorMsg', m => { isProcessingTurn = false; showToast(m); });
 
-    // Kick Logic: If host disbands, everyone reloads
     socket.on('roomClosed', () => {
         alert("Sect has been disbanded by the host.");
         window.location.reload();
@@ -239,6 +237,18 @@
 
     function update(d) {
         isProcessingTurn = false;
+        const activePlayers = d.players.filter(p => p.hand.length > 0);
+        
+        // BUG FIX: End game if only one player left with cards
+        if(activePlayers.length <= 1 && d.table.length === 0) {
+            showToast("DUEL ENDED", true);
+            setTimeout(() => {
+                if(d.players[0].userID === userID) {
+                    document.getElementById('start-btn').style.display = 'block';
+                }
+            }, 1000);
+        }
+
         const me = d.players.find(p => p.userID === userID); if(me) myCurrentHand = me.hand;
         const activeP = d.players[d.turn];
         document.getElementById('your-turn-btn').style.display = (activeP && activeP.userID === userID) ? 'block' : 'none';
@@ -273,7 +283,6 @@
 
             const div = document.createElement('div'); div.className = `player ${i === turn ? 'active' : ''}`;
             div.style.left = `calc(50% + ${x}px)`; div.style.top = `calc(50% + ${y}px)`;
-            // Player Icon restored
             div.innerHTML = `${swapBtnHTML}<div class="av"><span>🎴 ${p.hand.length}</span></div><div style="font-size:10px; margin-top:8px; color:${isMe ? 'var(--ui-blue)':'white'}">${p.name}</div>`;
             pLayer.appendChild(div);
         });
@@ -303,7 +312,6 @@
 
     function createCardUI(c) {
         const div = document.createElement('div'); div.className = `card ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
-        // Suit icon at 28px as requested
         div.innerHTML = `<div style="font-size:10px">${c.rank}</div><div style="font-size:28px;text-align:center">${icons[c.suit]}</div><div style="font-size:10px;transform:rotate(180deg)">${c.rank}</div>`;
         return div;
     }
@@ -318,7 +326,7 @@
     
     socket.on('receiveSwapRequest', d => { pendingSwapRequest = d.fromUserID; document.getElementById('swap-txt').innerText = d.fromName + " wants your hand!"; document.getElementById('swap-modal').style.display = 'block'; });
     socket.on('swapOccurred', d => { 
-        sfx.absorb.play().catch(()=>{}); // Take hand -> Absorb
+        sfx.absorb.play().catch(()=>{}); 
         update(d); 
     });
 </script>

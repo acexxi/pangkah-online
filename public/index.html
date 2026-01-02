@@ -22,8 +22,12 @@
         .room-list { height: 100px; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 12px; margin: 15px 0; border: 1px solid var(--border); }
         .room-item { padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; cursor: pointer; font-size: 0.8rem; }
 
+        /* PROFILE MODAL */
+        #profile-modal { position: fixed; inset: 0; z-index: 6000; background: rgba(2, 6, 23, 0.95); display: none; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
+        .profile-card { width: 85%; max-width: 320px; padding: 40px 20px; background: var(--glass); border: 1px solid var(--ui-blue); border-radius: 30px; text-align: center; }
+
         /* TOAST & MODALS */
-        #toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #f43f5e; padding: 10px 20px; border-radius: 10px; z-index: 10000; display: none; font-weight: 800; font-size: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        #toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #f43f5e; padding: 10px 20px; border-radius: 10px; z-index: 10000; display: none; font-weight: 800; font-size: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); text-align: center; min-width: 200px; }
         #swap-modal { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: #1e293b; padding: 25px; border-radius: 20px; border: 2px solid #f59e0b; z-index: 10001; display: none; text-align: center; width: 280px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
         #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(2,6,23,0.95); border: 2px solid var(--ui-blue); padding: 30px; border-radius: 20px; text-align: center; z-index: 9999; display: none; box-shadow: 0 0 50px rgba(59, 130, 246, 0.3); }
 
@@ -69,6 +73,7 @@
         .btn-swap { background: #f59e0b; color: #000; border: none; border-radius: 4px; font-size: 7px; font-weight: 900; padding: 3px 6px; cursor: pointer; margin-bottom: 4px; position: absolute; top: -25px; left: 50%; transform: translateX(-50%); width: 60px; }
         .btn { padding: 12px; border-radius: 10px; font-weight: 800; cursor: pointer; width: 100%; border: none; }
         .btn-p { background: var(--ui-blue); color: #fff; box-shadow: 0 0 15px rgba(59, 130, 246, 0.4); }
+        .btn-s { background: transparent; border: 1px solid var(--border); color: #fff; font-size: 10px; margin-top: 5px; }
         
         #discard-area { position: absolute; left: 10px; top: 70px; display: flex; flex-direction: column; gap: 4px; }
         .mini { width: 25px; height: 35px; background: white; color: black; border-radius: 4px; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
@@ -80,6 +85,20 @@
 <body>
 
 <div id="toast">MESSAGE</div>
+
+<div id="profile-modal">
+    <div class="profile-card">
+        <h3 style="color: var(--ui-blue); margin-top: 0;">CULTIVATION JOURNEY</h3>
+        <div id="prof-level" style="font-size: 24px; font-weight: 800;">LEVEL 1</div>
+        <div id="prof-title" style="color: var(--primary-action); letter-spacing: 2px; margin-bottom: 20px;">APPRENTICE</div>
+        <hr style="border: 0; border-top: 1px solid var(--border); margin: 20px 0;">
+        <div style="display: flex; justify-content: space-around; margin-bottom: 30px;">
+            <div><div style="font-size: 20px; font-weight: 800;" id="prof-wins">0</div><div style="font-size: 10px; opacity: 0.6;">WINS</div></div>
+            <div><div style="font-size: 20px; font-weight: 800;" id="prof-pangkahs">0</div><div style="font-size: 10px; opacity: 0.6;">PANGKAHS</div></div>
+        </div>
+        <button class="btn btn-p" onclick="closeProfile()">RETURN</button>
+    </div>
+</div>
 
 <div id="swap-modal">
     <div id="swap-txt" style="font-size: 13px; margin-bottom: 15px;">Player wants your hand!</div>
@@ -94,11 +113,12 @@
         <h2 style="color:var(--ui-blue); letter-spacing: 2px;">PANGKAH MURIM</h2>
         
         <div id="user-info" style="margin-bottom:15px; font-weight:800; font-size: 0.9rem;">
-            <span id="display-name"></span> 
-            <span onclick="editName()" style="color:var(--ui-blue); cursor:pointer; font-size:0.7rem; opacity:0.6;">[EDIT]</span>
-            <div id="stats-display" style="font-size: 10px; margin-top: 5px; opacity: 0.8; color: var(--primary-action);">
-                Record: 0 Wins | 0 Pangkahs
+            <div style="display: flex; justify-content: center; align-items: center; gap: 8px;">
+                <span id="display-name" style="color: var(--ui-blue);"></span> 
+                <span onclick="editName()" style="color:var(--ui-blue); cursor:pointer; font-size:0.7rem; opacity:0.6;">[EDIT]</span>
             </div>
+            <div id="level-title" style="color: var(--primary-action); font-size: 12px; margin-top: 4px; letter-spacing: 1px;">LEVEL 1 - APPRENTICE</div>
+            <button class="btn btn-s" onclick="openProfile()">VIEW PROFILE 📜</button>
         </div>
 
         <div class="room-list" id="room-box"></div>
@@ -168,9 +188,37 @@
     updateStatsUI();
     socket.emit('checkSession', { userID });
 
+    function getTitle(lvl) {
+        if (lvl <= 5) return "APPRENTICE";
+        if (lvl <= 10) return "WARRIOR";
+        if (lvl <= 15) return "MASTER";
+        if (lvl <= 20) return "GRANDMASTER";
+        if (lvl <= 25) return "EARTH IMMORTAL";
+        if (lvl <= 30) return "SKY SOVEREIGN";
+        if (lvl <= 35) return "PRIMORDIAL SAGE";
+        if (lvl <= 40) return "VOID REAVER";
+        if (lvl <= 45) return "HEAVENLY EMPEROR";
+        return "ANCIENT ANCESTOR";
+    }
+
+    function openProfile() {
+        const level = stats.wins + 1;
+        document.getElementById('prof-level').innerText = `LEVEL ${level}`;
+        document.getElementById('prof-title').innerText = getTitle(level);
+        document.getElementById('prof-wins').innerText = stats.wins;
+        document.getElementById('prof-pangkahs').innerText = stats.pangkahs;
+        document.getElementById('profile-modal').style.display = 'flex';
+    }
+
+    function closeProfile() {
+        document.getElementById('profile-modal').style.display = 'none';
+    }
+
     function updateStatsUI() {
+        const level = stats.wins + 1;
+        const title = getTitle(level);
         document.getElementById('display-name').innerText = myName;
-        document.getElementById('stats-display').innerText = `Record: ${stats.wins} Wins | ${stats.pangkahs} Pangkahs`;
+        document.getElementById('level-title').innerText = `LEVEL ${level} - ${title}`;
     }
 
     function saveStats() {
@@ -183,10 +231,12 @@
         if(n) { myName = n; localStorage.setItem('pName', n); updateStatsUI(); }
     }
 
-    function showToast(msg) {
+    function showToast(msg, isLevelUp = false) {
         const t = document.getElementById('toast');
-        t.innerText = msg; t.style.display = 'block';
-        setTimeout(() => t.style.display = 'none', 2500);
+        t.innerText = msg;
+        t.style.background = isLevelUp ? 'var(--primary-action)' : '#f43f5e';
+        t.style.display = 'block';
+        setTimeout(() => t.style.display = 'none', 3000);
     }
 
     function enter(type) {
@@ -218,7 +268,6 @@
         pendingSwapRequest = null;
     }
 
-    // SOCKET LISTENERS
     socket.on('roomClosed', () => {
         alert("The Sect Leader has disbanded the room.");
         location.reload();
@@ -270,15 +319,12 @@
     });
 
     socket.on('clearTable', d => {
-        // Track Pangkah Stats
         if(d.winner === myName && d.msg.toLowerCase() === 'pangkah!') {
             stats.pangkahs++;
             saveStats();
         }
-
         if(d.msg.toLowerCase() === 'pangkah!') { sfx.strike.play().catch(e => {}); } 
         else { sfx.sweep.play().catch(e => {}); }
-        
         const pop = document.getElementById('round-popup');
         const title = document.getElementById('pop-title');
         title.className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
@@ -306,7 +352,6 @@
     socket.on('errorMsg', m => showToast(m));
     
     socket.on('gameOver', d => { 
-        // Track Win Stats
         if(d.loser !== myName) {
             stats.wins++;
             saveStats();

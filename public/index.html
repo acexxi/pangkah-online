@@ -47,7 +47,8 @@
         .card { width: 50px; height: 75px; background: white; color: black; border-radius: 10px; padding: 6px; font-weight: 800; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 1px solid #ddd; transition: transform 0.1s; position: relative; }
         .card.red { color: var(--danger) !important; }
         
-        .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70px; height: 105px; border: 2px solid #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.6); pointer-events: none; z-index: 50; }
+        /* Updated Table Card Style */
+        .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 52px; height: 78px; border: 2px solid #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.6); pointer-events: none; z-index: 50; transition: all 0.3s ease; }
 
         #toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: var(--danger); padding: 12px 24px; border-radius: 12px; z-index: 10000; display: none; font-weight: 800; font-size: 13px; }
         .btn-swap { background: #f59e0b; color: #000; border: none; border-radius: 20px; font-size: 8px; font-weight: 900; padding: 4px 10px; position: absolute; top: -30px; left: 50%; transform: translateX(-50%); width: 80px; }
@@ -239,33 +240,21 @@
     function update(d) {
         isProcessingTurn = false; 
 
-        // --- END GAME DETECTION ---
         const playersWithCards = d.players.filter(p => p.hand.length > 0);
         if(playersWithCards.length <= 1) {
             const loser = playersWithCards[0];
             const loserName = loser ? loser.name : "None";
-            
             const pop = document.getElementById('round-popup');
             const popTitle = document.getElementById('pop-title');
             const popDesc = document.getElementById('pop-desc');
-
             popTitle.className = 'pangkah-text';
             popTitle.innerText = "DUEL OVER";
-            
             const isHost = d.players[0] && d.players[0].userID === userID;
-            let controls = "";
-            
-            if (isHost) {
-                controls = `
-                    <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
-                        <button class="btn btn-p" style="width:auto; padding:10px 20px; font-size:12px;" onclick="start()">RESTART</button>
-                        <button class="btn" style="width:auto; padding:10px 20px; font-size:12px; background:var(--danger); color:white;" onclick="closeRoom()">END</button>
-                    </div>
-                `;
-            } else {
-                controls = `<div style="margin-top:15px; font-size:11px; opacity:0.6;">Waiting for Sect Leader...</div>`;
-            }
-
+            let controls = isHost ? `
+                <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
+                    <button class="btn btn-p" style="width:auto; padding:10px 20px; font-size:12px;" onclick="start()">RESTART</button>
+                    <button class="btn" style="width:auto; padding:10px 20px; font-size:12px; background:var(--danger); color:white;" onclick="closeRoom()">END</button>
+                </div>` : `<div style="margin-top:15px; font-size:11px; opacity:0.6;">Waiting for Sect Leader...</div>`;
             popDesc.innerHTML = `<div style="font-weight:800; font-size:1.2rem;">${loserName} LOST</div>${controls}`;
             pop.style.display = 'block';
             render(d.players, d.turn, d.table || []);
@@ -302,18 +291,23 @@
                 while(players[nextValid].hand.length === 0 && nextValid !== myIdx) nextValid = (nextValid + 1) % players.length;
                 if(i === nextValid) swapBtnHTML = `<button class="btn-swap" onclick="socket.emit('sendSwapRequest', {roomID:myRoom, fromUserID:'${userID}'})">TAKE HAND</button>`;
             }
-
             const div = document.createElement('div'); div.className = `player ${i === turn ? 'active' : ''}`;
             div.style.left = `calc(50% + ${x}px)`; div.style.top = `calc(50% + ${y}px)`;
             div.innerHTML = `${swapBtnHTML}<div class="av"><span>🎴 ${p.hand.length}</span></div><div style="font-size:10px; margin-top:8px; color:${p.userID === userID ? 'var(--ui-blue)':'white'}">${p.name}</div>`;
             pLayer.appendChild(div);
         });
+
         renderHand();
+
+        // Spread Table Cards Horizontally
         const tLayer = document.getElementById('t-layer'); tLayer.innerHTML = "";
+        const spacing = 45; 
+        const totalW = (table.length - 1) * spacing;
         table.forEach((tc, idx) => {
             const el = createCardUI(tc.card); 
             el.className = `card table-card ${['Hearts','Diamonds'].includes(tc.card.suit) ? 'red' : ''}`;
-            el.style.transform = `translate(-50%, -50%) rotate(${idx * 15}deg)`; 
+            const posX = (idx * spacing) - (totalW / 2);
+            el.style.transform = `translate(calc(-50% + ${posX}px), -50%)`; 
             tLayer.appendChild(el);
         });
     }

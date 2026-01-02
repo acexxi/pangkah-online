@@ -21,24 +21,42 @@
         .pangkah-text { color: #f43f5e; font-size: 2rem; font-weight: 800; }
         .clean-text { color: var(--primary); font-size: 2rem; font-weight: 800; }
 
+        /* HEADER */
+        .header { height: 60px; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+        #suit-indicator { background: rgba(255,255,255,0.05); padding: 5px 12px; border-radius: 10px; border: 1px solid var(--border); font-weight: 800; display: none; align-items: center; gap: 8px; }
+        .suit-red { color: #f43f5e; }
+
         /* GAME UI */
-        .header { height: 60px; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
         #game-view { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
         .safe-wrap { position: relative; width: 100%; height: 100%; max-width: 42vh; max-height: 42vh; aspect-ratio: 1/1; }
         .ring { position: absolute; inset: 0; border-radius: 50%; border: 1px dashed rgba(16,185,129,0.2); }
         
+        /* PLAYER AVATAR & TURN LABEL */
         .player { position: absolute; transform: translate(-50%, -50%); text-align: center; z-index: 100; transition: 0.3s; }
-        .av { width: 45px; height: 45px; border-radius: 50%; background: #0f172a; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; position: relative; }
-        .active .av { border-color: var(--primary); box-shadow: 0 0 15px var(--primary); }
+        .av { width: 50px; height: 50px; border-radius: 50%; background: #0f172a; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; position: relative; }
+        .active .av { border-color: var(--primary); box-shadow: 0 0 20px var(--primary); animation: pulse 1.5s infinite; }
         
+        .turn-label { 
+            position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+            background: var(--primary); color: #000; font-size: 8px; font-weight: 900;
+            padding: 2px 8px; border-radius: 4px; text-transform: uppercase;
+            display: none; white-space: nowrap; box-shadow: 0 0 10px var(--primary);
+        }
+        .active .turn-label { display: block; }
+
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+
+        /* CARDS */
         #hand-area { height: 22vh; background: rgba(0,0,0,0.4); border-top: 1px solid var(--border); padding: 10px; overflow-x: auto; }
         .hand-flex { display: flex; gap: 8px; justify-content: center; }
-        .card { width: 50px; height: 75px; background: white; color: black; border-radius: 8px; padding: 5px; font-weight: 800; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; }
-        .card.red { color: #e11d48; }
-        .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .card { width: 50px; height: 75px; background: white; color: black; border-radius: 8px; padding: 5px; font-weight: 800; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 1px solid #ddd; }
+        .card.red { color: #f43f5e !important; } /* High priority for red suits */
+        .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
 
         #discard-area { position: absolute; left: 10px; top: 70px; display: flex; flex-direction: column; gap: 4px; }
         .mini { width: 25px; height: 35px; background: white; color: black; border-radius: 4px; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+        .mini.red { color: #f43f5e; }
+        
         input, select { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 10px; background: #000; color: #fff; border: 1px solid var(--border); }
         .btn { padding: 12px; border-radius: 10px; font-weight: 800; cursor: pointer; width: 100%; border: none; }
         .btn-p { background: var(--primary); color: #022c22; }
@@ -62,7 +80,10 @@
 
 <div class="header">
     <div id="room-tag" style="color:var(--primary); font-weight:800;">LOBBY</div>
-    <div id="turn-glow" style="display:none; background:var(--primary); color:#000; padding:4px 12px; border-radius:20px; font-weight:800; font-size:0.7rem; box-shadow:0 0 15px var(--primary)">YOUR TURN</div>
+    <div id="suit-indicator">
+        <span style="font-size: 0.7rem; opacity: 0.6;">SUIT:</span>
+        <span id="suit-symbol" style="font-size: 1.2rem;"></span>
+    </div>
 </div>
 
 <div id="game-view">
@@ -156,6 +177,19 @@
     function update(d) {
         const me = d.players.find(p => p.id === socket.id);
         if(me) myCurrentHand = me.hand;
+        
+        // Update Current Suit Indicator in Header
+        const sInd = document.getElementById('suit-indicator');
+        const sSym = document.getElementById('suit-symbol');
+        if (d.table && d.table.length > 0) {
+            const firstCard = d.table[0].card;
+            sInd.style.display = 'flex';
+            sSym.innerText = icons[firstCard.suit];
+            sSym.className = ['Hearts','Diamonds'].includes(firstCard.suit) ? 'suit-red' : '';
+        } else {
+            sInd.style.display = 'none';
+        }
+        
         render(d.players, d.turn, d.table || []);
     }
 
@@ -169,15 +203,20 @@
             const active = i === turn;
             const div = document.createElement('div'); div.className = `player ${active ? 'active' : ''}`;
             div.style.left = `calc(50% + ${x}px)`; div.style.top = `calc(50% + ${y}px)`;
-            div.innerHTML = `<div class="av"><span style="font-weight:800;">${p.name[0]}</span><div style="position:absolute; top:-5px; right:-5px; background:var(--primary); color:#000; font-size:9px; padding:2px 5px; border-radius:10px;">${p.hand.length}</div></div><div style="font-size:8px; margin-top:4px;">${p.name}</div>`;
+            div.innerHTML = `
+                <div class="turn-label">Your Turn</div>
+                <div class="av">
+                    <span style="font-weight:800;">${p.name[0]}</span>
+                    <div style="position:absolute; top:-5px; right:-5px; background:var(--primary); color:#000; font-size:9px; padding:2px 5px; border-radius:10px;">${p.hand.length}</div>
+                </div>
+                <div style="font-size:8px; margin-top:4px;">${p.name}</div>
+            `;
             pLayer.appendChild(div);
-            if(active && p.id === socket.id) document.getElementById('turn-glow').style.display = 'block';
-            else if(p.id === socket.id) document.getElementById('turn-glow').style.display = 'none';
         });
         renderHand();
         const tLayer = document.getElementById('t-layer'); tLayer.innerHTML = "";
         table.forEach((tc, idx) => {
-            const el = createCardUI(tc.card); el.className = "card table-card";
+            const el = createCardUI(tc.card); el.className = `card table-card ${['Hearts','Diamonds'].includes(tc.card.suit) ? 'red' : ''}`;
             el.style.transform = `translate(-50%, -50%) rotate(${idx * 15}deg)`; tLayer.appendChild(el);
         });
     }
@@ -192,7 +231,9 @@
     }
 
     function createCardUI(c) {
-        const div = document.createElement('div'); div.className = `card ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
+        const div = document.createElement('div'); 
+        const isRed = ['Hearts','Diamonds'].includes(c.suit);
+        div.className = `card ${isRed ? 'red' : ''}`;
         div.innerHTML = `<div style="font-size:9px">${c.rank}</div><div style="font-size:22px;text-align:center">${icons[c.suit]}</div><div style="font-size:9px;transform:rotate(180deg)">${c.rank}</div>`;
         return div;
     }

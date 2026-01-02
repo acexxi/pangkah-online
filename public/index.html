@@ -159,14 +159,33 @@
         return "ANCIENT ANCESTOR";
     }
 
+    // --- UI & LOBBY LOGIC ---
     function updateStatsUI() {
         const level = getLevel();
+        // Update Lobby
         document.getElementById('display-name').innerText = myName;
         document.getElementById('level-title').innerText = `LEVEL ${level} - ${getTitle(level)}`;
+        // Update Profile
+        document.getElementById('prof-level').innerText = `LEVEL ${level}`;
+        document.getElementById('prof-title').innerText = getTitle(level);
+        document.getElementById('prof-points').innerText = stats.points;
+        document.getElementById('prof-pangkahs').innerText = stats.pangkahs;
+        const prog = stats.points % 5;
+        document.getElementById('prof-progress-text').innerText = `Progress: ${prog}/5`;
+        document.getElementById('prof-bar-fill').style.width = (prog / 5 * 100) + "%";
     }
-    updateStatsUI();
 
-    function editName() { const n = prompt("Name:", myName); if(n) { myName = n; localStorage.setItem('pName', n); updateStatsUI(); } }
+    function editName() { 
+        const n = prompt("Enter Name:", myName); 
+        if(n && n.trim()) { 
+            myName = n.trim(); 
+            localStorage.setItem('pName', myName); 
+            updateStatsUI(); 
+        } 
+    }
+    
+    function openProfile() { updateStatsUI(); document.getElementById('profile-modal').style.display = 'flex'; }
+    function closeProfile() { document.getElementById('profile-modal').style.display = 'none'; }
     function showToast(msg, isPos = false) { const t = document.getElementById('toast'); t.innerText = msg; t.style.background = isPos ? 'var(--primary-action)' : 'var(--danger)'; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000); }
 
     function enter(type) {
@@ -176,14 +195,7 @@
     }
 
     function start() { socket.emit('startGame', myRoom); }
-    
-    function closeRoom() { 
-        if(!myRoom) return;
-        if(confirm("Disband this sect? All disciples will be kicked.")) {
-            socket.emit('requestCloseRoom', { roomID: myRoom }); 
-        }
-    }
-
+    function closeRoom() { if(myRoom && confirm("Disband this sect?")) socket.emit('requestCloseRoom', { roomID: myRoom }); }
     function sortHand() { const order = { 'Spades': 4, 'Hearts': 3, 'Diamonds': 2, 'Clubs': 1 }; myCurrentHand.sort((a, b) => (order[b.suit] - order[a.suit]) || (b.val - a.val)); renderHand(); }
     function answerSwap(accept) { document.getElementById('swap-modal').style.display = 'none'; if(accept && pendingSwapRequest) socket.emit('acceptSwap', { roomID: myRoom, fromUserID: pendingSwapRequest, myUserID: userID }); pendingSwapRequest = null; }
 
@@ -205,95 +217,44 @@
         render(p, -1);
     });
 
-    socket.on('gameInit', d => { 
-        document.getElementById('start-btn').style.display = 'none'; 
-        isProcessingTurn = false; // Reset lock on start
-        update(d); 
-    });
+    socket.on('gameInit', d => { document.getElementById('start-btn').style.display = 'none'; update(d); });
     
     socket.on('clearTable', d => {
         if(d.msg.toLowerCase() === 'pangkah!') {
             sfx.strike.play().catch(()=>{}); 
-            if(d.winner === myName) { stats.pangkahs++; localStorage.setItem('pStats', JSON.stringify(stats)); }
-        } else {
-            sfx.sweep.play().catch(()=>{}); 
-        }
+            if(d.winner === myName) { stats.points += 2; stats.pangkahs++; localStorage.setItem('pStats', JSON.stringify(stats)); updateStatsUI(); }
+        } else sfx.sweep.play().catch(()=>{});
         
         const pop = document.getElementById('round-popup');
         document.getElementById('pop-title').className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
         document.getElementById('pop-title').innerText = d.msg.toUpperCase();
         document.getElementById('pop-desc').innerText = d.winner + " has the lead."; pop.style.display = 'block';
-        setTimeout(() => { 
-            pop.style.display = 'none'; 
-            isProcessingTurn = false; // Unlock after animation
-            update(d); 
-        }, 2000);
+        setTimeout(() => { pop.style.display = 'none'; update(d); }, 2000);
     });
 
-    socket.on('updateTable', d => { 
-        sfx.place.play().catch(()=>{}); 
-        isProcessingTurn = false; // Unlock once server accepts play
-        update(d); 
-    });
-    
-    socket.on('nextTurn', d => {
-        isProcessingTurn = false; // Unlock for next player
-        update(d);
-    });
+    socket.on('updateTable', d => { sfx.place.play().catch(()=>{}); update(d); });
+    socket.on('nextTurn', d => update(d));
+    socket.on('errorMsg', m => { isProcessingTurn = false; showToast(m); });
+    socket.on('roomClosed', () => { alert("Sect disbanded."); window.location.reload(); });
 
-    socket.on('errorMsg', m => { 
-        isProcessingTurn = false; // Unlock if move was illegal
-        showToast(m); 
-    });
-
-    socket.on('roomClosed', () => {
-        alert("Sect has been disbanded by the host.");
-        window.location.reload();
-    });
-
+    // --- MAIN GAME LOGIC ---
     function update(d) {
-        isProcessingTurn = false; // Fixes the "multiple card drop" bug by unlocking the click
+        isProcessingTurn = false; // Spam Lock Unlock
 
-        // --- BUG FIX: DETECT LOSER ---
-        const playersWithCards = d.players.filter(p => p.hand.length > 0);
-        
-        // If only 1 player remains with cards, the game is over
-        if(playersWithCards.length === 1 && d.table.length === 0) {
-            const loser = playersWithCards[0];
-            
+        // BUG FIX: LOSER DETECTION
+        const activePs = d.players.filter(p => p.hand.length > 0);
+        if(activePs.length === 1 && d.table.length === 0) {
+            const loser = activePs[0];
             const pop = document.getElementById('round-popup');
             document.getElementById('pop-title').className = 'pangkah-text';
             document.getElementById('pop-title').innerText = "DUEL ENDED";
             document.getElementById('pop-desc').innerText = loser.name + " is the Loser.";
             pop.style.display = 'block';
-            
-            // Return to lobby state after 5 seconds
             setTimeout(() => {
                 pop.style.display = 'none';
-                // Only the host (first player in list) sees the Start button
-                if(d.players[0] && d.players[0].userID === userID) {
-                    document.getElementById('start-btn').style.display = 'block';
-                }
+                if(d.players[0] && d.players[0].userID === userID) document.getElementById('start-btn').style.display = 'block';
             }, 5000);
         }
-        // --- END FIX ---
-
-        const me = d.players.find(p => p.userID === userID); 
-        if(me) myCurrentHand = me.hand;
-        
-        const activeP = d.players[d.turn];
-        document.getElementById('your-turn-btn').style.display = (activeP && activeP.userID === userID) ? 'block' : 'none';
-        
-        const sInd = document.getElementById('suit-indicator'); 
-        if (d.table && d.table.length > 0) {
-            sInd.style.display = 'flex'; 
-            document.getElementById('suit-symbol').innerText = icons[d.table[0].card.suit];
-            document.getElementById('suit-symbol').style.color = ['Hearts','Diamonds'].includes(d.table[0].card.suit) ? 'var(--danger)' : 'white';
-        } else sInd.style.display = 'none';
-
-        render(d.players, d.turn, d.table || []);
-        if(d.discarded) showDiscarded(d.discarded);
-    }
 
         const me = d.players.find(p => p.userID === userID); if(me) myCurrentHand = me.hand;
         const activeP = d.players[d.turn];
@@ -346,13 +307,7 @@
         const hDiv = document.getElementById('my-cards'); hDiv.innerHTML = "";
         myCurrentHand.forEach(c => { 
             const el = createCardUI(c); 
-            el.onclick = () => {
-                // BUG FIX: Prevent multiple clicks/drops
-                if(!isProcessingTurn) {
-                    isProcessingTurn = true; 
-                    socket.emit('playCard', { roomID: myRoom, cardObject: c });
-                }
-            };
+            el.onclick = () => { if(!isProcessingTurn) { isProcessingTurn = true; socket.emit('playCard', { roomID: myRoom, cardObject: c }); } };
             hDiv.appendChild(el); 
         });
     }
@@ -367,16 +322,12 @@
         const dArea = document.getElementById('discard-area'); dArea.innerHTML = list.length ? '<div style="font-size:8px; opacity:0.5;">FATE</div>' : '';
         list.forEach(c => { const div = document.createElement('div'); div.className = `mini ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`; div.innerHTML = icons[c.suit]; dArea.appendChild(div); });
     }
-
-    function openProfile() { document.getElementById('profile-modal').style.display = 'flex'; }
-    function closeProfile() { document.getElementById('profile-modal').style.display = 'none'; }
     
     socket.on('receiveSwapRequest', d => { pendingSwapRequest = d.fromUserID; document.getElementById('swap-txt').innerText = d.fromName + " wants your hand!"; document.getElementById('swap-modal').style.display = 'block'; });
-    socket.on('swapOccurred', d => { 
-        sfx.absorb.play().catch(()=>{}); 
-        isProcessingTurn = false;
-        update(d); 
-    });
+    socket.on('swapOccurred', d => { sfx.absorb.play().catch(()=>{}); update(d); });
+
+    // BOOTSTRAP
+    updateStatsUI();
 </script>
 </body>
 </html>

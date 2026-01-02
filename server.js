@@ -22,9 +22,21 @@ function generateDeck() {
     return deck.sort(() => Math.random() - 0.5);
 }
 
+// Helper to send list of room IDs
+const broadcastRooms = () => {
+    io.emit('roomList', Object.keys(rooms).map(id => ({
+        id,
+        count: rooms[id].players.length,
+        max: rooms[id].maxPlayers
+    })));
+};
+
 io.on('connection', (socket) => {
+    // Send current rooms to new connection
+    broadcastRooms();
+
     socket.on('createRoom', ({ roomID, playerName, maxPlayers }) => {
-        if (rooms[roomID]) return socket.emit('errorMsg', 'Room ID already exists!');
+        if (rooms[roomID]) return socket.emit('errorMsg', 'Room ID taken!');
         rooms[roomID] = {
             id: roomID, maxPlayers: parseInt(maxPlayers),
             players: [{ id: socket.id, name: playerName, hand: [] }],
@@ -32,14 +44,18 @@ io.on('connection', (socket) => {
         };
         socket.join(roomID);
         io.to(roomID).emit('updatePlayers', rooms[roomID].players);
+        broadcastRooms();
     });
 
     socket.on('joinRoom', ({ roomID, playerName }) => {
         const room = rooms[roomID];
-        if (!room || room.players.length >= room.maxPlayers) return socket.emit('errorMsg', 'Room full or not found!');
+        if (!room) return socket.emit('errorMsg', 'Room not found!');
+        if (room.players.length >= room.maxPlayers) return socket.emit('errorMsg', 'Room full!');
+        
         room.players.push({ id: socket.id, name: playerName, hand: [] });
         socket.join(roomID);
         io.to(roomID).emit('updatePlayers', room.players);
+        broadcastRooms();
     });
 
     socket.on('startGame', (roomID) => {
@@ -67,27 +83,22 @@ io.on('connection', (socket) => {
 
         if (room.isFirstMove) {
             if (playedCard.suit !== 'Spades' || playedCard.rank !== 'K') {
-                return socket.emit('errorMsg', "You must start with the King of Spades!");
+                return socket.emit('errorMsg', "First move must be King of Spades!");
             }
             room.isFirstMove = false; 
         }
 
         if (room.table.length > 0 && playedCard.suit !== room.currentSuit) {
-            const hasSuitInHand = player.hand.some(c => c.suit === room.currentSuit);
-            if (hasSuitInHand) {
-                return socket.emit('errorMsg', `You must follow the suit: ${room.currentSuit}`);
+            if (player.hand.some(c => c.suit === room.currentSuit)) {
+                return socket.emit('errorMsg', `Must follow suit: ${room.currentSuit}`);
             }
         }
 
         player.hand.splice(cardIndex, 1);
         room.table.push({ playerIdx: room.turn, playerName: player.name, card: playedCard });
 
-        let isPangkah = false;
-        if (room.table.length === 1) {
-            room.currentSuit = playedCard.suit;
-        } else if (playedCard.suit !== room.currentSuit) {
-            isPangkah = true;
-        }
+        if (room.table.length === 1) room.currentSuit = playedCard.suit;
+        let isPangkah = playedCard.suit !== room.currentSuit;
 
         io.to(roomID).emit('updateTable', { table: room.table, turn: room.turn, players: room.players });
 
@@ -97,43 +108,36 @@ io.on('connection', (socket) => {
             setTimeout(() => {
                 let leadWinnerIdx = -1;
                 let highestLeadVal = -1;
-
                 room.table.forEach(item => {
-                    if (item.card.suit === room.currentSuit) {
-                        if (item.card.val > highestLeadVal) {
-                            highestLeadVal = item.card.val;
-                            leadWinnerIdx = item.playerIdx;
-                        }
+                    if (item.card.suit === room.currentSuit && item.card.val > highestLeadVal) {
+                        highestLeadVal = item.card.val;
+                        leadWinnerIdx = item.playerIdx;
                     }
                 });
 
-                if (isPangkah) {
-                    room.players[leadWinnerIdx].hand.push(...room.table.map(t => t.card));
-                }
+                if (isPangkah) room.players[leadWinnerIdx].hand.push(...room.table.map(t => t.card));
 
                 let survivors = room.players.filter(p => p.hand.length > 0);
                 if (survivors.length <= 1) {
                     io.to(roomID).emit('gameOver', { loser: survivors[0]?.name || "None" });
                     delete rooms[roomID];
+                    broadcastRooms();
                 } else {
                     room.turn = leadWinnerIdx;
                     room.table = [];
                     room.currentSuit = null;
-                    io.to(roomID).emit('clearTable', { 
-                        turn: room.turn, 
-                        winner: room.players[leadWinnerIdx].name, 
-                        players: room.players,
-                        msg: isPangkah ? "Pangkah Penalty!" : "Next Round"
-                    });
+                    io.to(roomID).emit('clearTable', { turn: room.turn, winner: room.players[leadWinnerIdx].name, players: room.players, msg: isPangkah ? "Pangkah Penalty!" : "Next Round" });
                 }
             }, 1500);
         } else {
-            do {
-                room.turn = (room.turn + 1) % room.players.length;
-            } while (room.players[room.turn].hand.length === 0);
+            do { room.turn = (room.turn + 1) % room.players.length; } while (room.players[room.turn].hand.length === 0);
             io.to(roomID).emit('nextTurn', { turn: room.turn, players: room.players, table: room.table });
         }
     });
+
+    socket.on('disconnect', () => {
+        // Simple cleanup logic can be added here
+    });
 });
 
-server.listen(process.env.PORT || 3000, '0.0.0.0');
+server.listen(3000, '0.0.0.0');

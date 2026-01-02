@@ -27,6 +27,7 @@
         .profile-card { width: 85%; max-width: 340px; padding: 40px 20px; background: var(--glass); border: 1px solid var(--ui-blue); border-radius: 32px; text-align: center; }
         .bar-container { width: 100%; height: 10px; background: rgba(255,255,255,0.05); border-radius: 20px; margin: 15px 0; overflow: hidden; border: 1px solid var(--border); }
         .bar-fill { height: 100%; background: linear-gradient(90deg, var(--ui-blue), var(--primary-action)); width: 0%; transition: width 0.6s ease; }
+        
         #swap-modal { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: var(--glass-heavy); backdrop-filter: blur(20px); padding: 30px; border-radius: 24px; border: 1px solid #f59e0b; z-index: 10001; display: none; text-align: center; width: 300px; }
         #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--glass-heavy); border: 1px solid var(--ui-blue); padding: 40px; border-radius: 24px; text-align: center; z-index: 9999; display: none; }
 
@@ -45,7 +46,8 @@
         .hand-flex { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; padding-bottom: 20px; }
         .card { width: 50px; height: 75px; background: white; color: black; border-radius: 10px; padding: 6px; font-weight: 800; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 1px solid #ddd; transition: transform 0.1s; position: relative; }
         .card.red { color: var(--danger) !important; }
-        .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 65px; height: 95px; border: 2px solid #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.6); pointer-events: none; }
+        
+        .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70px; height: 105px; border: 2px solid #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.6); pointer-events: none; z-index: 50; }
 
         #toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: var(--danger); padding: 12px 24px; border-radius: 12px; z-index: 10000; display: none; font-weight: 800; font-size: 13px; }
         .btn-swap { background: #f59e0b; color: #000; border: none; border-radius: 20px; font-size: 8px; font-weight: 900; padding: 4px 10px; position: absolute; top: -30px; left: 50%; transform: translateX(-50%); width: 80px; }
@@ -169,7 +171,6 @@
     }
 
     function start() { socket.emit('startGame', myRoom); }
-    
     function closeRoom() { 
         if(!myRoom) return;
         if(confirm("Disband this sect?")) {
@@ -199,8 +200,10 @@
     });
 
     socket.on('gameInit', d => { document.getElementById('start-btn').style.display = 'none'; update(d); });
+    
     socket.on('clearTable', d => {
-        sfx.sweep.play().catch(()=>{});
+        // Both Pangkah and Clean now use the Strike sound per request
+        sfx.strike.play().catch(()=>{});
         if(d.winner === myName && d.msg.toLowerCase() === 'pangkah!') { stats.pangkahs++; localStorage.setItem('pStats', JSON.stringify(stats)); }
         const pop = document.getElementById('round-popup');
         document.getElementById('pop-title').className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
@@ -255,8 +258,10 @@
         renderHand();
         const tLayer = document.getElementById('t-layer'); tLayer.innerHTML = "";
         table.forEach((tc, idx) => {
-            const el = createCardUI(tc.card); el.className = `card table-card ${['Hearts','Diamonds'].includes(tc.card.suit) ? 'red' : ''}`;
-            el.style.transform = `translate(-50%, -50%) rotate(${idx * 15}deg)`; tLayer.appendChild(el);
+            const el = createCardUI(tc.card); 
+            el.className = `card table-card ${['Hearts','Diamonds'].includes(tc.card.suit) ? 'red' : ''}`;
+            el.style.transform = `translate(-50%, -50%) rotate(${idx * 15}deg)`; 
+            tLayer.appendChild(el);
         });
     }
 

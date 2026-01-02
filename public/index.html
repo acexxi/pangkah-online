@@ -3,295 +3,217 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pangkah Elite | Glass Edition</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <title>Pangkah Elite</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        :root { 
-            --primary: #38bdf8; --accent: #f59e0b; --danger: #f43f5e;
-            --glass: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(255, 255, 255, 0.1);
+        :root { --p: #38bdf8; --a: #fbbf24; --d: #f43f5e; --bg: #0f172a; --glass: rgba(255,255,255,0.03); --border: rgba(255,255,255,0.1); }
+        * { box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+        body { margin: 0; height: 100vh; overflow: hidden; background: radial-gradient(circle at top right, #1e293b, #0f172a); color: white; display: flex; flex-direction: column; }
+
+        /* LOBBY GLASSMORPHISM */
+        #lobby { position: fixed; inset: 0; z-index: 5000; background: rgba(15,23,42,0.8); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; }
+        .glass-panel { width: 90%; max-width: 400px; padding: 40px; border-radius: 30px; background: var(--glass); border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(0,0,0,0.5); text-align: center; }
+        .name-tag { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px; font-weight: 900; color: var(--p); }
+        .room-scroll { height: 120px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 15px; margin: 15px 0; border: 1px solid var(--border); }
+        .room-item { padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; cursor: pointer; font-size: 0.9rem; }
+        .room-item:hover { background: rgba(56,189,248,0.1); }
+
+        /* DYNAMIC GAME LAYOUT */
+        .header { height: 60px; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+        #game-view { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; position: relative; }
+        
+        /* THE FIXED TABLE WRAPPER (Prevents Overlap) */
+        .safe-table-zone { 
+            position: relative; 
+            width: 100%; height: 100%; 
+            max-width: 500px; max-height: 500px; /* Constrains circle size */
+            aspect-ratio: 1/1;
+            display: flex; align-items: center; justify-content: center;
         }
-        * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
-        body { 
-            margin: 0; height: 100vh; overflow: hidden; color: white;
-            background: radial-gradient(circle at top right, #1e293b, #0f172a);
-            display: flex; flex-direction: column;
+        .visual-circle { 
+            position: absolute; inset: 15%; border-radius: 50%; border: 2px dashed var(--border);
+            background: radial-gradient(circle, rgba(56,189,248,0.05) 0%, transparent 70%);
         }
 
-        /* --- LOBBY UI --- */
-        #lobby { 
-            position: fixed; inset: 0; z-index: 2000; 
-            background: linear-gradient(135deg, rgba(15,23,42,0.95) 0%, rgba(30,41,59,0.9) 100%);
-            display: flex; align-items: center; justify-content: center; backdrop-filter: blur(20px);
-        }
-        .lobby-panel { 
-            width: 90%; max-width: 450px; padding: 40px; border-radius: 30px;
-            background: var(--glass); border: 1px solid var(--glass-border);
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); text-align: center;
-        }
-        .name-box { 
-            display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 25px;
-            font-size: 1.2rem; font-weight: 800; color: var(--primary);
-        }
-        .room-list { 
-            background: rgba(0,0,0,0.2); border-radius: 15px; padding: 15px; 
-            margin: 20px 0; max-height: 150px; overflow-y: auto; text-align: left;
-        }
-        .room-item { 
-            padding: 10px; border-bottom: 1px solid var(--glass-border); 
-            display: flex; justify-content: space-between; cursor: pointer;
-        }
-        .room-item:hover { background: var(--glass); }
-
-        /* --- GAME UI --- */
-        .header { 
-            height: 70px; padding: 0 30px; display: flex; justify-content: space-between; align-items: center;
-            background: var(--glass); backdrop-filter: blur(10px); border-bottom: 1px solid var(--glass-border);
-        }
-        #game-view { 
-            flex: 1; position: relative; display: flex; align-items: center; justify-content: center;
-            perspective: 1000px;
-        }
-        .main-table {
-            width: 70vh; height: 70vh; max-width: 90vw; max-height: 90vw;
-            background: radial-gradient(circle, rgba(56,189,248,0.1) 0%, transparent 70%);
-            border: 2px solid var(--glass-border); border-radius: 50%; position: relative;
-        }
-
-        /* --- AVATARS --- */
-        .player-node { 
-            position: absolute; width: 100px; transform: translate(-50%, -50%); 
-            text-align: center; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .avatar-glow {
-            width: 55px; height: 55px; border-radius: 50%; margin: 0 auto;
-            background: var(--glass); border: 2px solid var(--glass-border);
+        /* AVATARS (Stay inside safe zone) */
+        .player-node { position: absolute; width: 80px; text-align: center; transition: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 100; }
+        .av-glow { 
+            width: 50px; height: 50px; border-radius: 50%; margin: 0 auto; 
+            background: var(--bg); border: 2px solid var(--border); 
             display: flex; align-items: center; justify-content: center; position: relative;
         }
-        .active .avatar-glow { 
-            border-color: var(--primary); box-shadow: 0 0 20px var(--primary); 
-            background: rgba(56,189,248,0.1);
-        }
-        .card-badge {
-            position: absolute; -top: 5px; -right: 5px; background: var(--primary);
-            color: #000; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 20px;
-        }
+        .active .av-glow { border-color: var(--p); box-shadow: 0 0 15px var(--p); }
+        .badge { position: absolute; -top: 5px; -right: 5px; background: var(--p); color: #000; font-size: 10px; font-weight: 900; padding: 2px 6px; border-radius: 10px; }
 
-        /* --- HAND --- */
-        #hand-area { 
-            flex: 0 0 200px; padding: 20px; background: rgba(0,0,0,0.3);
-            border-top: 1px solid var(--glass-border); overflow-y: auto;
-        }
-        .hand-flex { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+        /* HAND (Responsive Multi-Row) */
+        #hand-area { min-height: 180px; padding: 15px; background: rgba(0,0,0,0.3); border-top: 1px solid var(--border); overflow-y: auto; z-index: 200; }
+        .hand-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 1000px; margin: 0 auto; }
 
-        /* --- CARDS --- */
-        .card {
-            width: 60px; height: 90px; border-radius: 10px; background: white; color: black;
-            display: flex; flex-direction: column; justify-content: space-between; padding: 8px;
-            font-weight: 800; cursor: pointer; border: 1px solid #ddd;
-            transition: transform 0.2s; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+        /* CARDS */
+        .card { 
+            width: 55px; height: 82px; background: white; border-radius: 8px; color: black; padding: 6px; 
+            font-weight: 900; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3); transition: 0.2s;
         }
-        .card.red { color: var(--danger); }
-        .card:hover { transform: translateY(-15px) scale(1.1); z-index: 100; border: 2px solid var(--primary); }
+        .card.red { color: var(--d); }
+        .card:hover { transform: translateY(-10px) scale(1.05); z-index: 50; }
         .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
-        /* --- BUTTONS & INPUTS --- */
-        input { 
-            width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--glass-border);
-            background: rgba(0,0,0,0.3); color: white; margin: 10px 0; outline: none;
-        }
-        .btn { 
-            padding: 14px 24px; border-radius: 12px; border: none; font-weight: 800; cursor: pointer;
-            transition: 0.3s; text-transform: uppercase; letter-spacing: 1px;
-        }
-        .btn-primary { background: var(--primary); color: #0f172a; width: 100%; margin: 5px 0; }
-        .btn-outline { background: transparent; border: 1px solid var(--glass-border); color: white; width: 100%; }
-        
-        #status-popup {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.9); padding: 30px; border-radius: 20px; border: 1px solid var(--primary);
-            z-index: 5000; display: none; text-align: center;
-        }
+        /* BUTTONS */
+        input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: #000; color: #fff; margin: 10px 0; text-align: center; }
+        .btn { padding: 12px 20px; border-radius: 12px; border: none; font-weight: 900; cursor: pointer; text-transform: uppercase; width: 100%; transition: 0.2s; }
+        .btn-p { background: var(--p); color: var(--bg); }
+        .btn-s { background: transparent; border: 1px solid var(--border); color: white; margin-top: 10px; }
+
+        #popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #000; border: 2px solid var(--p); padding: 30px; border-radius: 20px; z-index: 10000; text-align: center; display: none; }
     </style>
 </head>
 <body>
 
 <div id="lobby">
-    <div class="lobby-panel">
-        <div class="name-box">
-            <span id="display-name">Player</span>
-            <span style="cursor:pointer; font-size: 0.9rem;" onclick="editName()">✏️</span>
-        </div>
-        
-        <div style="font-size: 0.8rem; opacity: 0.6; text-align: left;">ACTIVE ROOMS</div>
-        <div class="room-list" id="room-list-ui">
-            <div style="opacity:0.4; font-size:0.8rem;">No active rooms. Create one!</div>
-        </div>
-
-        <input type="text" id="target-room" placeholder="Enter Room ID">
-        <select id="player-count" style="width:100%; padding:10px; border-radius:10px; background:#000; color:#fff; border:1px solid #333; margin-bottom:10px;">
-            <option value="4">4 Players</option>
-            <option value="5">5 Players</option>
-        </select>
-        
-        <button class="btn btn-primary" onclick="handleAction('create')">Create Room</button>
-        <button class="btn btn-outline" onclick="handleAction('join')">Join Room</button>
+    <div class="glass-panel">
+        <div class="name-tag"><span id="name-val">Player</span> <span onclick="editName()" style="cursor:pointer; font-size: 0.8rem;">[EDIT]</span></div>
+        <div style="font-size: 0.7rem; opacity: 0.5; text-align: left;">ONGOING ROOMS</div>
+        <div class="room-scroll" id="room-ui"></div>
+        <input type="text" id="room-id" placeholder="ROOM NAME">
+        <select id="max-p" style="width:100%; background:#000; color:#fff; padding:10px; border-radius:10px; margin-bottom:10px;"><option value="4">4 Players</option><option value="5">5 Players</option></select>
+        <button class="btn btn-p" onclick="action('create')">Create Room</button>
+        <button class="btn btn-s" onclick="action('join')">Join Room</button>
     </div>
 </div>
 
-<div id="status-popup">
-    <h2 id="pop-title" style="margin:0; color:var(--primary);">PANGKAH!</h2>
-    <p id="pop-desc"></p>
-</div>
+<div id="popup"><h2 id="pop-msg" style="margin:0; color:var(--p);"></h2></div>
 
 <div class="header">
-    <div id="room-info" style="font-weight: 800; color: var(--primary);">Lobby</div>
-    <div id="turn-glow" style="display:none; padding: 5px 15px; border-radius: 20px; background: var(--primary); color: #000; font-weight: 800;">YOUR TURN</div>
-    <div id="player-status" style="font-size: 0.9rem; opacity:0.7;">Waiting for players...</div>
+    <div id="room-display" style="font-weight: 900; font-size: 0.8rem; color: var(--p);">LOBBY</div>
+    <div id="turn-tip" style="display:none; background: var(--p); color: #000; padding: 4px 12px; border-radius: 20px; font-weight: 900; font-size: 0.8rem;">YOUR TURN</div>
+    <div id="game-status" style="font-size: 0.7rem; opacity: 0.6;">Waiting...</div>
 </div>
 
 <div id="game-view">
-    <div class="main-table" id="table-bounds">
-        <div id="players-layer" style="position:absolute; inset:0;"></div>
-        <div id="cards-layer" style="position:absolute; inset:0;"></div>
-        <button id="start-btn" class="btn btn-primary" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:auto;" onclick="startGame()">Start Match</button>
+    <div class="safe-table-zone" id="safe-zone">
+        <div class="visual-circle"></div>
+        <div id="player-layer" style="position: absolute; inset: 0;"></div>
+        <div id="table-cards" style="position: absolute; inset: 0;"></div>
+        <button id="start-match" class="btn btn-p" style="display:none; width: auto; position: absolute;" onclick="startMatch()">START GAME</button>
     </div>
 </div>
 
-<div id="hand-area">
-    <div class="hand-flex" id="my-cards"></div>
-</div>
+<div id="hand-area"><div class="hand-grid" id="my-hand"></div></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
     const socket = io();
-    const state = {
-        name: localStorage.getItem('pangkah_name') || 'Player_' + Math.floor(Math.random()*999),
-        room: null,
-        suitIcons: { 'Spades': '♠', 'Hearts': '♥', 'Diamonds': '♦', 'Clubs': '♣' }
-    };
+    let myName = localStorage.getItem('pName') || 'User' + Math.floor(Math.random()*999);
+    let myRoom = null;
+    const icons = { 'Spades': '♠', 'Hearts': '♥', 'Diamonds': '♦', 'Clubs': '♣' };
 
-    document.getElementById('display-name').innerText = state.name;
+    document.getElementById('name-val').innerText = myName;
 
     function editName() {
-        const n = prompt("Enter your name:", state.name);
-        if(n) {
-            state.name = n;
-            localStorage.setItem('pangkah_name', n);
-            document.getElementById('display-name').innerText = n;
-        }
+        const n = prompt("Enter Name:", myName);
+        if(n) { myName = n; localStorage.setItem('pName', n); document.getElementById('name-val').innerText = n; }
     }
 
-    function handleAction(type) {
-        const rid = document.getElementById('target-room').value;
+    function action(type) {
+        const rid = document.getElementById('room-id').value;
         if(!rid) return alert("Enter Room ID");
-        state.room = rid;
-        const max = document.getElementById('player-count').value;
+        myRoom = rid;
         socket.emit(type === 'create' ? 'createRoom' : 'joinRoom', { 
-            roomID: rid, playerName: state.name, maxPlayers: max 
+            roomID: rid, playerName: myName, maxPlayers: document.getElementById('max-p').value 
         });
     }
 
-    function startGame() { socket.emit('startGame', state.room); }
+    function startMatch() { socket.emit('startGame', myRoom); }
 
     socket.on('roomList', list => {
-        const ui = document.getElementById('room-list-ui');
-        ui.innerHTML = list.length ? "" : '<div style="opacity:0.4; font-size:0.8rem;">No active rooms.</div>';
+        const ui = document.getElementById('room-ui');
+        ui.innerHTML = list.length ? "" : '<div style="padding:20px; opacity:0.3; font-size:0.8rem;">No rooms.</div>';
         list.forEach(r => {
             const div = document.createElement('div');
             div.className = "room-item";
-            div.innerHTML = `<span>#${r.id}</span> <span>${r.count}/${r.max}</span>`;
-            div.onclick = () => document.getElementById('target-room').value = r.id;
+            div.innerHTML = `<span>#${r.id}</span> <span>${r.current}/${r.max}</span>`;
+            div.onclick = () => document.getElementById('room-id').value = r.id;
             ui.appendChild(div);
         });
     });
 
     socket.on('updatePlayers', p => {
         document.getElementById('lobby').style.display = 'none';
-        document.getElementById('room-info').innerText = "ROOM: " + state.room;
-        if(p.length >= 4) document.getElementById('start-btn').style.display = 'block';
+        document.getElementById('room-display').innerText = "ROOM: " + myRoom;
+        if(p.length >= 4) document.getElementById('start-match').style.display = 'block';
         render(p, -1);
     });
 
-    socket.on('gameInit', d => {
-        document.getElementById('start-btn').style.display = 'none';
-        render(d.players, d.turn);
-    });
-
+    socket.on('gameInit', d => { document.getElementById('start-match').style.display = 'none'; render(d.players, d.turn); });
     socket.on('updateTable', d => render(d.players, d.turn, d.table));
     socket.on('nextTurn', d => render(d.players, d.turn, d.table));
 
     socket.on('clearTable', d => {
-        const pop = document.getElementById('status-popup');
-        document.getElementById('pop-desc').innerText = d.msg;
+        const pop = document.getElementById('popup');
+        document.getElementById('pop-msg').innerText = d.winner + ": " + d.msg;
         pop.style.display = 'block';
-        setTimeout(() => {
-            pop.style.display = 'none';
-            render(d.players, d.turn);
-        }, 2000);
+        setTimeout(() => { pop.style.display = 'none'; render(d.players, d.turn); }, 2000);
     });
 
     socket.on('errorMsg', m => alert(m));
-    socket.on('gameOver', d => { alert("Game Over! Loser: " + d.loser); location.reload(); });
+    socket.on('gameOver', d => { alert("GAME OVER! Loser: " + d.loser); location.reload(); });
 
     function render(players, turn, table = []) {
-        // Player Avatars
-        const layer = document.getElementById('players-layer');
+        const layer = document.getElementById('player-layer');
         layer.innerHTML = "";
-        const radius = (document.getElementById('table-bounds').offsetWidth / 2);
+        const radius = document.getElementById('safe-zone').offsetWidth / 2.5;
 
         players.forEach((p, i) => {
             const angle = (i * (360 / players.length) - 90) * (Math.PI / 180);
-            const x = Math.cos(angle) * (radius + 20); // Push slightly outside the circle
-            const y = Math.sin(angle) * (radius + 20);
+            const x = Math.cos(angle) * radius;
+            const y = Math.sin(angle) * radius;
             
             const div = document.createElement('div');
             div.className = `player-node ${i === turn ? 'active' : ''}`;
             div.style.left = `calc(50% + ${x}px)`;
             div.style.top = `calc(50% + ${y}px)`;
             div.innerHTML = `
-                <div class="avatar-glow">
-                    <span style="font-weight:800;">${p.name[0].toUpperCase()}</span>
-                    <div class="card-badge">${p.hand.length}</div>
+                <div class="av-glow">
+                    <span style="font-weight:900;">${p.name[0].toUpperCase()}</span>
+                    <div class="badge">${p.hand.length}</div>
                 </div>
-                <div style="font-size:10px; margin-top:5px; white-space:nowrap;">${p.name}</div>
+                <div style="font-size:10px; margin-top:5px; font-weight:700;">${p.name}</div>
             `;
             layer.appendChild(div);
 
-            if(i === turn && p.id === socket.id) document.getElementById('turn-glow').style.display = 'block';
-            else if(p.id === socket.id) document.getElementById('turn-glow').style.display = 'none';
+            if(i === turn && p.id === socket.id) document.getElementById('turn-tip').style.display = 'block';
+            else if(p.id === socket.id) document.getElementById('turn-tip').style.display = 'none';
         });
 
-        // My Hand
         const me = players.find(p => p.id === socket.id);
-        const hDiv = document.getElementById('my-cards');
+        const hDiv = document.getElementById('my-hand');
         hDiv.innerHTML = "";
         if(me) {
             me.hand.sort((a,b) => a.suit.localeCompare(b.suit) || b.val - a.val);
             me.hand.forEach(c => {
-                const el = createCardUI(c);
-                el.onclick = () => socket.emit('playCard', { roomID: state.room, cardObject: c });
+                const el = createCard(c);
+                el.onclick = () => socket.emit('playCard', { roomID: myRoom, cardObject: c });
                 hDiv.appendChild(el);
             });
         }
 
-        // Table Cards
-        const tLayer = document.getElementById('cards-layer');
-        tLayer.innerHTML = "";
+        const tDiv = document.getElementById('table-cards');
+        tDiv.innerHTML = "";
         table.forEach((tc, idx) => {
-            const el = createCardUI(tc.card);
+            const el = createCard(tc.card);
             el.className = "card table-card";
-            el.style.transform = `translate(-50%, -50%) rotate(${idx * 10}deg) translateY(-10px)`;
-            tLayer.appendChild(el);
+            el.style.transform = `translate(-50%, -50%) rotate(${idx * 15}deg)`;
+            tDiv.appendChild(el);
         });
     }
 
-    function createCardUI(c) {
+    function createCard(c) {
         const div = document.createElement('div');
         div.className = `card ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
         div.innerHTML = `
             <div style="font-size:10px">${c.rank}</div>
-            <div style="font-size:24px; text-align:center;">${state.suitIcons[c.suit]}</div>
+            <div style="font-size:24px; text-align:center;">${icons[c.suit]}</div>
             <div style="font-size:10px; transform:rotate(180deg)">${c.rank}</div>
         `;
         return div;

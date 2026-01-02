@@ -31,26 +31,19 @@
         .safe-wrap { position: relative; width: 100%; height: 100%; max-width: 42vh; max-height: 42vh; aspect-ratio: 1/1; }
         .ring { position: absolute; inset: 0; border-radius: 50%; border: 1px dashed rgba(16,185,129,0.2); }
         
-        /* PLAYER AVATAR & TURN LABEL */
         .player { position: absolute; transform: translate(-50%, -50%); text-align: center; z-index: 100; transition: 0.3s; }
         .av { width: 50px; height: 50px; border-radius: 50%; background: #0f172a; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; position: relative; }
         .active .av { border-color: var(--primary); box-shadow: 0 0 20px var(--primary); animation: pulse 1.5s infinite; }
         
-        .turn-label { 
-            position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
-            background: var(--primary); color: #000; font-size: 8px; font-weight: 900;
-            padding: 2px 8px; border-radius: 4px; text-transform: uppercase;
-            display: none; white-space: nowrap; box-shadow: 0 0 10px var(--primary);
-        }
+        .turn-label { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); background: var(--primary); color: #000; font-size: 8px; font-weight: 900; padding: 2px 8px; border-radius: 4px; display: none; white-space: nowrap; }
         .active .turn-label { display: block; }
-
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
 
         /* CARDS */
         #hand-area { height: 22vh; background: rgba(0,0,0,0.4); border-top: 1px solid var(--border); padding: 10px; overflow-x: auto; }
         .hand-flex { display: flex; gap: 8px; justify-content: center; }
         .card { width: 50px; height: 75px; background: white; color: black; border-radius: 8px; padding: 5px; font-weight: 800; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 1px solid #ddd; }
-        .card.red { color: #f43f5e !important; } /* High priority for red suits */
+        .card.red { color: #f43f5e !important; }
         .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
 
         #discard-area { position: absolute; left: 10px; top: 70px; display: flex; flex-direction: column; gap: 4px; }
@@ -80,10 +73,7 @@
 
 <div class="header">
     <div id="room-tag" style="color:var(--primary); font-weight:800;">LOBBY</div>
-    <div id="suit-indicator">
-        <span style="font-size: 0.7rem; opacity: 0.6;">SUIT:</span>
-        <span id="suit-symbol" style="font-size: 1.2rem;"></span>
-    </div>
+    <div id="suit-indicator"><span id="suit-symbol" style="font-size: 1.2rem;"></span></div>
 </div>
 
 <div id="game-view">
@@ -104,12 +94,18 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
     const socket = io();
+    let userID = localStorage.getItem('pUserID') || 'uid_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('pUserID', userID);
+    
     let myName = localStorage.getItem('pName') || 'User' + Math.floor(Math.random()*999);
     let myRoom = "";
     let myCurrentHand = [];
     const icons = { 'Spades': '♠', 'Hearts': '♥', 'Diamonds': '♦', 'Clubs': '♣' };
 
     document.getElementById('user-info').firstChild.textContent = myName + " ";
+
+    // Initial check for active session
+    socket.emit('checkSession', { userID });
 
     function editName() {
         const n = prompt("Name:", myName);
@@ -119,7 +115,7 @@
     function enter(type) {
         myRoom = document.getElementById('rid').value;
         if(!myRoom) return alert("ID Required");
-        socket.emit(type === 'create' ? 'createRoom' : 'joinRoom', { roomID: myRoom, playerName: myName, maxPlayers: document.getElementById('maxp').value });
+        socket.emit(type === 'create' ? 'createRoom' : 'joinRoom', { roomID: myRoom, playerName: myName, maxPlayers: document.getElementById('maxp').value, userID: userID });
     }
 
     function start() { socket.emit('startGame', myRoom); }
@@ -129,6 +125,19 @@
         myCurrentHand.sort((a, b) => (order[b.suit] - order[a.suit]) || (b.val - a.val));
         renderHand();
     }
+
+    socket.on('reconnectSuccess', d => {
+        myRoom = d.roomID;
+        document.getElementById('lobby').style.display = 'none';
+        document.getElementById('room-tag').innerText = "ROOM: " + myRoom;
+        if(d.gameStarted) {
+            showDiscarded(d.discarded);
+            update(d);
+        } else {
+            render(d.players, -1);
+            if(d.players.length >= 4) document.getElementById('start-btn').style.display = 'block';
+        }
+    });
 
     socket.on('roomList', list => {
         const box = document.getElementById('room-box');
@@ -150,12 +159,7 @@
 
     socket.on('gameInit', d => {
         document.getElementById('start-btn').style.display = 'none';
-        const dArea = document.getElementById('discard-area');
-        dArea.innerHTML = d.discarded.length ? '<div style="font-size:8px; opacity:0.5;">OUT</div>' : '';
-        d.discarded.forEach(c => {
-            const div = document.createElement('div'); div.className = `mini ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
-            div.innerHTML = icons[c.suit]; dArea.appendChild(div);
-        });
+        showDiscarded(d.discarded);
         update(d);
     });
 
@@ -169,16 +173,24 @@
         setTimeout(() => { pop.style.display = 'none'; update(d); }, 2000);
     });
 
+    function showDiscarded(list) {
+        const dArea = document.getElementById('discard-area');
+        dArea.innerHTML = list.length ? '<div style="font-size:8px; opacity:0.5;">OUT</div>' : '';
+        list.forEach(c => {
+            const div = document.createElement('div'); div.className = `mini ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
+            div.innerHTML = icons[c.suit]; dArea.appendChild(div);
+        });
+    }
+
     socket.on('updateTable', d => update(d));
     socket.on('nextTurn', d => update(d));
     socket.on('errorMsg', m => alert(m));
-    socket.on('gameOver', d => { alert("Game Over! Loser: " + d.loser); location.reload(); });
+    socket.on('gameOver', d => { alert("Game Over! Loser: " + d.loser); localStorage.removeItem('pUserID'); location.reload(); });
 
     function update(d) {
-        const me = d.players.find(p => p.id === socket.id);
+        const me = d.players.find(p => p.userID === userID);
         if(me) myCurrentHand = me.hand;
         
-        // Update Current Suit Indicator in Header
         const sInd = document.getElementById('suit-indicator');
         const sSym = document.getElementById('suit-symbol');
         if (d.table && d.table.length > 0) {
@@ -189,7 +201,6 @@
         } else {
             sInd.style.display = 'none';
         }
-        
         render(d.players, d.turn, d.table || []);
     }
 
@@ -201,6 +212,8 @@
             const x = Math.cos(angle) * (radius + 20);
             const y = Math.sin(angle) * (radius + 20);
             const active = i === turn;
+            const isMe = p.userID === userID;
+
             const div = document.createElement('div'); div.className = `player ${active ? 'active' : ''}`;
             div.style.left = `calc(50% + ${x}px)`; div.style.top = `calc(50% + ${y}px)`;
             div.innerHTML = `
@@ -209,7 +222,7 @@
                     <span style="font-weight:800;">${p.name[0]}</span>
                     <div style="position:absolute; top:-5px; right:-5px; background:var(--primary); color:#000; font-size:9px; padding:2px 5px; border-radius:10px;">${p.hand.length}</div>
                 </div>
-                <div style="font-size:8px; margin-top:4px;">${p.name}</div>
+                <div style="font-size:8px; margin-top:4px; font-weight:${isMe ? '800':'400'}">${p.name}${isMe ? ' (You)' : ''}</div>
             `;
             pLayer.appendChild(div);
         });
@@ -232,8 +245,7 @@
 
     function createCardUI(c) {
         const div = document.createElement('div'); 
-        const isRed = ['Hearts','Diamonds'].includes(c.suit);
-        div.className = `card ${isRed ? 'red' : ''}`;
+        div.className = `card ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
         div.innerHTML = `<div style="font-size:9px">${c.rank}</div><div style="font-size:22px;text-align:center">${icons[c.suit]}</div><div style="font-size:9px;transform:rotate(180deg)">${c.rank}</div>`;
         return div;
     }

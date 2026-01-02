@@ -9,103 +9,98 @@
         :root { 
             --primary-action: #10b981; 
             --ui-blue: #3b82f6; 
-            --bg-gradient: radial-gradient(circle at 50% -20%, #1e3a8a, #020617 80%);
-            --glass: rgba(59, 130, 246, 0.05);
-            --border: rgba(59, 130, 246, 0.2); 
+            --bg-solid: #020617;
+            --panel-solid: #1e293b;
+            --border: #334155; 
             --danger: #f43f5e;
         }
         * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { margin: 0; height: 100vh; overflow: hidden; background: var(--bg-gradient); color: white; display: flex; flex-direction: column; }
+        body { margin: 0; height: 100vh; overflow: hidden; background: var(--bg-solid); color: white; display: flex; flex-direction: column; }
 
-        /* LOBBY & PROFILE */
-        #lobby { position: fixed; inset: 0; z-index: 5000; backdrop-filter: blur(40px); background: rgba(2, 6, 23, 0.9); display: flex; align-items: center; justify-content: center; }
-        .panel { width: 90%; max-width: 400px; padding: 30px; border-radius: 28px; background: var(--glass); border: 1px solid var(--border); text-align: center; }
-        .room-list { height: 100px; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 12px; margin: 15px 0; border: 1px solid var(--border); }
+        /* LOBBY & PROFILE - SOLID STYLE */
+        #lobby { position: fixed; inset: 0; z-index: 5000; background: var(--bg-solid); display: flex; align-items: center; justify-content: center; }
+        .panel { width: 90%; max-width: 400px; padding: 30px; border-radius: 20px; background: var(--panel-solid); border: 2px solid var(--border); text-align: center; }
+        .room-list { height: 100px; overflow-y: auto; background: #0f172a; border-radius: 12px; margin: 15px 0; border: 1px solid var(--border); }
         .room-item { padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; cursor: pointer; font-size: 0.8rem; }
-        #profile-modal { position: fixed; inset: 0; z-index: 6000; background: rgba(2, 6, 23, 0.95); display: none; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
-        .profile-card { width: 85%; max-width: 320px; padding: 40px 20px; background: var(--glass); border: 1px solid var(--ui-blue); border-radius: 30px; text-align: center; }
-        .bar-container { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 10px; margin: 10px 0; overflow: hidden; border: 1px solid var(--border); }
-        .bar-fill { height: 100%; background: var(--primary-action); width: 0%; transition: width 0.5s ease; box-shadow: 0 0 10px var(--primary-action); }
+        #profile-modal { position: fixed; inset: 0; z-index: 6000; background: var(--bg-solid); display: none; align-items: center; justify-content: center; }
+        .profile-card { width: 85%; max-width: 320px; padding: 40px 20px; background: var(--panel-solid); border: 2px solid var(--ui-blue); border-radius: 20px; text-align: center; }
+        .bar-container { width: 100%; height: 8px; background: #0f172a; border-radius: 10px; margin: 10px 0; overflow: hidden; border: 1px solid var(--border); }
+        .bar-fill { height: 100%; background: var(--primary-action); width: 0%; transition: width 0.5s ease; }
 
         /* TOAST & POPUPS */
-        #toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #f43f5e; padding: 10px 20px; border-radius: 10px; z-index: 10000; display: none; font-weight: 800; font-size: 12px; text-align: center; min-width: 200px; }
-        #swap-modal { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: #1e293b; padding: 25px; border-radius: 20px; border: 2px solid #f59e0b; z-index: 10001; display: none; text-align: center; width: 280px; }
-        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(2,6,23,0.95); border: 2px solid var(--ui-blue); padding: 30px; border-radius: 20px; text-align: center; z-index: 9999; display: none; }
+        #toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: var(--danger); padding: 10px 20px; border-radius: 10px; z-index: 10000; display: none; font-weight: 800; font-size: 12px; text-align: center; min-width: 200px; }
+        #swap-modal { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: #0f172a; padding: 25px; border-radius: 20px; border: 2px solid #f59e0b; z-index: 10001; display: none; text-align: center; width: 280px; }
+        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #0f172a; border: 2px solid var(--ui-blue); padding: 30px; border-radius: 20px; text-align: center; z-index: 9999; display: none; }
 
         /* HEADER */
-        .header { height: 60px; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); position: relative; z-index: 1001; }
+        .header { height: 60px; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: #0f172a; position: relative; z-index: 1001; }
         .header-center { position: absolute; left: 50%; transform: translateX(-50%); }
-        #suit-indicator { background: rgba(255,255,255,0.05); padding: 5px 12px; border-radius: 10px; border: 1px solid var(--border); font-weight: 800; display: none; align-items: center; gap: 8px; }
-        .suit-red { color: #f43f5e; }
+        #suit-indicator { background: #1e293b; padding: 5px 12px; border-radius: 10px; border: 1px solid var(--border); font-weight: 800; display: none; align-items: center; gap: 8px; }
+        .suit-red { color: var(--danger); }
         #your-turn-btn { background: var(--primary-action); color: #000; font-size: 10px; font-weight: 900; padding: 6px 15px; border-radius: 20px; border: none; display: none; animation: blinker 1s linear infinite; }
         @keyframes blinker { 50% { opacity: 0.3; } }
 
         /* GAME BOARD */
         #game-view { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; z-index: 100; }
         .safe-wrap { position: relative; width: 100%; height: 100%; max-width: 42vh; max-height: 42vh; aspect-ratio: 1/1; }
-        .ring { position: absolute; inset: 0; border-radius: 50%; border: 1px dashed rgba(59, 130, 246, 0.2); pointer-events: none; }
+        .ring { position: absolute; inset: 0; border-radius: 50%; border: 1px dashed var(--border); pointer-events: none; }
         .player { position: absolute; transform: translate(-50%, -50%); text-align: center; z-index: 100; transition: 0.3s; }
-        .av { width: 48px; height: 58px; border-radius: 8px; background: #0f172a; border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
-        .active .av { border-color: var(--primary-action); box-shadow: 0 0 20px var(--primary-action); border-width: 2px; }
+        .av { width: 48px; height: 58px; border-radius: 8px; background: #020617; border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+        .active .av { border-color: var(--primary-action); box-shadow: 0 0 15px var(--primary-action); border-width: 2px; }
         
-        /* LAST CARD ALERT UI */
+        /* LAST CARD ALERT */
         .last-card-alert .av { border-color: var(--danger) !important; animation: pulse-danger 0.8s infinite; border-width: 2px; }
-        @keyframes pulse-danger { 0% { box-shadow: 0 0 0px var(--danger); } 50% { box-shadow: 0 0 15px var(--danger); } 100% { box-shadow: 0 0 0px var(--danger); } }
+        @keyframes pulse-danger { 0%, 100% { box-shadow: 0 0 0px var(--danger); } 50% { box-shadow: 0 0 15px var(--danger); } }
 
         .card-count-min { font-size: 16px; font-weight: 800; color: var(--ui-blue); }
 
         /* HAND AREA */
         #hand-area { 
-            height: 25vh; background: rgba(0,0,0,0.7); 
-            border-top: 1px solid var(--border); padding: 15px 10px; 
+            height: 25vh; background: #000000; 
+            border-top: 2px solid var(--border); padding: 15px 10px; 
             overflow-x: hidden; overflow-y: auto; z-index: 2000; position: relative; 
         }
-        .hand-flex { 
-            display: flex; justify-content: center; flex-wrap: wrap; 
-            width: 100%; max-width: 600px; margin: 0 auto;
-        }
+        .hand-flex { display: flex; justify-content: center; flex-wrap: wrap; width: 100%; max-width: 600px; margin: 0 auto; }
         .card { 
             width: 48px; height: 72px; background: white; color: black; 
             border-radius: 6px; padding: 4px; font-weight: 800; 
             display: flex; flex-direction: column; justify-content: space-between; 
             cursor: pointer; border: 1px solid #999; position: relative; 
-            transition: transform 0.2s, z-index 0s, margin 0.2s;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            transition: transform 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
         }
         .card.fanned { margin-left: -22px; }
         .card.fanned:first-child { margin-left: 0; }
-        .card:active { transform: translateY(-15px) scale(1.15); z-index: 5000 !important; border-color: var(--primary-action); }
-        .card.red { color: #f43f5e !important; }
+        .card:active { transform: translateY(-15px) scale(1.1); z-index: 5000 !important; }
+        .card.red { color: var(--danger) !important; }
 
-        /* ENHANCEMENT: BIGGER TABLE CARDS */
+        /* BIGGER TABLE CARDS */
         .table-card { 
             position: absolute; top: 50%; left: 50%; 
             transform: translate(-50%, -50%); 
             width: 60px; height: 90px;
-            pointer-events: none; 
-            z-index: 50;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+            pointer-events: none; z-index: 50;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.8);
             border: 1px solid #fff;
         }
 
-        .btn-swap { background: #f59e0b; color: #000; border: none; border-radius: 4px; font-size: 7px; font-weight: 900; padding: 3px 6px; cursor: pointer; position: absolute; top: -25px; left: 50%; transform: translateX(-50%); width: 60px; z-index: 1000; }
+        .btn-swap { background: #f59e0b; color: #000; border: none; border-radius: 4px; font-size: 7px; font-weight: 900; padding: 3px 6px; position: absolute; top: -25px; left: 50%; transform: translateX(-50%); width: 60px; }
         .btn { padding: 12px; border-radius: 10px; font-weight: 800; cursor: pointer; width: 100%; border: none; }
         .btn-p { background: var(--ui-blue); color: #fff; }
         .btn-s { background: transparent; border: 1px solid var(--border); color: #fff; font-size: 10px; margin-top: 5px; }
-        input, select { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 10px; background: #000; color: #fff; border: 1px solid var(--border); }
+        input, select { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 10px; background: #0f172a; color: #fff; border: 1px solid var(--border); }
         #discard-area { position: absolute; left: 10px; top: 70px; display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
         .mini { width: 25px; height: 35px; background: white; color: black; border-radius: 4px; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
-        .pangkah-text { color: #f43f5e; font-size: 2rem; font-weight: 800; }
+        .pangkah-text { color: var(--danger); font-size: 2rem; font-weight: 800; }
         .clean-text { color: var(--ui-blue); font-size: 2rem; font-weight: 800; }
     </style>
 </head>
 <body>
 
-<div id="toast">MESSAGE</div>
+<div id="toast"></div>
 
 <div id="profile-modal">
     <div class="profile-card">
-        <h3 style="color: var(--ui-blue); margin-top: 0;">CULTIVATION</h3>
+        <h3>CULTIVATION</h3>
         <div id="prof-level" style="font-size: 24px; font-weight: 800;">LEVEL 1</div>
         <div id="prof-title" style="color: var(--primary-action); letter-spacing: 2px; margin-bottom: 10px;">APPRENTICE</div>
         <div style="text-align: right; font-size: 9px; color: #aaa; margin-bottom: 2px;" id="prof-progress-text">Progress: 0/5</div>
@@ -121,17 +116,17 @@
 <div id="swap-modal">
     <div id="swap-txt" style="font-size: 13px; margin-bottom: 15px;">Player wants your hand!</div>
     <div style="display: flex; gap: 10px;">
-        <button class="btn btn-p" onclick="answerSwap(true)" style="padding: 8px;">ACCEPT</button>
-        <button class="btn" onclick="answerSwap(false)" style="padding: 8px; background: #334155; color: white;">DECLINE</button>
+        <button class="btn btn-p" onclick="answerSwap(true)">ACCEPT</button>
+        <button class="btn" onclick="answerSwap(false)" style="background: #334155; color: white;">DECLINE</button>
     </div>
 </div>
 
 <div id="lobby">
     <div class="panel">
-        <h2 style="color:var(--ui-blue);">PANGKAH MURIM</h2>
-        <div id="user-info" style="margin-bottom:15px; font-weight:800;">
-            <div id="display-name" style="color: var(--ui-blue);"></div>
-            <div id="level-title" style="color: var(--primary-action); font-size: 12px;">LEVEL 1 - APPRENTICE</div>
+        <h2 style="color:var(--ui-blue); margin-top:0;">PANGKAH MURIM</h2>
+        <div style="margin-bottom:15px; font-weight:800;">
+            <div id="display-name" style="color: var(--ui-blue); font-size: 1.1rem;"></div>
+            <div id="level-title" style="color: var(--primary-action); font-size: 12px; margin-top:4px;">LEVEL 1 - APPRENTICE</div>
             <button class="btn btn-s" onclick="openProfile()">VIEW PROFILE 📜</button>
         </div>
         <div class="room-list" id="room-box"></div>
@@ -148,7 +143,7 @@
     <div id="room-tag" style="color:var(--ui-blue); font-weight:800; font-size: 10px;">LOBBY</div>
     <div class="header-center"><button id="your-turn-btn">YOUR TURN</button></div>
     <div style="display: flex; align-items: center; gap: 10px;">
-        <button id="close-room-btn" onclick="closeRoom()" style="display:none; background: #f43f5e; color: white; border: none; padding: 4px 8px; border-radius: 6px; font-size: 9px; font-weight: 800;">CLOSE</button>
+        <button id="close-room-btn" onclick="closeRoom()" style="display:none; background: var(--danger); color: white; border: none; padding: 4px 8px; border-radius: 6px; font-size: 9px; font-weight: 800;">CLOSE</button>
         <div id="suit-indicator"><span id="suit-symbol" style="font-size: 1.2rem;"></span></div>
     </div>
 </div>
@@ -164,7 +159,7 @@
 </div>
 
 <div id="hand-area">
-    <div style="text-align:center; margin-bottom:8px;"><button class="btn" style="width:auto; padding:4px 12px; font-size:10px; background:rgba(59, 130, 246, 0.2); color:#fff; border: 1px solid var(--border);" onclick="sortHand()">SORT TECHNIQUE ⇅</button></div>
+    <div style="text-align:center; margin-bottom:8px;"><button class="btn" style="width:auto; padding:4px 12px; font-size:10px; background:#1e293b; color:#fff; border: 1px solid var(--border);" onclick="sortHand()">SORT TECHNIQUE ⇅</button></div>
     <div class="hand-flex" id="my-cards"></div>
 </div>
 
@@ -180,7 +175,7 @@
     stats.points = parseInt(stats.points) || 0;
     
     let myRoom = "", myCurrentHand = [], pendingSwapRequest = null, isProcessingTurn = false;
-    let playersWithLastCard = new Set(); // Internal state for alerts
+    let playersWithLastCard = new Set();
     const icons = { 'Spades': '♠', 'Hearts': '♥', 'Diamonds': '♦', 'Clubs': '♣' };
 
     function getLevel() { return Math.floor(stats.points / 5) + 1; }
@@ -219,7 +214,7 @@
         document.getElementById('profile-modal').style.display = 'flex';
     }
     function closeProfile() { document.getElementById('profile-modal').style.display = 'none'; }
-    function showToast(msg, isPos = false) { const t = document.getElementById('toast'); t.innerText = msg; t.style.background = isPos ? 'var(--primary-action)' : '#f43f5e'; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000); }
+    function showToast(msg, isPos = false) { const t = document.getElementById('toast'); t.innerText = msg; t.style.background = isPos ? 'var(--primary-action)' : 'var(--danger)'; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000); }
 
     socket.on('updatePlayers', p => {
         document.getElementById('lobby').style.display = 'none'; document.getElementById('room-tag').innerText = "SECT: " + myRoom;
@@ -258,13 +253,11 @@
     function render(players, turn, table = []) {
         const pLayer = document.getElementById('p-layer'); pLayer.innerHTML = "";
         const radius = document.getElementById('table-wrap').offsetWidth / 2;
-        
         players.forEach((p, i) => {
             const angle = (i * (360 / players.length) - 90) * (Math.PI / 180);
             const x = Math.cos(angle) * (radius + 25); const y = Math.sin(angle) * (radius + 25);
             const active = i === turn; const isMe = p.userID === userID;
             
-            // LAST CARD ALERT LOGIC
             const hasOne = p.hand.length === 1;
             if(hasOne && !playersWithLastCard.has(p.userID)) {
                 sfx.strike.play().catch(e=>{});
@@ -279,7 +272,6 @@
             div.innerHTML = `<div class="av"><span class="card-count-min">${p.hand.length}</span></div><div style="font-size:10px; margin-top:6px; color:${isMe ? 'var(--ui-blue)':'white'}">${p.name}</div>`;
             pLayer.appendChild(div);
         });
-        
         renderHand();
         const tLayer = document.getElementById('t-layer'); tLayer.innerHTML = "";
         table.forEach((tc, idx) => {

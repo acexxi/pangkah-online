@@ -107,10 +107,7 @@
     </div>
 </div>
 
-<div id="round-popup">
-    <div id="pop-title"></div>
-    <div id="pop-desc" style="margin-top:10px; opacity:0.8;"></div>
-</div>
+<div id="round-popup"><div id="pop-title"></div><div id="pop-desc"></div></div>
 
 <div class="header">
     <div id="room-tag" style="color:var(--ui-blue); font-weight:800; font-size: 11px;">LOBBY</div>
@@ -139,54 +136,39 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
     const socket = io();
-    const sfx = { 
-        place: new Audio('place.mp3'), 
-        sweep: new Audio('sweep.mp3'), 
-        strike: new Audio('strike.mp3'), 
-        absorb: new Audio('absorb.mp3') 
-    };
+    const sfx = { place: new Audio('place.mp3'), sweep: new Audio('sweep.mp3'), strike: new Audio('strike.mp3'), absorb: new Audio('absorb.mp3') };
     
     let userID = localStorage.getItem('pUserID') || 'uid_' + Math.random().toString(36).substr(2, 9);
     localStorage.setItem('pUserID', userID);
     let myName = localStorage.getItem('pName') || 'Disciple' + Math.floor(Math.random()*999);
     let stats = JSON.parse(localStorage.getItem('pStats')) || { points: 0, pangkahs: 0 };
-    stats.points = parseInt(stats.points) || 0;
     
     let myRoom = "", myCurrentHand = [], pendingSwapRequest = null, isProcessingTurn = false;
     const icons = { 'Spades': '♠', 'Hearts': '♥', 'Diamonds': '♦', 'Clubs': '♣' };
 
-    function getLevel() { return Math.floor(stats.points / 5) + 1; }
+    function getLevel() { return Math.floor((stats.points || 0) / 5) + 1; }
     function getTitle(lvl) {
         if (lvl <= 5) return "APPRENTICE"; if (lvl <= 10) return "WARRIOR";
         if (lvl <= 15) return "MASTER"; if (lvl <= 20) return "GRANDMASTER";
         return "ANCIENT ANCESTOR";
     }
 
-    // --- UI/LOBBY FUNCTIONS ---
     function updateStatsUI() {
         const level = getLevel();
-        const dn = document.getElementById('display-name');
-        const lt = document.getElementById('level-title');
-        if(dn) dn.innerText = myName;
-        if(lt) lt.innerText = `LEVEL ${level} - ${getTitle(level)}`;
-        
+        if(document.getElementById('display-name')) document.getElementById('display-name').innerText = myName;
+        if(document.getElementById('level-title')) document.getElementById('level-title').innerText = `LEVEL ${level} - ${getTitle(level)}`;
         if(document.getElementById('prof-level')) document.getElementById('prof-level').innerText = `LEVEL ${level}`;
         if(document.getElementById('prof-title')) document.getElementById('prof-title').innerText = getTitle(level);
-        if(document.getElementById('prof-points')) document.getElementById('prof-points').innerText = stats.points;
-        if(document.getElementById('prof-pangkahs')) document.getElementById('prof-pangkahs').innerText = stats.pangkahs;
-        
-        const prog = stats.points % 5;
+        if(document.getElementById('prof-points')) document.getElementById('prof-points').innerText = stats.points || 0;
+        if(document.getElementById('prof-pangkahs')) document.getElementById('prof-pangkahs').innerText = stats.pangkahs || 0;
+        const prog = (stats.points || 0) % 5;
         if(document.getElementById('prof-progress-text')) document.getElementById('prof-progress-text').innerText = `Progress: ${prog}/5`;
         if(document.getElementById('prof-bar-fill')) document.getElementById('prof-bar-fill').style.width = (prog / 5 * 100) + "%";
     }
 
     function editName() { 
         const n = prompt("Enter Name:", myName); 
-        if(n && n.trim()) { 
-            myName = n.trim(); 
-            localStorage.setItem('pName', myName); 
-            updateStatsUI(); 
-        } 
+        if(n && n.trim()) { myName = n.trim(); localStorage.setItem('pName', myName); updateStatsUI(); } 
     }
     
     function openProfile() { updateStatsUI(); document.getElementById('profile-modal').style.display = 'flex'; }
@@ -204,7 +186,6 @@
     function sortHand() { const order = { 'Spades': 4, 'Hearts': 3, 'Diamonds': 2, 'Clubs': 1 }; myCurrentHand.sort((a, b) => (order[b.suit] - order[a.suit]) || (b.val - a.val)); renderHand(); }
     function answerSwap(accept) { document.getElementById('swap-modal').style.display = 'none'; if(accept && pendingSwapRequest) socket.emit('acceptSwap', { roomID: myRoom, fromUserID: pendingSwapRequest, myUserID: userID }); pendingSwapRequest = null; }
 
-    // --- SOCKET LISTENERS ---
     socket.on('roomList', list => {
         const box = document.getElementById('room-box'); box.innerHTML = list.length ? "" : '<div style="padding:15px; opacity:0.3;">Searching...</div>';
         list.forEach(r => {
@@ -230,19 +211,11 @@
         update(d); 
     });
     
-    // 1. Replace your clearTable listener
     socket.on('clearTable', d => {
         if(d.msg.toLowerCase() === 'pangkah!') {
             sfx.strike.play().catch(()=>{}); 
-            if(d.winner === myName) { 
-                stats.points += 2; 
-                stats.pangkahs++; 
-                localStorage.setItem('pStats', JSON.stringify(stats)); 
-                updateStatsUI(); 
-            }
-        } else {
-            sfx.sweep.play().catch(()=>{});
-        }
+            if(d.winner === myName) { stats.points = (stats.points || 0) + 2; stats.pangkahs = (stats.pangkahs || 0) + 1; localStorage.setItem('pStats', JSON.stringify(stats)); updateStatsUI(); }
+        } else sfx.sweep.play().catch(()=>{});
         
         const pop = document.getElementById('round-popup');
         document.getElementById('pop-title').className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
@@ -250,28 +223,24 @@
         document.getElementById('pop-desc').innerText = d.winner + " has the lead."; 
         pop.style.display = 'block';
 
-        // Check if this was the final round of the game
         const playersWithCards = d.players.filter(p => p.hand.length > 0);
         if (playersWithCards.length <= 1) {
-            // Delay slightly so users see the "Pangkah/Clean" message first
             setTimeout(() => update(d), 1500); 
         } else {
-            // Normal round: hide popup after 2 seconds
-            setTimeout(() => { 
-                pop.style.display = 'none'; 
-                update(d); 
-            }, 2000);
+            setTimeout(() => { pop.style.display = 'none'; update(d); }, 2000);
         }
     });
 
-    // 2. Replace your entire update(d) function
+    socket.on('updateTable', d => { sfx.place.play().catch(()=>{}); update(d); });
+    socket.on('nextTurn', d => update(d));
+    socket.on('errorMsg', m => { isProcessingTurn = false; showToast(m); });
+    socket.on('roomClosed', () => { alert("Sect disbanded."); window.location.reload(); });
+
     function update(d) {
         isProcessingTurn = false; 
 
-        // --- FINAL DUEL CHECK ---
+        // --- END GAME DETECTION ---
         const playersWithCards = d.players.filter(p => p.hand.length > 0);
-        
-        // Trigger if only one player is left with cards
         if(playersWithCards.length <= 1) {
             const loser = playersWithCards[0];
             const loserName = loser ? loser.name : "None";
@@ -294,20 +263,17 @@
                     </div>
                 `;
             } else {
-                controls = `<div style="margin-top:15px; font-size:11px; opacity:0.6;">Waiting for Sect Leader to decide...</div>`;
+                controls = `<div style="margin-top:15px; font-size:11px; opacity:0.6;">Waiting for Sect Leader...</div>`;
             }
 
-            popDesc.innerHTML = `<div style="font-weight:800; font-size:1.2rem;">${loserName} IS THE LOSER</div>${controls}`;
+            popDesc.innerHTML = `<div style="font-weight:800; font-size:1.2rem;">${loserName} LOST</div>${controls}`;
             pop.style.display = 'block';
-            
             render(d.players, d.turn, d.table || []);
-            return; // Stop execution here so popup doesn't close
+            return; 
         }
 
-        // --- NORMAL GAME UPDATE ---
         const me = d.players.find(p => p.userID === userID); 
         if(me) myCurrentHand = me.hand;
-        
         const activeP = d.players[d.turn];
         document.getElementById('your-turn-btn').style.display = (activeP && activeP.userID === userID) ? 'block' : 'none';
         
@@ -321,6 +287,7 @@
         render(d.players, d.turn, d.table || []);
         if(d.discarded) showDiscarded(d.discarded);
     }
+
     function render(players, turn, table = []) {
         const pLayer = document.getElementById('p-layer'); pLayer.innerHTML = "";
         const radius = document.getElementById('table-wrap').offsetWidth / 2;
@@ -329,7 +296,6 @@
         players.forEach((p, i) => {
             const angle = (i * (360 / players.length) - 90) * (Math.PI / 180);
             const x = Math.cos(angle) * (radius + 25); const y = Math.sin(angle) * (radius + 25);
-            
             let swapBtnHTML = ""; 
             if(players.length > 1 && i !== myIdx && p.hand.length > 0) {
                 let nextValid = (myIdx + 1) % players.length;

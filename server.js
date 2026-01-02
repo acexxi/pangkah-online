@@ -119,19 +119,24 @@ io.on('connection', (socket) => {
     socket.on('acceptSwap', ({ roomID, fromUserID, myUserID }) => {
         const room = rooms[roomID];
         if(!room) return;
-        const p1 = room.players.find(p => p.userID === fromUserID);
-        const p2 = room.players.find(p => p.userID === myUserID);
         
-        const tempHand = [...p1.hand];
-        p1.hand = [...p2.hand];
-        p2.hand = tempHand;
+        const requester = room.players.find(p => p.userID === fromUserID);
+        const accepter = room.players.find(p => p.userID === myUserID);
         
-        io.to(roomID).emit('swapOccurred', { 
-            msg: `${p1.name} swapped cards with ${p2.name}!`, 
-            players: room.players,
-            turn: room.turn,
-            table: room.table
-        });
+        if (requester && accepter) {
+            // Requester TAKES the accepter's hand
+            requester.hand = [...accepter.hand];
+            
+            // Accepter is now empty-handed (effectively out of this round)
+            accepter.hand = [];
+            
+            io.to(roomID).emit('swapOccurred', { 
+                msg: `${requester.name} took ${accepter.name}'s hand!`, 
+                players: room.players,
+                turn: room.turn,
+                table: room.table
+            });
+        }
     });
 
     socket.on('playCard', ({ roomID, cardObject }) => {

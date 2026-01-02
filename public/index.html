@@ -265,28 +265,64 @@
     socket.on('roomClosed', () => { alert("Sect disbanded."); window.location.reload(); });
 
     // --- FIX 2: PREVENT HANGING & DETECT LOSER ---
+    // --- MAIN GAME LOGIC ---
     function update(d) {
-        isProcessingTurn = false; // Always unlock when receiving data
+        isProcessingTurn = false; // Spam protection unlock
 
+        // --- GAME END DETECTION ---
         const playersWithCards = d.players.filter(p => p.hand.length > 0);
-        
-        // Check if game is over (1 or 0 players with cards left)
         if(playersWithCards.length <= 1) {
             const loserName = playersWithCards.length === 1 ? playersWithCards[0].name : "None";
             const pop = document.getElementById('round-popup');
-            document.getElementById('pop-title').className = 'pangkah-text';
-            document.getElementById('pop-title').innerText = "DUEL OVER";
-            document.getElementById('pop-desc').innerText = loserName + " is the Loser.";
+            const popTitle = document.getElementById('pop-title');
+            const popDesc = document.getElementById('pop-desc');
+
+            popTitle.className = 'pangkah-text';
+            popTitle.innerText = "DUEL OVER";
+            
+            // Create Host Control UI if current user is the host
+            let hostControls = "";
+            const isHost = d.players[0] && d.players[0].userID === userID;
+            
+            if (isHost) {
+                hostControls = `
+                    <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
+                        <button class="btn btn-p" style="width:auto; padding:8px 20px;" onclick="start()">RESTART</button>
+                        <button class="btn" style="width:auto; padding:8px 20px; background:var(--danger); color:white;" onclick="closeRoom()">END</button>
+                    </div>
+                `;
+            }
+
+            popDesc.innerHTML = `<div>${loserName} is the Loser.</div>${hostControls}`;
             pop.style.display = 'block';
             
-            setTimeout(() => {
-                pop.style.display = 'none';
-                // Show start button only to host
-                if(d.players[0] && d.players[0].userID === userID) {
-                    document.getElementById('start-btn').style.display = 'block';
-                }
-            }, 5000);
+            // Note: Popup stays open until host clicks Restart or End
+            return; 
         }
+
+        const me = d.players.find(p => p.userID === userID); 
+        if(me) myCurrentHand = me.hand;
+        const activeP = d.players[d.turn];
+        document.getElementById('your-turn-btn').style.display = (activeP && activeP.userID === userID) ? 'block' : 'none';
+        
+        const sInd = document.getElementById('suit-indicator'); 
+        if (d.table && d.table.length > 0) {
+            sInd.style.display = 'flex'; 
+            document.getElementById('suit-symbol').innerText = icons[d.table[0].card.suit];
+            document.getElementById('suit-symbol').style.color = ['Hearts','Diamonds'].includes(d.table[0].card.suit) ? 'var(--danger)' : 'white';
+        } else sInd.style.display = 'none';
+
+        render(d.players, d.turn, d.table || []);
+        if(d.discarded) showDiscarded(d.discarded);
+    }
+
+    // Ensure gameInit hides the popup if it was open from a previous round
+    socket.on('gameInit', d => { 
+        document.getElementById('round-popup').style.display = 'none';
+        document.getElementById('start-btn').style.display = 'none'; 
+        isProcessingTurn = false;
+        update(d); 
+    });
 
         const me = d.players.find(p => p.userID === userID); 
         if(me) myCurrentHand = me.hand;

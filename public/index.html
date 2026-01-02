@@ -13,58 +13,67 @@
         #lobby { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.98); display: flex; align-items: center; justify-content: center; z-index: 2000; }
         .lobby-card { background: var(--glass); backdrop-filter: blur(10px); padding: 30px; border-radius: 20px; text-align: center; width: 90%; max-width: 400px; }
 
-        .header { height: 8vh; min-height: 50px; background: rgba(0,0,0,0.4); display: flex; justify-content: space-between; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--glass); }
+        .header { flex: 0 0 60px; background: rgba(0,0,0,0.4); display: flex; justify-content: space-between; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--glass); z-index: 1100; }
         #turn-indicator { background: var(--green); color: white; padding: 4px 12px; border-radius: 15px; font-weight: 900; font-size: 0.8rem; display: none; }
 
-        /* Game Area: Centered and responsive */
-        #game-area { flex: 0 0 57vh; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        /* FIX: Dynamic scaling for portrait/landscape */
+        #game-view { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 40px; }
+        
+        .table-wrap {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-width: 75vh; /* Prevents getting too big */
+            max-height: 50vw; /* Prevents getting too wide */
+            aspect-ratio: 1 / 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         .table-circle { 
-            width: 45vh; height: 45vh; 
-            max-width: 80vw; max-height: 80vw; 
-            border: 2px solid rgba(56, 189, 248, 0.3); 
+            width: 80%; height: 80%; 
+            border: 2px solid rgba(56, 189, 248, 0.2); 
             border-radius: 50%; 
-            position: relative; 
+            position: relative;
             display: flex; align-items: center; justify-content: center;
         }
 
-        /* Avatar Placement */
-        .player-node { position: absolute; width: 80px; text-align: center; z-index: 100; }
+        .player-node { position: absolute; width: 80px; text-align: center; z-index: 100; transform: translate(-50%, -50%); }
         .avatar { width: 45px; height: 45px; background: #1e293b; border-radius: 50%; margin: 0 auto; display: flex; align-items: center; justify-content: center; border: 3px solid #334155; position: relative; }
         .active .avatar { border-color: var(--gold); box-shadow: 0 0 15px var(--gold); }
         .card-count { position: absolute; top: -5px; right: -5px; background: var(--accent); color: black; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 900; }
 
-        /* Hand Area: Multi-row wrap */
-        #hand-container { flex: 1; background: rgba(0,0,0,0.2); display: flex; flex-direction: column; align-items: center; padding: 10px; border-top: 1px solid var(--glass); }
-        #myHand { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: 100%; overflow-y: auto; }
+        /* Hand Area: Now more flexible */
+        #hand-container { flex: 0 0 30%; min-height: 150px; background: rgba(0,0,0,0.2); display: flex; flex-direction: column; align-items: center; padding: 10px; border-top: 1px solid var(--glass); overflow-y: auto; }
+        #myHand { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: 100%; max-width: 1200px; }
 
-        /* Card Visuals */
         .card { 
-            width: 55px; height: 85px; 
+            width: 50px; height: 75px; 
             background: white; border-radius: 6px; color: black; 
             display: flex; flex-direction: column; justify-content: space-between; 
             padding: 5px; font-weight: 900; cursor: pointer; border: 1px solid #ccc;
-            transition: transform 0.2s;
         }
         .card.red { color: #ef4444; }
-        .suit-center { font-size: 1.8rem; text-align: center; }
-        .card:hover { transform: translateY(-10px); z-index: 1000; border-color: var(--accent); }
+        .suit-center { font-size: 1.5rem; text-align: center; }
+        .card:hover { transform: translateY(-5px); border-color: var(--accent); }
 
         .played-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
         
         #status-msg { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 20px; border-radius: 15px; border: 2px solid var(--gold); display: none; z-index: 5000; text-align: center; }
         
-        input, select { padding: 12px; border-radius: 8px; border: 1px solid #334155; background: #000; color: white; margin: 5px 0; width: 100%; }
+        input, select { padding: 10px; border-radius: 8px; border: 1px solid #334155; background: #000; color: white; margin: 5px 0; width: 100%; }
     </style>
 </head>
 <body>
 
 <div id="lobby">
     <div class="lobby-card">
-        <h1 style="color:var(--accent); margin-bottom: 20px;">PANGKAH ELITE</h1>
-        <input type="text" id="pName" placeholder="Enter Name">
+        <h1 style="color:var(--accent); font-size: 1.5rem;">PANGKAH ELITE</h1>
+        <input type="text" id="pName" placeholder="Name">
         <input type="text" id="rID" placeholder="Room ID">
         <select id="mP"><option value="4">4 Players</option><option value="5">5 Players</option></select>
-        <button class="btn-main" style="padding: 15px; border-radius: 8px; width: 100%; font-weight: 900; background: var(--accent); border:none; margin-top: 10px;" onclick="join(true)">Create / Join</button>
+        <button style="padding: 12px; border-radius: 8px; width: 100%; font-weight: 900; background: var(--accent); border:none; cursor:pointer;" onclick="join()">JOIN GAME</button>
     </div>
 </div>
 
@@ -74,21 +83,23 @@
 </div>
 
 <div class="header">
-    <div style="font-size: 0.8rem; opacity: 0.6;" id="room-tag">Room: -</div>
+    <div style="font-size: 0.7rem; opacity: 0.6;" id="room-tag">Room: -</div>
     <div id="turn-indicator">YOUR TURN</div>
-    <div style="font-weight: 900; color: var(--gold);" id="status-text">Lobby</div>
+    <div style="font-weight: 900; color: var(--gold); font-size: 0.8rem;" id="status-text">Lobby</div>
 </div>
 
-<div id="game-area">
-    <div class="table-circle" id="table-circle">
-        <div id="tableCards"></div>
-        <div id="players-circle" style="position: absolute; inset: 0;"></div>
-        <button id="startBtn" style="display:none; z-index: 500; background: var(--accent); border:none; padding: 10px 20px; font-weight: 900; border-radius: 5px;" onclick="start()">START GAME</button>
+<div id="game-view">
+    <div class="table-wrap" id="table-wrap">
+        <div class="table-circle">
+            <div id="tableCards"></div>
+            <button id="startBtn" style="display:none; z-index: 500; background: var(--accent); border:none; padding: 10px 20px; font-weight: 900; border-radius: 5px; cursor:pointer;" onclick="start()">START</button>
+        </div>
+        <div id="players-circle" style="position: absolute; inset: 0; pointer-events: none;"></div>
     </div>
 </div>
 
 <div id="hand-container">
-    <p style="margin: 0 0 5px 0; font-size: 0.7rem; opacity: 0.5;">YOUR HAND</p>
+    <p style="margin: 0 0 10px 0; font-size: 0.6rem; opacity: 0.5;">YOUR HAND</p>
     <div id="myHand"></div>
 </div>
 
@@ -117,7 +128,7 @@
 
     socket.on('gameInit', d => { 
         document.getElementById('startBtn').style.display = 'none'; 
-        document.getElementById('status-text').innerText = "In Game";
+        document.getElementById('status-text').innerText = "Live";
         render(d.players, d.turn); 
     });
 
@@ -143,8 +154,9 @@
         const pCircle = document.getElementById('players-circle');
         pCircle.innerHTML = "";
         
-        // Calculate responsive radius
-        const radius = document.getElementById('table-circle').offsetWidth / 2 + 35;
+        // Calculate radius based on the wrapper size
+        const wrap = document.getElementById('table-wrap');
+        const radius = wrap.offsetWidth / 2;
 
         players.forEach((p, i) => {
             const angle = (i * (360 / players.length) - 90) * (Math.PI / 180);
@@ -154,14 +166,14 @@
 
             const div = document.createElement('div');
             div.className = `player-node ${isActive ? 'active' : ''}`;
-            div.style.left = `calc(50% + ${x}px - 40px)`;
-            div.style.top = `calc(50% + ${y}px - 40px)`;
+            div.style.left = `calc(50% + ${x}px)`;
+            div.style.top = `calc(50% + ${y}px)`;
             div.innerHTML = `
                 <div class="avatar">
                     <span style="font-weight:900;">${p.name[0].toUpperCase()}</span>
                     <div class="card-count">${p.hand.length}</div>
                 </div>
-                <div style="font-size:10px; margin-top:5px; font-weight:700;">${p.name}</div>
+                <div style="font-size:9px; margin-top:3px; font-weight:700;">${p.name}</div>
             `;
             pCircle.appendChild(div);
 
@@ -198,12 +210,17 @@
         const div = document.createElement('div');
         div.className = `card ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
         div.innerHTML = `
-            <div style="font-size:10px">${c.rank}${suitIcons[c.suit]}</div>
+            <div style="font-size:9px">${c.rank}</div>
             <div class="suit-center">${suitIcons[c.suit]}</div>
-            <div style="font-size:10px; transform:rotate(180deg)">${c.rank}${suitIcons[c.suit]}</div>
+            <div style="font-size:9px; transform:rotate(180deg)">${c.rank}</div>
         `;
         return div;
     }
+
+    // Auto-re-render on window resize to fix avatar positioning
+    window.addEventListener('resize', () => {
+        socket.emit('requestUpdate', myRoom); // You can add this listener in server.js or just trigger a local refresh logic
+    });
 </script>
 </body>
 </html>

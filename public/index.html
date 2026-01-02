@@ -136,7 +136,12 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
     const socket = io();
-    const sfx = { place: new Audio('place.mp3'), sweep: new Audio('sweep.mp3'), strike: new Audio('strike.mp3'), absorb: new Audio('absorb.mp3') };
+    const sfx = { 
+        place: new Audio('place.mp3'), 
+        sweep: new Audio('sweep.mp3'), 
+        strike: new Audio('strike.mp3'), 
+        absorb: new Audio('absorb.mp3') 
+    };
     
     let userID = localStorage.getItem('pUserID') || 'uid_' + Math.random().toString(36).substr(2, 9);
     localStorage.setItem('pUserID', userID);
@@ -171,11 +176,11 @@
     }
 
     function start() { socket.emit('startGame', myRoom); }
+    
     function closeRoom() { 
         if(!myRoom) return;
-        if(confirm("Disband this sect?")) {
+        if(confirm("Disband this sect? All disciples will be kicked.")) {
             socket.emit('requestCloseRoom', { roomID: myRoom }); 
-            window.location.reload(); 
         }
     }
 
@@ -192,6 +197,7 @@
 
     socket.on('updatePlayers', p => {
         document.getElementById('lobby').style.display = 'none';
+        document.getElementById('room-tag').innerText = "SECT: " + myRoom;
         if(p.length > 0 && p[0].userID === userID) {
             document.getElementById('close-room-btn').style.display = 'block';
             if(p.length >= 4) document.getElementById('start-btn').style.display = 'block';
@@ -202,9 +208,14 @@
     socket.on('gameInit', d => { document.getElementById('start-btn').style.display = 'none'; update(d); });
     
     socket.on('clearTable', d => {
-        // Both Pangkah and Clean now use the Strike sound per request
-        sfx.strike.play().catch(()=>{});
-        if(d.winner === myName && d.msg.toLowerCase() === 'pangkah!') { stats.pangkahs++; localStorage.setItem('pStats', JSON.stringify(stats)); }
+        // Correct Sound Logic:
+        if(d.msg.toLowerCase() === 'pangkah!') {
+            sfx.strike.play().catch(()=>{}); // Pangkah -> Strike
+            if(d.winner === myName) { stats.pangkahs++; localStorage.setItem('pStats', JSON.stringify(stats)); }
+        } else {
+            sfx.sweep.play().catch(()=>{}); // Clean -> Sweep
+        }
+        
         const pop = document.getElementById('round-popup');
         document.getElementById('pop-title').className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
         document.getElementById('pop-title').innerText = d.msg.toUpperCase();
@@ -212,9 +223,19 @@
         setTimeout(() => { pop.style.display = 'none'; update(d); }, 2000);
     });
 
-    socket.on('updateTable', d => { sfx.place.play().catch(()=>{}); update(d); });
+    socket.on('updateTable', d => { 
+        sfx.place.play().catch(()=>{}); // Drop card -> Place
+        update(d); 
+    });
+    
     socket.on('nextTurn', d => update(d));
     socket.on('errorMsg', m => { isProcessingTurn = false; showToast(m); });
+
+    // Kick Logic: If host disbands, everyone reloads
+    socket.on('roomClosed', () => {
+        alert("Sect has been disbanded by the host.");
+        window.location.reload();
+    });
 
     function update(d) {
         isProcessingTurn = false;
@@ -252,6 +273,7 @@
 
             const div = document.createElement('div'); div.className = `player ${i === turn ? 'active' : ''}`;
             div.style.left = `calc(50% + ${x}px)`; div.style.top = `calc(50% + ${y}px)`;
+            // Player Icon restored
             div.innerHTML = `${swapBtnHTML}<div class="av"><span>🎴 ${p.hand.length}</span></div><div style="font-size:10px; margin-top:8px; color:${isMe ? 'var(--ui-blue)':'white'}">${p.name}</div>`;
             pLayer.appendChild(div);
         });
@@ -281,6 +303,7 @@
 
     function createCardUI(c) {
         const div = document.createElement('div'); div.className = `card ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
+        // Suit icon at 28px as requested
         div.innerHTML = `<div style="font-size:10px">${c.rank}</div><div style="font-size:28px;text-align:center">${icons[c.suit]}</div><div style="font-size:10px;transform:rotate(180deg)">${c.rank}</div>`;
         return div;
     }
@@ -294,7 +317,10 @@
     function closeProfile() { document.getElementById('profile-modal').style.display = 'none'; }
     
     socket.on('receiveSwapRequest', d => { pendingSwapRequest = d.fromUserID; document.getElementById('swap-txt').innerText = d.fromName + " wants your hand!"; document.getElementById('swap-modal').style.display = 'block'; });
-    socket.on('swapOccurred', d => { sfx.absorb.play().catch(()=>{}); update(d); });
+    socket.on('swapOccurred', d => { 
+        sfx.absorb.play().catch(()=>{}); // Take hand -> Absorb
+        update(d); 
+    });
 </script>
 </body>
 </html>

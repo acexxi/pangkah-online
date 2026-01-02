@@ -28,7 +28,7 @@ io.on('connection', (socket) => {
         rooms[roomID] = {
             id: roomID, maxPlayers: parseInt(maxPlayers),
             players: [{ id: socket.id, name: playerName, hand: [] }],
-            turn: 0, table: [], currentSuit: null, isFirstMove: true // Tracker for King Spades
+            turn: 0, table: [], currentSuit: null, isFirstMove: true
         };
         socket.join(roomID);
         io.to(roomID).emit('updatePlayers', rooms[roomID].players);
@@ -65,19 +65,17 @@ io.on('connection', (socket) => {
 
         const playedCard = player.hand[cardIndex];
 
-        // RULE 1: First player MUST start with King of Spades
         if (room.isFirstMove) {
             if (playedCard.suit !== 'Spades' || playedCard.rank !== 'K') {
-                return socket.emit('errorMsg', "Game Rule: You must start with the King of Spades!");
+                return socket.emit('errorMsg', "You must start with the King of Spades!");
             }
-            room.isFirstMove = false; // Move is valid, unlock game
+            room.isFirstMove = false; 
         }
 
-        // RULE 2: Follow suit if possible
         if (room.table.length > 0 && playedCard.suit !== room.currentSuit) {
             const hasSuitInHand = player.hand.some(c => c.suit === room.currentSuit);
             if (hasSuitInHand) {
-                return socket.emit('errorMsg', `Follow the suit! You have ${room.currentSuit} in hand.`);
+                return socket.emit('errorMsg', `You must follow the suit: ${room.currentSuit}`);
             }
         }
 
@@ -125,7 +123,7 @@ io.on('connection', (socket) => {
                         turn: room.turn, 
                         winner: room.players[leadWinnerIdx].name, 
                         players: room.players,
-                        msg: isPangkah ? "PANGKAH! " + room.players[leadWinnerIdx].name + " takes all." : "Round Cleared."
+                        msg: isPangkah ? "Pangkah Penalty!" : "Next Round"
                     });
                 }
             }, 1500);

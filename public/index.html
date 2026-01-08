@@ -64,13 +64,22 @@
         .safe-wrap { position: relative; width: 100%; height: 100%; max-width: 45vh; max-height: 45vh; aspect-ratio: 1/1; }
         .ring { position: absolute; inset: 0; border-radius: 50%; border: 1px dashed rgba(255,255,255,0.1); }
         .player { position: absolute; transform: translate(-50%, -50%); text-align: center; z-index: 100; transition: all 0.5s ease; }
-        .av { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 14px; background: var(--glass-heavy); border: 1px solid var(--border-light); box-shadow: 0 8px 32px rgba(0,0,0,0.3); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); }
-        .av-left { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
-        .av-name { font-size: 11px; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.5); white-space: nowrap; }
-        .av-title { font-size: 8px; padding: 2px 6px; border-radius: 4px; font-weight: 800; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
-        .av-cards { font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 4px; padding-left: 8px; border-left: 1px solid var(--border); }
-        .active .av { border-color: var(--primary-action); box-shadow: 0 0 25px var(--primary-action); border-width: 2px; }
-        .player.eliminated .av { opacity: 0.3; border-color: var(--danger); }
+        
+        /* Custom Avatar Frame */
+        .av { position: relative; width: 205px; height: 70px; background: url('/avatar-frame.png') center/contain no-repeat; display: flex; align-items: center; }
+        .av-take-hand { position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 36px; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity 0.2s; }
+        .av-take-hand.visible { opacity: 1; }
+        .av-take-hand:hover { background: rgba(255,255,255,0.1); }
+        .av-take-hand svg { width: 18px; height: 18px; fill: #10b981; }
+        .av-avatar { position: absolute; left: 38px; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; border-radius: 8px; background: rgba(255,255,255,0.1); overflow: hidden; }
+        .av-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .av-info { position: absolute; left: 82px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 90px; }
+        .av-level { font-size: 8px; font-weight: 800; color: #10b981; text-transform: uppercase; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+        .av-name { font-size: 11px; font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 85px; }
+        .av-title { font-size: 8px; font-weight: 600; color: rgba(255,255,255,0.7); text-shadow: 0 1px 2px rgba(0,0,0,0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 85px; }
+        .av-cards { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 16px; font-weight: 900; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.8); width: 28px; text-align: center; }
+        .active .av { filter: drop-shadow(0 0 15px var(--primary-action)); }
+        .player.eliminated .av { opacity: 0.3; filter: grayscale(1); }
         #hand-area { height: 28vh; background: var(--glass-heavy); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid var(--border-light); padding: 15px; overflow-y: auto; z-index: 2000; box-shadow: 0 -4px 30px rgba(0,0,0,0.2); position: relative; }
         .hand-header { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 10px; }
         #turn-indicator-inline { background: var(--primary-action); color: #000; font-size: 11px; font-weight: 900; padding: 8px 16px; border-radius: 20px; display: none; animation: pulse-glow 1.5s infinite; }
@@ -88,7 +97,6 @@
         @keyframes flash { 0% { opacity: 1; } 100% { opacity: 0; } }
         #streak-indicator { position: fixed; top: 80px; left: 20px; background: var(--glass-heavy); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); padding: 10px 15px; border-radius: 16px; border: 1px solid var(--gold); display: none; z-index: 100; box-shadow: 0 4px 20px rgba(251,191,36,0.2); }
         #toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: var(--danger); padding: 12px 24px; border-radius: 12px; z-index: 10003; display: none; font-weight: 800; font-size: 13px; }
-        .btn-swap { background: #f59e0b; color: #000; border: none; border-radius: 20px; font-size: 8px; font-weight: 900; padding: 4px 10px; position: absolute; top: -30px; left: 50%; transform: translateX(-50%); width: 80px; cursor: pointer; }
         .btn { padding: 14px; border-radius: 16px; font-weight: 800; cursor: pointer; width: 100%; border: none; transition: all 0.2s; }
         .btn-p { background: linear-gradient(135deg, var(--ui-blue), #2563eb); color: #fff; box-shadow: 0 4px 15px rgba(59,130,246,0.4); }
         .btn-p:hover { box-shadow: 0 6px 20px rgba(59,130,246,0.5); transform: translateY(-2px); }
@@ -378,7 +386,7 @@ function launchConfetti(){
     }
 }
 
-function enter(type){myRoom=document.getElementById('rid').value.trim();if(!myRoom)return showToast("Sect ID Required");showLoading(true);const data={roomID:myRoom,playerName:myName,userID,equippedTitle:getEquippedTitleData()};if(type==='create'){data.maxPlayers=document.getElementById('maxp').value;isHost=true;}socket.emit(type==='create'?'createRoom':'joinRoom',data);}
+function enter(type){myRoom=document.getElementById('rid').value.trim();if(!myRoom)return showToast("Sect ID Required");showLoading(true);const data={roomID:myRoom,playerName:myName,userID,equippedTitle:getEquippedTitleData(),level:getLevel()};if(type==='create'){data.maxPlayers=document.getElementById('maxp').value;isHost=true;}socket.emit(type==='create'?'createRoom':'joinRoom',data);}
 function start(){showLoading(true);socket.emit('startGame',myRoom);}
 function closeRoom(){if(myRoom&&confirm("Disband this sect?"))socket.emit('requestCloseRoom',{roomID:myRoom});}
 function sortHand(){const o={Spades:4,Hearts:3,Diamonds:2,Clubs:1};myCurrentHand.sort((a,b)=>(o[b.suit]-o[a.suit])||(b.val-a.val));renderHand();}
@@ -400,7 +408,32 @@ socket.on('gameOver',data=>{setTurnIndicator(false);stats.games=(stats.games||0)
 socket.on('receiveSwapRequest',d=>{pendingSwapRequest=d.fromUserID;document.getElementById('swap-txt').innerText=d.fromName+" wants your hand!";document.getElementById('swap-modal').style.display='block';let t=15;const timer=document.getElementById('swap-timer');timer.innerText=`${t}s`;const cd=setInterval(()=>{t--;timer.innerText=`${t}s`;if(t<=0)clearInterval(cd);},1000);swapTimeoutId=setTimeout(()=>{clearInterval(cd);if(pendingSwapRequest===d.fromUserID){answerSwap(false);showToast("Swap expired");}},15000);});
 socket.on('swapOccurred',d=>{playSound('absorb');showToast(d.msg,true);if(d.requesterUserID===userID){stats.handsAbsorbed=(stats.handsAbsorbed||0)+1;addXP(5,"Hand Absorbed!");}if(d.accepterUserID===userID)addXP(3,"Hand Given!");saveStats();checkAllTitles();update(d);});
 function update(d){isProcessingTurn=false;showLoading(false);const me=d.players.find(p=>p.userID===userID);if(me)myCurrentHand=me.hand;const active=d.players[d.turn];const isMyTurn=active?.userID===userID;setTurnIndicator(isMyTurn);const sInd=document.getElementById('suit-indicator');if(d.table?.length>0){sInd.style.display='flex';currentLeadSuit=d.table[0].card.suit;document.getElementById('suit-symbol').innerText=icons[currentLeadSuit];document.getElementById('suit-symbol').style.color=['Hearts','Diamonds'].includes(currentLeadSuit)?'var(--danger)':'white';}else{sInd.style.display='none';currentLeadSuit=null;}render(d.players,d.turn,d.table||[]);if(d.fateAces)showDiscarded(d.fateAces);}
-function render(players,turn,table=[]){const pLayer=document.getElementById('p-layer');pLayer.innerHTML="";const radius=document.getElementById('table-wrap').offsetWidth/2;const myIdx=players.findIndex(p=>p.userID===userID);players.forEach((p,i)=>{const angle=(i*(360/players.length)-90)*(Math.PI/180);const x=Math.cos(angle)*(radius+25),y=Math.sin(angle)*(radius+25);let swapBtn="";if(players.length>1&&i!==myIdx&&p.hand.length>0){let nxt=(myIdx+1)%players.length,att=0;while(players[nxt].hand.length===0&&att<players.length){nxt=(nxt+1)%players.length;att++;}if(i===nxt&&att<players.length)swapBtn=`<button class="btn-swap" onclick="socket.emit('sendSwapRequest',{roomID:'${myRoom}',fromUserID:'${userID}'})">TAKE HAND</button>`;}const titleHtml=p.equippedTitle?`<div class="av-title ${p.equippedTitle.rarity}">${p.equippedTitle.icon} ${p.equippedTitle.name}</div>`:'';const div=document.createElement('div');div.className=`player ${i===turn?'active':''} ${p.hand.length===0?'eliminated':''}`;div.style.left=`calc(50% + ${x}px)`;div.style.top=`calc(50% + ${y}px)`;div.innerHTML=`${swapBtn}<div class="av"><div class="av-left"><div class="av-name" style="color:${p.userID===userID?'var(--ui-blue)':'white'}">${p.name}</div>${titleHtml}</div><div class="av-cards"><span style="opacity:0.7">♠</span> ${p.hand.length}</div></div>`;pLayer.appendChild(div);});renderHand();const tLayer=document.getElementById('t-layer');tLayer.innerHTML="";if(table.length>0){const rowDiv=document.createElement('div');rowDiv.className='table-cards-row';table.forEach((tc)=>{const el=createCardUI(tc.card);el.className=`card table-card ${['Hearts','Diamonds'].includes(tc.card.suit)?'red':''}`;rowDiv.appendChild(el);});tLayer.appendChild(rowDiv);}}
+function render(players,turn,table=[]){const pLayer=document.getElementById('p-layer');pLayer.innerHTML="";const radius=document.getElementById('table-wrap').offsetWidth/2;const myIdx=players.findIndex(p=>p.userID===userID);players.forEach((p,i)=>{const angle=(i*(360/players.length)-90)*(Math.PI/180);const x=Math.cos(angle)*(radius+50),y=Math.sin(angle)*(radius+20);
+// Check if this player is next for swap
+let canSwap=false;
+if(players.length>1&&i!==myIdx&&p.hand.length>0){let nxt=(myIdx+1)%players.length,att=0;while(players[nxt].hand.length===0&&att<players.length){nxt=(nxt+1)%players.length;att++;}if(i===nxt&&att<players.length)canSwap=true;}
+// Get level from player or default
+const playerLevel=p.level||1;
+// Title text
+const titleText=p.equippedTitle?`${p.equippedTitle.name}`:'';
+// Build avatar HTML
+const div=document.createElement('div');
+div.className=`player ${i===turn?'active':''} ${p.hand.length===0?'eliminated':''}`;
+div.style.left=`calc(50% + ${x}px)`;
+div.style.top=`calc(50% + ${y}px)`;
+div.innerHTML=`<div class="av">
+<div class="av-take-hand ${canSwap?'visible':''}" onclick="event.stopPropagation();socket.emit('sendSwapRequest',{roomID:'${myRoom}',fromUserID:'${userID}'})">
+<svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+</div>
+<div class="av-avatar"></div>
+<div class="av-info">
+<div class="av-level">LVL ${playerLevel}</div>
+<div class="av-name" style="color:${p.userID===userID?'var(--ui-blue)':'#fff'}">${p.name}</div>
+<div class="av-title">${titleText}</div>
+</div>
+<div class="av-cards">${p.hand.length}</div>
+</div>`;
+pLayer.appendChild(div);});renderHand();const tLayer=document.getElementById('t-layer');tLayer.innerHTML="";if(table.length>0){const rowDiv=document.createElement('div');rowDiv.className='table-cards-row';table.forEach((tc)=>{const el=createCardUI(tc.card);el.className=`card table-card ${['Hearts','Diamonds'].includes(tc.card.suit)?'red':''}`;rowDiv.appendChild(el);});tLayer.appendChild(rowDiv);}}
 function renderHand(){const hDiv=document.getElementById('my-cards');hDiv.innerHTML="";const isMyTurn=document.getElementById('turn-glow').classList.contains('active');const hasLead=currentLeadSuit&&myCurrentHand.some(c=>c.suit===currentLeadSuit);myCurrentHand.forEach(c=>{const el=createCardUI(c);let canPlay=true,highlight=false;if(!isMyTurn||isProcessingTurn)canPlay=false;else if(isFirstMove){canPlay=c.suit==='Spades'&&c.rank==='K';highlight=canPlay;}else if(currentLeadSuit&&hasLead){canPlay=c.suit===currentLeadSuit;highlight=canPlay;}else highlight=isMyTurn;if(!canPlay)el.classList.add('disabled');else if(highlight)el.classList.add('highlight');el.onclick=e=>{if(!isProcessingTurn&&isMyTurn&&canPlay){e.currentTarget.classList.add('disabled');e.currentTarget.classList.remove('highlight');isProcessingTurn=true;showLoading(true);socket.emit('playCard',{roomID:myRoom,cardObject:c});}};hDiv.appendChild(el);});}
 function createCardUI(c){const d=document.createElement('div');d.className=`card ${['Hearts','Diamonds'].includes(c.suit)?'red':''}`;d.innerHTML=`<div style="font-size:10px">${c.rank}</div><div style="font-size:28px;text-align:center">${icons[c.suit]}</div><div style="font-size:10px;transform:rotate(180deg)">${c.rank}</div>`;return d;}
 function showDiscarded(list){const d=document.getElementById('discard-area');if(!list||list.length===0){d.innerHTML='';d.style.display='none';return;}d.style.display='flex';const isBlack=s=>['Spades','Clubs'].includes(s);d.innerHTML=`<div class="fate-label">⚰️ FATE (${list.length} Aces)</div>`;list.forEach(c=>{const div=document.createElement('div');div.className=`fate-card ${isBlack(c.suit)?'black':'red'}`;div.innerHTML=`<div style="font-size:12px">A</div><div style="font-size:22px">${icons[c.suit]}</div>`;d.appendChild(div);});}

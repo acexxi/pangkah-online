@@ -65,20 +65,30 @@
         .ring { position: absolute; inset: 0; border-radius: 50%; border: 1px dashed rgba(255,255,255,0.1); }
         .player { position: absolute; transform: translate(-50%, -50%); text-align: center; z-index: 100; transition: all 0.5s ease; }
         
-        /* Custom Avatar Frame */
+        /* Custom Avatar Frame - 205 x 70 */
         .av { position: relative; width: 205px; height: 70px; background: url('/avatar-frame.png') center/contain no-repeat; display: flex; align-items: center; }
-        .av-take-hand { position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 36px; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity 0.2s; }
-        .av-take-hand.visible { opacity: 1; }
-        .av-take-hand:hover { background: rgba(255,255,255,0.1); }
-        .av-take-hand svg { width: 18px; height: 18px; fill: #10b981; }
-        .av-avatar { position: absolute; left: 38px; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; border-radius: 8px; background: rgba(255,255,255,0.1); overflow: hidden; }
+        
+        /* Left Hexagon - Take Hand (clickable area) */
+        .av-take-hand { position: absolute; left: 2px; top: 50%; transform: translateY(-50%); width: 32px; height: 50px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 0.2s; border-radius: 4px; }
+        .av-take-hand.visible { opacity: 1; pointer-events: auto; }
+        .av-take-hand:hover { background: rgba(16,185,129,0.3); }
+        .av-take-hand::after { content: 'TH'; font-size: 12px; font-weight: 900; color: #10b981; text-shadow: 0 0 8px #10b981, 0 1px 2px rgba(0,0,0,0.8); }
+        
+        /* Avatar Square (future use) */
+        .av-avatar { position: absolute; left: 36px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border-radius: 6px; background: transparent; overflow: hidden; }
         .av-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .av-info { position: absolute; left: 82px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 90px; }
-        .av-level { font-size: 8px; font-weight: 800; color: #10b981; text-transform: uppercase; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
-        .av-name { font-size: 11px; font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 85px; }
-        .av-title { font-size: 8px; font-weight: 600; color: rgba(255,255,255,0.7); text-shadow: 0 1px 2px rgba(0,0,0,0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 85px; }
-        .av-cards { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 16px; font-weight: 900; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.8); width: 28px; text-align: center; }
-        .active .av { filter: drop-shadow(0 0 15px var(--primary-action)); }
+        
+        /* Center Info - Level, Name, Title */
+        .av-info { position: absolute; left: 78px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0px; width: 95px; height: 50px; }
+        .av-level { font-size: 7px; font-weight: 800; color: #10b981; text-transform: uppercase; text-shadow: 0 1px 2px rgba(0,0,0,0.8); line-height: 1.2; }
+        .av-name { font-size: 10px; font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; line-height: 1.3; }
+        .av-title { font-size: 7px; font-weight: 600; color: rgba(255,255,255,0.7); text-shadow: 0 1px 2px rgba(0,0,0,0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; line-height: 1.2; }
+        
+        /* Right Hexagon - Card Count */
+        .av-cards { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 18px; font-weight: 900; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.8); width: 30px; text-align: center; }
+        
+        /* Active player glow */
+        .active .av { filter: drop-shadow(0 0 12px var(--primary-action)); }
         .player.eliminated .av { opacity: 0.3; filter: grayscale(1); }
         #hand-area { height: 28vh; background: var(--glass-heavy); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid var(--border-light); padding: 15px; overflow-y: auto; z-index: 2000; box-shadow: 0 -4px 30px rgba(0,0,0,0.2); position: relative; }
         .hand-header { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 10px; }
@@ -422,9 +432,7 @@ div.className=`player ${i===turn?'active':''} ${p.hand.length===0?'eliminated':'
 div.style.left=`calc(50% + ${x}px)`;
 div.style.top=`calc(50% + ${y}px)`;
 div.innerHTML=`<div class="av">
-<div class="av-take-hand ${canSwap?'visible':''}" onclick="event.stopPropagation();socket.emit('sendSwapRequest',{roomID:'${myRoom}',fromUserID:'${userID}'})">
-<svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
-</div>
+<div class="av-take-hand ${canSwap?'visible':''}" onclick="event.stopPropagation();socket.emit('sendSwapRequest',{roomID:'${myRoom}',fromUserID:'${userID}'})" title="Take Hand"></div>
 <div class="av-avatar"></div>
 <div class="av-info">
 <div class="av-level">LVL ${playerLevel}</div>

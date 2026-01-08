@@ -6,134 +6,187 @@
     <title>Pangkah Murim</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
-        :root { 
-            --primary-action: #10b981; 
-            --ui-blue: #3b82f6; 
-            --bg-gradient: radial-gradient(circle at 50% -20%, #1e3a8a, #020617 90%);
-            --glass: rgba(255, 255, 255, 0.03);
-            --glass-heavy: rgba(15, 23, 42, 0.85);
-            --border: rgba(255, 255, 255, 0.1); 
-            --danger: #f43f5e;
-        }
+        :root { --primary-action: #10b981; --ui-blue: #3b82f6; --bg-gradient: radial-gradient(circle at 50% -20%, #1e3a8a, #020617 90%); --glass: rgba(255,255,255,0.03); --glass-heavy: rgba(15,23,42,0.85); --border: rgba(255,255,255,0.1); --danger: #f43f5e; --gold: #fbbf24; --purple: #a855f7; --legendary: linear-gradient(135deg, #fbbf24, #f59e0b); --epic: linear-gradient(135deg, #a855f7, #7c3aed); --rare: linear-gradient(135deg, #3b82f6, #2563eb); --common: linear-gradient(135deg, #6b7280, #4b5563); }
         * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
         body { margin: 0; height: 100vh; overflow: hidden; background: var(--bg-gradient); color: white; display: flex; flex-direction: column; }
-
         #lobby { position: fixed; inset: 0; z-index: 5000; backdrop-filter: blur(30px); background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; }
         .panel { width: 90%; max-width: 400px; padding: 35px; border-radius: 32px; background: var(--glass); border: 1px solid var(--border); backdrop-filter: blur(15px); text-align: center; }
         .room-list { height: 120px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 16px; margin: 15px 0; border: 1px solid var(--border); }
         .room-item { padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; cursor: pointer; font-size: 0.85rem; transition: background 0.2s; }
         .room-item:hover { background: rgba(255,255,255,0.05); }
-
-        #profile-modal { position: fixed; inset: 0; z-index: 6000; background: var(--glass-heavy); backdrop-filter: blur(15px); display: none; align-items: center; justify-content: center; }
-        .profile-card { width: 85%; max-width: 340px; padding: 40px 20px; background: var(--glass); border: 1px solid var(--ui-blue); border-radius: 32px; text-align: center; }
-        .bar-container { width: 100%; height: 10px; background: rgba(255,255,255,0.05); border-radius: 20px; margin: 15px 0; overflow: hidden; border: 1px solid var(--border); }
+        .room-item.in-game { opacity: 0.5; }
+        .modal-overlay { position: fixed; inset: 0; z-index: 6000; background: var(--glass-heavy); backdrop-filter: blur(15px); display: none; align-items: center; justify-content: center; overflow-y: auto; padding: 20px; }
+        #profile-modal .profile-card, #titles-modal .titles-card, .gameover-card { width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; padding: 30px 20px; background: var(--glass); border-radius: 32px; text-align: center; }
+        #profile-modal .profile-card { border: 1px solid var(--ui-blue); }
+        #titles-modal .titles-card { border: 1px solid var(--purple); }
+        .gameover-card { border: 1px solid var(--danger); }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
+        .stat-box { background: rgba(0,0,0,0.3); padding: 15px 10px; border-radius: 16px; border: 1px solid var(--border); }
+        .stat-value { font-size: 24px; font-weight: 800; color: var(--ui-blue); }
+        .stat-label { font-size: 9px; opacity: 0.6; margin-top: 4px; text-transform: uppercase; }
+        .bar-container { width: 100%; height: 10px; background: rgba(255,255,255,0.05); border-radius: 20px; margin: 10px 0; overflow: hidden; border: 1px solid var(--border); }
         .bar-fill { height: 100%; background: linear-gradient(90deg, var(--ui-blue), var(--primary-action)); width: 0%; transition: width 0.6s ease; }
-        
+        .title-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0; }
+        .title-item { padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: rgba(0,0,0,0.3); cursor: pointer; transition: all 0.2s; text-align: left; position: relative; }
+        .title-item:hover { transform: scale(1.02); }
+        .title-item.locked { opacity: 0.4; cursor: not-allowed; }
+        .title-item.equipped { border-color: var(--gold); box-shadow: 0 0 15px rgba(251,191,36,0.3); }
+        .title-name { font-weight: 800; font-size: 11px; margin-bottom: 4px; }
+        .title-desc { font-size: 9px; opacity: 0.6; }
+        .title-rarity { font-size: 8px; font-weight: 800; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 6px; }
+        .title-rarity.legendary { background: var(--legendary); color: #000; }
+        .title-rarity.epic { background: var(--epic); color: #fff; }
+        .title-rarity.rare { background: var(--rare); color: #fff; }
+        .title-rarity.common { background: var(--common); color: #fff; }
+        .title-progress { font-size: 8px; color: var(--ui-blue); margin-top: 4px; }
+        .filter-tabs { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; }
+        .filter-tab { padding: 6px 12px; border-radius: 20px; font-size: 10px; font-weight: 800; cursor: pointer; border: 1px solid var(--border); background: rgba(0,0,0,0.3); }
+        .filter-tab.active { background: var(--ui-blue); border-color: var(--ui-blue); }
         #swap-modal { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: var(--glass-heavy); backdrop-filter: blur(20px); padding: 30px; border-radius: 24px; border: 1px solid #f59e0b; z-index: 10001; display: none; text-align: center; width: 90%; max-width: 320px; }
-        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--glass-heavy); border: 1px solid var(--ui-blue); padding: 40px; border-radius: 24px; text-align: center; z-index: 9999; display: none; min-width: 280px; max-width: 90%; }
-
-        .header { height: 70px; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.1); backdrop-filter: blur(10px); }
-        #your-turn-btn { background: var(--primary-action); color: #000; font-size: 11px; font-weight: 900; padding: 8px 18px; border-radius: 25px; border: none; display: none; animation: pulse-glow 1.5s infinite; pointer-events: none; }
+        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--glass-heavy); border: 1px solid var(--ui-blue); padding: 40px; border-radius: 24px; text-align: center; z-index: 9999; display: none; min-width: 300px; }
+        .pangkah-text { color: var(--danger); font-size: 2.2rem; font-weight: 900; text-shadow: 0 0 20px var(--danger); }
+        .clean-text { color: var(--ui-blue); font-size: 2.2rem; font-weight: 900; text-shadow: 0 0 20px var(--ui-blue); }
+        #gameover-modal { position: fixed; inset: 0; z-index: 10000; background: var(--glass-heavy); backdrop-filter: blur(20px); display: none; align-items: center; justify-content: center; padding: 20px; }
+        .finish-list { margin: 20px 0; }
+        .finish-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; margin: 8px 0; background: rgba(0,0,0,0.3); border-radius: 12px; border: 1px solid var(--border); }
+        .finish-item.winner { border-color: var(--gold); background: rgba(251,191,36,0.1); }
+        .finish-item.loser { border-color: var(--danger); background: rgba(244,63,94,0.1); }
+        .bonus-list { background: rgba(0,0,0,0.3); border-radius: 16px; padding: 15px; margin: 15px 0; text-align: left; }
+        .bonus-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+        .bonus-item:last-child { border-bottom: none; }
+        .rematch-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
+        #achievement-popup { position: fixed; top: 100px; right: 20px; background: var(--glass-heavy); backdrop-filter: blur(20px); padding: 20px; border-radius: 16px; border: 1px solid var(--gold); z-index: 10002; display: none; min-width: 280px; animation: slideIn 0.5s ease; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .header { height: 70px; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.1); }
+        #your-turn-btn { background: var(--primary-action); color: #000; font-size: 11px; font-weight: 900; padding: 8px 18px; border-radius: 25px; border: none; display: none; animation: pulse-glow 1.5s infinite; }
         @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px var(--primary-action); } 50% { box-shadow: 0 0 20px var(--primary-action); } }
-
         #game-view { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
         .safe-wrap { position: relative; width: 100%; height: 100%; max-width: 45vh; max-height: 45vh; aspect-ratio: 1/1; }
         .ring { position: absolute; inset: 0; border-radius: 50%; border: 1px dashed rgba(255,255,255,0.05); }
         .player { position: absolute; transform: translate(-50%, -50%); text-align: center; z-index: 100; transition: all 0.5s ease; }
-        .av { width: 54px; height: 66px; border-radius: 12px; background: #0f172a; border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 10px 20px rgba(0,0,0,0.3); font-weight: 800; transition: all 0.3s ease; }
+        .av { width: 54px; height: 66px; border-radius: 12px; background: #0f172a; border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 10px 20px rgba(0,0,0,0.3); font-weight: 800; }
         .active .av { border-color: var(--primary-action); box-shadow: 0 0 25px var(--primary-action); border-width: 2px; }
         .player.eliminated .av { opacity: 0.3; border-color: var(--danger); }
-
-        #hand-area { height: 28vh; background: rgba(2, 6, 23, 0.75); backdrop-filter: blur(25px); border-top: 1px solid var(--border); padding: 15px; overflow-y: auto; z-index: 2000; }
+        .player-title { font-size: 8px; padding: 2px 6px; border-radius: 4px; margin-top: 4px; font-weight: 800; }
+        #hand-area { height: 28vh; background: rgba(2,6,23,0.75); backdrop-filter: blur(25px); border-top: 1px solid var(--border); padding: 15px; overflow-y: auto; z-index: 2000; }
         .hand-flex { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; padding-bottom: 20px; }
-        .card { width: 50px; height: 75px; background: white; color: black; border-radius: 10px; padding: 6px; font-weight: 800; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 1px solid #ddd; transition: transform 0.15s, box-shadow 0.15s; position: relative; }
+        .card { width: 50px; height: 75px; background: white; color: black; border-radius: 10px; padding: 6px; font-weight: 800; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 1px solid #ddd; transition: transform 0.15s, box-shadow 0.15s; }
         .card:hover { transform: translateY(-8px); box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
-        .card:active { transform: translateY(-4px); }
         .card.red { color: var(--danger) !important; }
         .card.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
         .card.highlight { border: 2px solid var(--primary-action); box-shadow: 0 0 10px var(--primary-action); }
-        
-        .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70px; height: 105px; border: 2px solid #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.6); pointer-events: none; z-index: 50; animation: cardDrop 0.3s ease; }
-        @keyframes cardDrop { from { transform: translate(-50%, -150%) scale(0.5); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
-
-        #toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: var(--danger); padding: 12px 24px; border-radius: 12px; z-index: 10000; display: none; font-weight: 800; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-        .btn-swap { background: #f59e0b; color: #000; border: none; border-radius: 20px; font-size: 8px; font-weight: 900; padding: 4px 10px; position: absolute; top: -30px; left: 50%; transform: translateX(-50%); width: 80px; cursor: pointer; transition: transform 0.2s; }
-        .btn-swap:hover { transform: translateX(-50%) scale(1.05); }
-        .btn { padding: 14px; border-radius: 14px; font-weight: 800; cursor: pointer; width: 100%; border: none; transition: 0.2s; }
-        .btn:hover { transform: scale(1.02); }
-        .btn:active { transform: scale(0.98); }
+        .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70px; height: 105px; border: 2px solid #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.6); pointer-events: none; z-index: 50; animation: cardDrop 0.4s ease; }
+        @keyframes cardDrop { from { transform: translate(-50%, -200%) scale(0.5); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+        .pangkah-flash { position: fixed; inset: 0; background: rgba(244,63,94,0.3); z-index: 9998; pointer-events: none; animation: flash 0.5s ease; }
+        .clean-flash { position: fixed; inset: 0; background: rgba(59,130,246,0.2); z-index: 9998; pointer-events: none; animation: flash 0.5s ease; }
+        @keyframes flash { 0% { opacity: 1; } 100% { opacity: 0; } }
+        #streak-indicator { position: fixed; top: 80px; left: 20px; background: var(--glass-heavy); padding: 10px 15px; border-radius: 12px; border: 1px solid var(--gold); display: none; z-index: 100; }
+        #toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: var(--danger); padding: 12px 24px; border-radius: 12px; z-index: 10003; display: none; font-weight: 800; font-size: 13px; }
+        .btn-swap { background: #f59e0b; color: #000; border: none; border-radius: 20px; font-size: 8px; font-weight: 900; padding: 4px 10px; position: absolute; top: -30px; left: 50%; transform: translateX(-50%); width: 80px; cursor: pointer; }
+        .btn { padding: 14px; border-radius: 14px; font-weight: 800; cursor: pointer; width: 100%; border: none; }
         .btn-p { background: linear-gradient(135deg, var(--ui-blue), #2563eb); color: #fff; }
         .btn-s { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: #fff; font-size: 11px; }
+        .btn-gold { background: var(--legendary); color: #000; }
         input, select { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 14px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid var(--border); outline: none; }
-        input:focus, select:focus { border-color: var(--ui-blue); }
-        .pangkah-text { color: var(--danger); font-size: 2.2rem; font-weight: 900; text-shadow: 0 0 20px var(--danger); }
-        .clean-text { color: var(--ui-blue); font-size: 2.2rem; font-weight: 900; text-shadow: 0 0 20px var(--ui-blue); }
         #discard-area { position: absolute; left: 15px; top: 85px; display: flex; flex-direction: column; gap: 5px; z-index: 10; }
-        .mini { width: 28px; height: 38px; background: white; color: black; border-radius: 6px; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: 900; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
-        .loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); z-index: 9998; display: none; align-items: center; justify-content: center; }
+        .mini { width: 28px; height: 38px; background: white; color: black; border-radius: 6px; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+        .loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9998; display: none; align-items: center; justify-content: center; }
         .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: var(--primary-action); border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        
-        #connection-status { position: fixed; bottom: 10px; right: 10px; font-size: 10px; padding: 4px 8px; background: rgba(0,0,0,0.5); border-radius: 8px; }
+        #connection-status { position: fixed; bottom: 10px; right: 10px; font-size: 10px; padding: 4px 8px; background: rgba(0,0,0,0.5); border-radius: 8px; z-index: 100; }
+        .xp-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; font-weight: 900; color: var(--primary-action); z-index: 10004; pointer-events: none; animation: xpFloat 1.5s ease forwards; }
+        @keyframes xpFloat { 0% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -100%) scale(1.5); } }
     </style>
 </head>
 <body>
-
-<div id="toast">MESSAGE</div>
+<div id="toast"></div>
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div id="connection-status">🟢 Connected</div>
+<div id="achievement-popup"></div>
+<div id="streak-indicator"><span>🔥</span><span id="streak-count">0</span><div style="font-size:9px;opacity:0.6">WIN STREAK</div></div>
 
-<div id="profile-modal">
+<div class="modal-overlay" id="profile-modal">
     <div class="profile-card">
-        <h3 style="color: var(--ui-blue); margin-top: 0; letter-spacing: 2px;">CULTIVATION</h3>
-        <div id="prof-level" style="font-size: 28px; font-weight: 800;">LEVEL 1</div>
-        <div id="prof-title" style="color: var(--primary-action); letter-spacing: 2px; margin-bottom: 15px;">APPRENTICE</div>
-        <div style="text-align: right; font-size: 10px; color: #aaa; margin-bottom: 4px;" id="prof-progress-text">XP: 0/100</div>
+        <h3 style="color:var(--ui-blue);margin-top:0">CULTIVATION PROFILE</h3>
+        <div id="prof-equipped-title" style="margin-bottom:15px"></div>
+        <div id="prof-level" style="font-size:28px;font-weight:800">LEVEL 1</div>
+        <div id="prof-rank-title" style="color:var(--primary-action);margin-bottom:15px">APPRENTICE</div>
+        <div style="text-align:right;font-size:10px;color:#aaa" id="prof-progress-text">XP: 0/100</div>
         <div class="bar-container"><div id="prof-bar-fill" class="bar-fill"></div></div>
-        <div style="display: flex; justify-content: space-around; margin: 25px 0;">
-            <div><div style="font-size: 22px; font-weight: 800;" id="prof-points">0</div><div style="font-size: 10px; opacity: 0.6;">TOTAL XP</div></div>
-            <div><div style="font-size: 22px; font-weight: 800;" id="prof-pangkahs">0</div><div style="font-size: 10px; opacity: 0.6;">PANGKAHS</div></div>
+        <div class="stats-grid">
+            <div class="stat-box"><div class="stat-value" id="prof-xp">0</div><div class="stat-label">Total XP</div></div>
+            <div class="stat-box"><div class="stat-value" id="prof-wins">0</div><div class="stat-label">1st Place</div></div>
+            <div class="stat-box"><div class="stat-value" id="prof-pangkahs">0</div><div class="stat-label">Pangkahs</div></div>
+            <div class="stat-box"><div class="stat-value" id="prof-games">0</div><div class="stat-label">Games</div></div>
+            <div class="stat-box"><div class="stat-value" id="prof-streak">0</div><div class="stat-label">Best Streak</div></div>
+            <div class="stat-box"><div class="stat-value" id="prof-winrate">0%</div><div class="stat-label">Win Rate</div></div>
         </div>
+        <button class="btn btn-gold" onclick="openTitles()" style="margin-bottom:10px">🏆 VIEW TITLES</button>
         <button class="btn btn-p" onclick="closeProfile()">RETURN</button>
     </div>
 </div>
 
+<div class="modal-overlay" id="titles-modal">
+    <div class="titles-card">
+        <h3 style="color:var(--purple);margin-top:0">🏆 ACHIEVEMENT TITLES</h3>
+        <p style="font-size:11px;opacity:0.6;margin-bottom:20px">Unlock titles and equip one to display!</p>
+        <div class="filter-tabs" id="title-filters"></div>
+        <div class="title-grid" id="title-grid"></div>
+        <button class="btn btn-s" onclick="closeTitles()" style="margin-top:15px">BACK</button>
+    </div>
+</div>
+
 <div id="swap-modal">
-    <div id="swap-txt" style="font-size: 14px; margin-bottom: 20px; font-weight: 600;">Player wants your hand!</div>
-    <div id="swap-timer" style="font-size: 12px; margin-bottom: 15px; color: #f59e0b;">15s remaining</div>
-    <div style="display: flex; gap: 12px;">
+    <div id="swap-txt" style="font-size:14px;margin-bottom:20px;font-weight:600"></div>
+    <div id="swap-timer" style="font-size:12px;margin-bottom:15px;color:#f59e0b">15s</div>
+    <div style="display:flex;gap:12px">
         <button class="btn btn-p" onclick="answerSwap(true)">ACCEPT</button>
-        <button class="btn" onclick="answerSwap(false)" style="background: rgba(255,255,255,0.1); color: white;">DECLINE</button>
+        <button class="btn" onclick="answerSwap(false)" style="background:rgba(255,255,255,0.1);color:white">DECLINE</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="gameover-modal">
+    <div class="gameover-card">
+        <h2 style="color:var(--danger);margin-top:0">⚔️ DUEL COMPLETE</h2>
+        <div id="game-number" style="font-size:11px;opacity:0.6;margin-bottom:15px"></div>
+        <div class="finish-list" id="finish-list"></div>
+        <div class="bonus-list" id="bonus-list"></div>
+        <div class="rematch-section">
+            <div id="rematch-status" style="font-size:12px;margin-bottom:15px;color:var(--ui-blue)">Waiting...</div>
+            <button class="btn btn-gold" id="rematch-btn" onclick="requestRematch()">⚡ REMATCH</button>
+            <button class="btn btn-s" onclick="location.reload()" style="margin-top:10px">LEAVE</button>
+        </div>
     </div>
 </div>
 
 <div id="lobby">
     <div class="panel">
-        <h2 style="color:var(--ui-blue); letter-spacing: 3px; margin-bottom: 25px;">PANGKAH MURIM</h2>
-        <div id="user-info" style="margin-bottom:20px; padding: 15px; background: rgba(255,255,255,0.03); border-radius: 20px; border: 1px solid var(--border);">
-            <div style="display: flex; justify-content: center; align-items: center; gap: 8px;">
-                <span id="display-name" style="color: var(--ui-blue); font-size: 1.1rem; font-weight: 800;"></span> 
-                <span onclick="editName()" style="color:var(--primary-action); cursor:pointer; font-size:0.7rem;">[EDIT]</span>
+        <h2 style="color:var(--ui-blue);letter-spacing:3px;margin-bottom:25px">PANGKAH MURIM</h2>
+        <div style="margin-bottom:20px;padding:15px;background:rgba(255,255,255,0.03);border-radius:20px;border:1px solid var(--border)">
+            <div style="display:flex;justify-content:center;align-items:center;gap:8px">
+                <span id="display-name" style="color:var(--ui-blue);font-size:1.1rem;font-weight:800"></span>
+                <span onclick="editName()" style="color:var(--primary-action);cursor:pointer;font-size:0.7rem">[EDIT]</span>
             </div>
-            <div id="level-title" style="color: var(--primary-action); font-size: 12px; margin-top: 6px;">LEVEL 1 - APPRENTICE</div>
-            <button class="btn btn-s" onclick="openProfile()" style="margin-top:12px;">VIEW STATS 📜</button>
+            <div id="lobby-title" style="margin:8px 0"></div>
+            <div id="level-title" style="color:var(--primary-action);font-size:12px">LEVEL 1</div>
+            <button class="btn btn-s" onclick="openProfile()" style="margin-top:12px">VIEW PROFILE 📜</button>
         </div>
         <div class="room-list" id="room-box"></div>
         <input id="rid" placeholder="Enter Sect ID" maxlength="20">
         <select id="maxp"><option value="4">4 Players</option><option value="5">5 Players</option><option value="6">6 Players</option></select>
         <button class="btn btn-p" onclick="enter('create')">CREATE SECT</button>
-        <button class="btn btn-s" onclick="enter('join')" style="margin-top:8px;">JOIN SECT</button>
+        <button class="btn btn-s" onclick="enter('join')" style="margin-top:8px">JOIN SECT</button>
     </div>
 </div>
 
 <div id="round-popup"><div id="pop-title"></div><div id="pop-desc"></div></div>
 
 <div class="header">
-    <div id="room-tag" style="color:var(--ui-blue); font-weight:800; font-size: 11px;">LOBBY</div>
-    <div class="header-center"><button id="your-turn-btn">YOUR TURN</button></div>
-    <div style="display: flex; align-items: center; gap: 12px;">
-        <button id="close-room-btn" onclick="closeRoom()" style="display:none; background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 10px; font-weight: 800; cursor: pointer;">DISBAND</button>
-        <div id="suit-indicator" style="display:none; align-items:center; background:rgba(255,255,255,0.05); padding:4px 10px; border-radius:10px; border:1px solid var(--border);"><span id="suit-symbol" style="font-size: 1.2rem;"></span></div>
+    <div id="room-tag" style="color:var(--ui-blue);font-weight:800;font-size:11px">LOBBY</div>
+    <button id="your-turn-btn">YOUR TURN</button>
+    <div style="display:flex;align-items:center;gap:12px">
+        <button id="close-room-btn" onclick="closeRoom()" style="display:none;background:var(--danger);color:white;border:none;padding:6px 12px;border-radius:8px;font-size:10px;font-weight:800;cursor:pointer">DISBAND</button>
+        <div id="suit-indicator" style="display:none;align-items:center;background:rgba(255,255,255,0.05);padding:4px 10px;border-radius:10px"><span id="suit-symbol" style="font-size:1.2rem"></span></div>
     </div>
 </div>
 
@@ -143,628 +196,73 @@
         <div class="ring"></div>
         <div id="p-layer"></div>
         <div id="t-layer"></div>
-        <button id="start-btn" class="btn" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:auto; padding:15px 30px; background: var(--primary-action); color:#000;" onclick="start()">BEGIN DUEL</button>
+        <button id="start-btn" class="btn" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:auto;padding:15px 30px;background:var(--primary-action);color:#000" onclick="start()">BEGIN DUEL</button>
     </div>
 </div>
 
 <div id="hand-area">
-    <div style="text-align:center; margin-bottom:12px;"><button class="btn" style="width:auto; padding:6px 18px; font-size:11px; background:rgba(255,255,255,0.05); color:#fff; border: 1px solid var(--border);" onclick="sortHand()">SORT TECHNIQUES ⇅</button></div>
+    <div style="text-align:center;margin-bottom:12px"><button class="btn" style="width:auto;padding:6px 18px;font-size:11px;background:rgba(255,255,255,0.05);color:#fff;border:1px solid var(--border)" onclick="sortHand()">SORT ⇅</button></div>
     <div class="hand-flex" id="my-cards"></div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-    const socket = io();
-    
-    // Audio files (optional - graceful fallback if missing)
-    const sfx = { 
-        place: new Audio('place.mp3'), 
-        sweep: new Audio('sweep.mp3'), 
-        strike: new Audio('strike.mp3'), 
-        absorb: new Audio('absorb.mp3') 
-    };
-    Object.values(sfx).forEach(audio => audio.volume = 0.3);
-    
-    // User persistence
-    let userID = localStorage.getItem('pUserID') || 'uid_' + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem('pUserID', userID);
-    let myName = localStorage.getItem('pName') || 'Disciple' + Math.floor(Math.random()*999);
-    let stats = JSON.parse(localStorage.getItem('pStats')) || { 
-        xp: 0, 
-        pangkahs: 0, 
-        finishRanks: { first: 0, second: 0, third: 0, other: 0 },
-        handsAbsorbed: 0,
-        losses: 0
-    };
-    
-    // Game state
-    let myRoom = "";
-    let myCurrentHand = [];
-    let pendingSwapRequest = null;
-    let swapTimeoutId = null;
-    let isProcessingTurn = false;
-    let isHost = false;
-    let isFirstMove = true;
-    let currentLeadSuit = null;
-    let finishOrder = [];
-    
-    const icons = { 'Spades': '♠', 'Hearts': '♥', 'Diamonds': '♦', 'Clubs': '♣' };
+const TITLES=[{id:'ancient_ancestor',name:'Ancient Ancestor',desc:'Reach Level 50',rarity:'legendary',icon:'🐉',req:{t:'level',v:50}},{id:'pangkah_god',name:'Pangkah God',desc:'500 Pangkahs',rarity:'legendary',icon:'⚡',req:{t:'pangkahs',v:500}},{id:'unbreakable',name:'The Unbreakable',desc:'10 win streak',rarity:'legendary',icon:'💎',req:{t:'streak',v:10}},{id:'thousand_victories',name:'Thousand Victories',desc:'Win 1000 games',rarity:'legendary',icon:'👑',req:{t:'wins',v:1000}},{id:'sect_master',name:'Sect Master',desc:'Play 2000 games',rarity:'legendary',icon:'🏯',req:{t:'games',v:2000}},{id:'immortal',name:'Immortal',desc:'100,000 XP',rarity:'legendary',icon:'✨',req:{t:'xp',v:100000}},{id:'grandmaster',name:'Grandmaster',desc:'Reach Level 30',rarity:'epic',icon:'🎭',req:{t:'level',v:30}},{id:'pangkah_master',name:'Pangkah Master',desc:'200 Pangkahs',rarity:'epic',icon:'🔥',req:{t:'pangkahs',v:200}},{id:'untouchable',name:'Untouchable',desc:'7 win streak',rarity:'epic',icon:'🛡️',req:{t:'streak',v:7}},{id:'champion',name:'Champion',desc:'Win 500 games',rarity:'epic',icon:'🏆',req:{t:'wins',v:500}},{id:'veteran',name:'Battle Veteran',desc:'Play 1000 games',rarity:'epic',icon:'⚔️',req:{t:'games',v:1000}},{id:'enlightened',name:'Enlightened One',desc:'50,000 XP',rarity:'epic',icon:'🌟',req:{t:'xp',v:50000}},{id:'absorber',name:'Soul Absorber',desc:'Absorb 100 hands',rarity:'epic',icon:'👻',req:{t:'handsAbsorbed',v:100}},{id:'night_owl',name:'Night Owl',desc:'100 night games',rarity:'epic',icon:'🦉',req:{t:'nightGames',v:100}},{id:'master',name:'Master',desc:'Reach Level 15',rarity:'rare',icon:'🎯',req:{t:'level',v:15}},{id:'pangkah_adept',name:'Pangkah Adept',desc:'50 Pangkahs',rarity:'rare',icon:'💥',req:{t:'pangkahs',v:50}},{id:'hot_streak',name:'Hot Streak',desc:'5 win streak',rarity:'rare',icon:'🌊',req:{t:'streak',v:5}},{id:'conqueror',name:'Conqueror',desc:'Win 100 games',rarity:'rare',icon:'🗡️',req:{t:'wins',v:100}},{id:'dedicated',name:'Dedicated',desc:'Play 500 games',rarity:'rare',icon:'📿',req:{t:'games',v:500}},{id:'cultivator',name:'Cultivator',desc:'10,000 XP',rarity:'rare',icon:'🌱',req:{t:'xp',v:10000}},{id:'hand_collector',name:'Hand Collector',desc:'Absorb 30 hands',rarity:'rare',icon:'🤲',req:{t:'handsAbsorbed',v:30}},{id:'social',name:'Social Butterfly',desc:'50 unique players',rarity:'rare',icon:'🦋',req:{t:'uniquePlayers',v:50}},{id:'consistent',name:'Consistent',desc:'Top 2 in 50 games',rarity:'rare',icon:'📈',req:{t:'topTwo',v:50}},{id:'second_best',name:'Always Second',desc:'2nd place 25 times',rarity:'rare',icon:'🥈',req:{t:'secondPlace',v:25}},{id:'warrior',name:'Warrior',desc:'Reach Level 5',rarity:'common',icon:'⚔️',req:{t:'level',v:5}},{id:'first_pangkah',name:'First Strike',desc:'First Pangkah',rarity:'common',icon:'🎯',req:{t:'pangkahs',v:1}},{id:'first_blood',name:'First Blood',desc:'Win first game',rarity:'common',icon:'🩸',req:{t:'wins',v:1}},{id:'newcomer',name:'Newcomer',desc:'Play 10 games',rarity:'common',icon:'🌟',req:{t:'games',v:10}},{id:'regular',name:'Regular',desc:'Play 50 games',rarity:'common',icon:'🎮',req:{t:'games',v:50}},{id:'learner',name:'Quick Learner',desc:'1,000 XP',rarity:'common',icon:'📚',req:{t:'xp',v:1000}},{id:'pangkah_novice',name:'Pangkah Novice',desc:'10 Pangkahs',rarity:'common',icon:'🔰',req:{t:'pangkahs',v:10}},{id:'victor',name:'Victor',desc:'Win 10 games',rarity:'common',icon:'🏅',req:{t:'wins',v:10}},{id:'determined',name:'Determined',desc:'Win 25 games',rarity:'common',icon:'💪',req:{t:'wins',v:25}},{id:'hand_taker',name:'Hand Taker',desc:'Absorb 5 hands',rarity:'common',icon:'✋',req:{t:'handsAbsorbed',v:5}},{id:'streak_starter',name:'Streak Starter',desc:'3 win streak',rarity:'common',icon:'🔥',req:{t:'streak',v:3}},{id:'persistent',name:'Persistent',desc:'Play 100 games',rarity:'common',icon:'🎲',req:{t:'games',v:100}},{id:'collector',name:'Card Collector',desc:'Play 1000 cards',rarity:'common',icon:'🃏',req:{t:'cardsPlayed',v:1000}},{id:'runner_up',name:'Runner Up',desc:'2nd place 5 times',rarity:'common',icon:'🥈',req:{t:'secondPlace',v:5}},{id:'third_wheel',name:'Third Wheel',desc:'3rd place 5 times',rarity:'common',icon:'🥉',req:{t:'thirdPlace',v:5}}];
+const socket=io(),icons={Spades:'♠',Hearts:'♥',Diamonds:'♦',Clubs:'♣'},XP_PER_LEVEL=100;
+let userID=localStorage.getItem('pUserID')||'uid_'+Math.random().toString(36).substr(2,9);localStorage.setItem('pUserID',userID);
+let myName=localStorage.getItem('pName')||'Disciple'+Math.floor(Math.random()*999);
+const DEFAULT_STATS={xp:0,pangkahs:0,wins:0,losses:0,games:0,currentStreak:0,bestStreak:0,handsAbsorbed:0,cardsPlayed:0,secondPlace:0,thirdPlace:0,topTwo:0,nightGames:0,uniquePlayers:[],unlockedTitles:[],equippedTitle:null};
+let stats={...DEFAULT_STATS,...JSON.parse(localStorage.getItem('pStats')||'{}')};
+let myRoom='',myCurrentHand=[],pendingSwapRequest=null,swapTimeoutId=null,isProcessingTurn=false,isHost=false,isFirstMove=true,currentLeadSuit=null,currentFilter='all',rematchRequested=false;
 
-    // ENHANCED LEVEL SYSTEM - 100 XP per level
-    const XP_PER_LEVEL = 100;
-    
-    function getLevel() { 
-        return Math.floor((stats.xp || 0) / XP_PER_LEVEL) + 1; 
-    }
-    
-    function getTitle(lvl) {
-        if (lvl <= 5) return "APPRENTICE"; 
-        if (lvl <= 10) return "WARRIOR";
-        if (lvl <= 15) return "MASTER"; 
-        if (lvl <= 20) return "GRANDMASTER";
-        return "ANCIENT ANCESTOR";
-    }
-    
-    function getCurrentLevelXP() {
-        return (stats.xp || 0) % XP_PER_LEVEL;
-    }
-    
-    function addXP(amount, reason) {
-        const oldLevel = getLevel();
-        stats.xp = (stats.xp || 0) + amount;
-        
-        // Prevent negative XP
-        if (stats.xp < 0) stats.xp = 0;
-        
-        localStorage.setItem('pStats', JSON.stringify(stats));
-        
-        const newLevel = getLevel();
-        if (newLevel > oldLevel) {
-            showToast(`⚡ LEVEL UP! Now ${getTitle(newLevel)} (Lv.${newLevel})`, true);
-        }
-        
-        if (amount > 0) {
-            showToast(`+${amount} XP: ${reason}`, true);
-        } else if (amount < 0) {
-            showToast(`${amount} XP: ${reason}`, false);
-        }
-        
-        updateStatsUI();
-    }
-
-    function updateStatsUI() {
-        const level = getLevel();
-        const title = getTitle(level);
-        const currentXP = getCurrentLevelXP();
-        const xpProgress = (currentXP / XP_PER_LEVEL * 100).toFixed(1);
-        
-        document.getElementById('display-name').innerText = myName;
-        document.getElementById('level-title').innerText = `LEVEL ${level} - ${title}`;
-        document.getElementById('prof-level').innerText = `LEVEL ${level}`;
-        document.getElementById('prof-title').innerText = title;
-        document.getElementById('prof-points').innerText = stats.xp || 0;
-        document.getElementById('prof-pangkahs').innerText = stats.pangkahs || 0;
-        document.getElementById('prof-progress-text').innerText = `XP: ${currentXP}/${XP_PER_LEVEL}`;
-        document.getElementById('prof-bar-fill').style.width = xpProgress + "%";
-    }
-
-    function editName() { 
-        const n = prompt("Enter Name:", myName); 
-        if (n && n.trim().length > 0 && n.trim().length <= 20) { 
-            myName = n.trim(); 
-            localStorage.setItem('pName', myName); 
-            updateStatsUI(); 
-        } else if (n && n.trim().length > 20) {
-            showToast("Name too long (max 20 chars)");
-        }
-    }
-    
-    function openProfile() { updateStatsUI(); document.getElementById('profile-modal').style.display = 'flex'; }
-    function closeProfile() { document.getElementById('profile-modal').style.display = 'none'; }
-    
-    function showToast(msg, isPos = false) { 
-        const t = document.getElementById('toast'); 
-        t.innerText = msg; 
-        t.style.background = isPos ? 'var(--primary-action)' : 'var(--danger)'; 
-        t.style.display = 'block'; 
-        setTimeout(() => t.style.display = 'none', 3000); 
-    }
-
-    function showLoading(show) {
-        document.getElementById('loading').style.display = show ? 'flex' : 'none';
-    }
-
-    // LOBBY ACTIONS
-    function enter(type) {
-        myRoom = document.getElementById('rid').value.trim();
-        if (!myRoom) return showToast("Sect ID Required");
-        if (myRoom.length > 20) return showToast("Sect ID too long");
-        
-        showLoading(true);
-        const data = { 
-            roomID: myRoom, 
-            playerName: myName, 
-            userID: userID 
-        };
-        
-        if (type === 'create') {
-            data.maxPlayers = document.getElementById('maxp').value;
-            isHost = true;
-        }
-        
-        socket.emit(type === 'create' ? 'createRoom' : 'joinRoom', data);
-    }
-
-    function start() { 
-        showLoading(true);
-        socket.emit('startGame', myRoom); 
-    }
-    
-    function closeRoom() { 
-        if (myRoom && confirm("Disband this sect? All players will be kicked.")) {
-            socket.emit('requestCloseRoom', { roomID: myRoom }); 
-        }
-    }
-    
-    function sortHand() { 
-        const order = { 'Spades': 4, 'Hearts': 3, 'Diamonds': 2, 'Clubs': 1 }; 
-        myCurrentHand.sort((a, b) => (order[b.suit] - order[a.suit]) || (b.val - a.val)); 
-        renderHand(); 
-    }
-    
-    function answerSwap(accept) {
-        // Clear timeout
-        if (swapTimeoutId) {
-            clearTimeout(swapTimeoutId);
-            swapTimeoutId = null;
-        }
-        
-        document.getElementById('swap-modal').style.display = 'none'; 
-        
-        if (accept && pendingSwapRequest) {
-            socket.emit('acceptSwap', { 
-                roomID: myRoom, 
-                fromUserID: pendingSwapRequest, 
-                myUserID: userID 
-            }); 
-        }
-        pendingSwapRequest = null; 
-    }
-
-    // SOCKET EVENTS
-    socket.on('connect', () => {
-        console.log('Connected to server');
-        document.getElementById('connection-status').innerHTML = '🟢 Connected';
-        
-        // Attempt reconnection if user was in a room
-        if (userID) {
-            socket.emit('checkSession', { userID });
-        }
-    });
-
-    socket.on('disconnect', () => {
-        console.log('Disconnected from server');
-        document.getElementById('connection-status').innerHTML = '🔴 Disconnected';
-        showToast("Connection lost. Reconnecting...");
-    });
-
-    socket.on('reconnectSuccess', (data) => {
-        console.log('Reconnected to room:', data.roomID);
-        myRoom = data.roomID;
-        isFirstMove = data.isFirstMove || false;
-        currentLeadSuit = data.currentSuit;
-        
-        // Restore isHost status
-        if (data.players.length > 0 && data.players[0].userID === userID) {
-            isHost = true;
-            document.getElementById('close-room-btn').style.display = 'block';
-        }
-        
-        showLoading(false);
-        document.getElementById('lobby').style.display = 'none';
-        document.getElementById('room-tag').innerText = "SECT: " + myRoom;
-        
-        showToast("Reconnected!", true);
-        update(data);
-    });
-
-    socket.on('roomList', list => {
-        const box = document.getElementById('room-box'); 
-        box.innerHTML = list.length ? "" : '<div style="padding:15px; opacity:0.3;">No active sects...</div>';
-        list.forEach(r => {
-            const d = document.createElement('div'); 
-            d.className = 'room-item'; 
-            d.innerHTML = `<span>#${r.id}</span> <span>${r.count}/${r.max}</span>`;
-            d.onclick = () => document.getElementById('rid').value = r.id; 
-            box.appendChild(d);
-        });
-    });
-
-    socket.on('updatePlayers', p => {
-        showLoading(false);
-        document.getElementById('lobby').style.display = 'none';
-        document.getElementById('room-tag').innerText = "SECT: " + myRoom;
-        
-        // Check if current user is host (first player in list)
-        if (p.length > 0 && p[0].userID === userID) {
-            isHost = true;
-            document.getElementById('close-room-btn').style.display = 'block';
-            if (p.length >= 4) {
-                document.getElementById('start-btn').style.display = 'block';
-            }
-        } else {
-            isHost = false;
-            document.getElementById('close-room-btn').style.display = 'none';
-        }
-        
-        render(p, -1);
-    });
-
-    socket.on('gameInit', d => { 
-        showLoading(false);
-        document.getElementById('round-popup').style.display = 'none';
-        document.getElementById('start-btn').style.display = 'none'; 
-        isProcessingTurn = false;
-        isFirstMove = d.isFirstMove !== undefined ? d.isFirstMove : true;
-        currentLeadSuit = null;
-        finishOrder = []; // Reset finish order for new game
-        update(d); 
-    });
-    
-    socket.on('clearTable', d => {
-        // Handle Pangkah rewards
-        if (d.msg.toLowerCase() === 'pangkah!') {
-            sfx.strike.play().catch(() => {});
-            
-            if (d.winner === myName) { 
-                stats.pangkahs = (stats.pangkahs || 0) + 1; 
-                addXP(2, "Successful Pangkah!");
-            }
-        } else {
-            sfx.sweep.play().catch(() => {});
-        }
-        
-        // Reset lead suit for new round
-        currentLeadSuit = null;
-        
-        // Show round result popup
-        const pop = document.getElementById('round-popup');
-        document.getElementById('pop-title').className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
-        document.getElementById('pop-title').innerText = d.msg.toUpperCase();
-        document.getElementById('pop-desc').innerText = d.winner + " has the lead."; 
-        pop.style.display = 'block';
-
-        // Check if game is ending
-        const playersWithCards = d.players.filter(p => p.hand.length > 0);
-        if (playersWithCards.length <= 1) {
-            setTimeout(() => update(d), 1500); 
-        } else {
-            setTimeout(() => { 
-                pop.style.display = 'none'; 
-                update(d); 
-            }, 2000);
-        }
-    });
-
-    socket.on('updateTable', d => { 
-        sfx.place.play().catch(() => {}); 
-        
-        // Update lead suit from server
-        if (d.currentSuit) {
-            currentLeadSuit = d.currentSuit;
-        }
-        
-        // First card played means no longer first move
-        if (d.table && d.table.length > 0) {
-            isFirstMove = false;
-        }
-        
-        update(d); 
-    });
-    
-    socket.on('nextTurn', d => {
-        if (d.currentSuit) {
-            currentLeadSuit = d.currentSuit;
-        }
-        update(d);
-    });
-    
-    socket.on('errorMsg', m => { 
-        showLoading(false);
-        isProcessingTurn = false; 
-        showToast(m); 
-    });
-    
-    socket.on('roomClosed', () => { 
-        showToast("Sect disbanded by leader");
-        setTimeout(() => window.location.reload(), 2000);
-    });
-
-    socket.on('gameOver', data => {
-        console.log('Game over:', data);
-    });
-
-    // UPDATE GAME STATE
-    function update(d) {
-        isProcessingTurn = false; 
-        showLoading(false);
-
-        // Check if game is over
-        const playersWithCards = d.players.filter(p => p.hand.length > 0);
-        
-        // Track players who just finished (have 0 cards but not yet in finishOrder)
-        d.players.forEach(p => {
-            if (p.hand.length === 0 && !finishOrder.some(f => f.userID === p.userID)) {
-                finishOrder.push({ 
-                    userID: p.userID, 
-                    name: p.name, 
-                    position: finishOrder.length + 1 
-                });
-                
-                // Award XP for finishing position (only for current player)
-                if (p.userID === userID) {
-                    const position = finishOrder.length;
-                    if (position === 1) {
-                        addXP(10, "1st to finish!");
-                        stats.finishRanks.first = (stats.finishRanks.first || 0) + 1;
-                    } else if (position === 2) {
-                        addXP(7, "2nd to finish!");
-                        stats.finishRanks.second = (stats.finishRanks.second || 0) + 1;
-                    } else if (position === 3) {
-                        addXP(5, "3rd to finish!");
-                        stats.finishRanks.third = (stats.finishRanks.third || 0) + 1;
-                    } else {
-                        addXP(3, `${position}th to finish!`);
-                        stats.finishRanks.other = (stats.finishRanks.other || 0) + 1;
-                    }
-                    localStorage.setItem('pStats', JSON.stringify(stats));
-                }
-            }
-        });
-        
-        if (playersWithCards.length <= 1) {
-            const loser = playersWithCards[0];
-            const loserName = loser ? loser.name : "None";
-            
-            // Award/deduct XP for loser
-            if (loser && loser.userID === userID) {
-                addXP(-1, "Defeated");
-                stats.losses = (stats.losses || 0) + 1;
-                localStorage.setItem('pStats', JSON.stringify(stats));
-            }
-            
-            const pop = document.getElementById('round-popup');
-            const popTitle = document.getElementById('pop-title');
-            const popDesc = document.getElementById('pop-desc');
-
-            popTitle.className = 'pangkah-text';
-            popTitle.innerText = "DUEL OVER";
-            
-            let controls = "";
-            if (isHost) {
-                controls = `
-                    <div style="margin-top:20px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
-                        <button class="btn btn-p" style="width:auto; padding:10px 20px; font-size:12px;" onclick="start()">RESTART</button>
-                        <button class="btn" style="width:auto; padding:10px 20px; font-size:12px; background:var(--danger); color:white;" onclick="closeRoom()">END</button>
-                    </div>
-                `;
-            } else {
-                controls = `<div style="margin-top:15px; font-size:11px; opacity:0.6;">Waiting for Sect Leader...</div>`;
-            }
-
-            popDesc.innerHTML = `<div style="font-weight:800; font-size:1.2rem; margin-bottom:10px;">${loserName} LOST</div>${controls}`;
-            pop.style.display = 'block';
-            
-            render(d.players, d.turn, d.table || []);
-            return; 
-        }
-
-        // Update current hand
-        const me = d.players.find(p => p.userID === userID); 
-        if (me) myCurrentHand = me.hand;
-        
-        // Update turn indicator
-        const activeP = d.players[d.turn];
-        document.getElementById('your-turn-btn').style.display = 
-            (activeP && activeP.userID === userID) ? 'block' : 'none';
-        
-        // Update suit indicator
-        const sInd = document.getElementById('suit-indicator'); 
-        if (d.table && d.table.length > 0) {
-            sInd.style.display = 'flex'; 
-            const leadSuit = d.table[0].card.suit;
-            currentLeadSuit = leadSuit;
-            document.getElementById('suit-symbol').innerText = icons[leadSuit];
-            document.getElementById('suit-symbol').style.color = 
-                ['Hearts','Diamonds'].includes(leadSuit) ? 'var(--danger)' : 'white';
-        } else {
-            sInd.style.display = 'none';
-            currentLeadSuit = null;
-        }
-
-        render(d.players, d.turn, d.table || []);
-        if (d.discarded) showDiscarded(d.discarded);
-    }
-
-    // RENDER FUNCTIONS
-    function render(players, turn, table = []) {
-        const pLayer = document.getElementById('p-layer'); 
-        pLayer.innerHTML = "";
-        const radius = document.getElementById('table-wrap').offsetWidth / 2;
-        const myIdx = players.findIndex(p => p.userID === userID);
-        
-        players.forEach((p, i) => {
-            const angle = (i * (360 / players.length) - 90) * (Math.PI / 180);
-            const x = Math.cos(angle) * (radius + 25); 
-            const y = Math.sin(angle) * (radius + 25);
-            
-            // Show "Take Hand" button only for next valid player
-            let swapBtnHTML = ""; 
-            if (players.length > 1 && i !== myIdx && p.hand.length > 0) {
-                let nextValid = (myIdx + 1) % players.length;
-                let attempts = 0;
-                while (players[nextValid].hand.length === 0 && attempts < players.length) {
-                    nextValid = (nextValid + 1) % players.length;
-                    attempts++;
-                }
-                
-                if (i === nextValid && attempts < players.length) {
-                    swapBtnHTML = `<button class="btn-swap" onclick="socket.emit('sendSwapRequest', {roomID:'${myRoom}', fromUserID:'${userID}'})">TAKE HAND</button>`;
-                }
-            }
-
-            const div = document.createElement('div'); 
-            div.className = `player ${i === turn ? 'active' : ''} ${p.hand.length === 0 ? 'eliminated' : ''}`;
-            div.style.left = `calc(50% + ${x}px)`; 
-            div.style.top = `calc(50% + ${y}px)`;
-            div.innerHTML = `
-                ${swapBtnHTML}
-                <div class="av">
-                    <span>🎴 ${p.hand.length}</span>
-                </div>
-                <div style="font-size:10px; margin-top:8px; color:${p.userID === userID ? 'var(--ui-blue)' : 'white'}; font-weight:${p.userID === userID ? '800' : '600'}">
-                    ${p.name}
-                </div>
-            `;
-            pLayer.appendChild(div);
-        });
-        
-        renderHand();
-        
-        // Render table cards
-        const tLayer = document.getElementById('t-layer'); 
-        tLayer.innerHTML = "";
-        table.forEach((tc, idx) => {
-            const el = createCardUI(tc.card); 
-            el.className = `card table-card ${['Hearts','Diamonds'].includes(tc.card.suit) ? 'red' : ''}`;
-            el.style.transform = `translate(-50%, -50%) rotate(${idx * 15}deg)`; 
-            tLayer.appendChild(el);
-        });
-    }
-
-    function renderHand() {
-        const hDiv = document.getElementById('my-cards'); 
-        hDiv.innerHTML = "";
-        
-        const isMyTurn = document.getElementById('your-turn-btn').style.display === 'block';
-        const hasLeadSuit = currentLeadSuit && myCurrentHand.some(c => c.suit === currentLeadSuit);
-        
-        myCurrentHand.forEach(c => { 
-            const el = createCardUI(c);
-            
-            // Determine if card is playable
-            let canPlay = true;
-            let shouldHighlight = false;
-            
-            if (!isMyTurn || isProcessingTurn) {
-                canPlay = false;
-            } else if (isFirstMove) {
-                // First move: only K♠ is playable
-                canPlay = (c.suit === 'Spades' && c.rank === 'K');
-                shouldHighlight = canPlay;
-            } else if (currentLeadSuit && hasLeadSuit) {
-                // Must follow suit
-                canPlay = (c.suit === currentLeadSuit);
-                shouldHighlight = canPlay;
-            } else {
-                // Can play anything
-                shouldHighlight = isMyTurn;
-            }
-            
-            if (!canPlay) {
-                el.classList.add('disabled');
-            } else if (shouldHighlight) {
-                el.classList.add('highlight');
-            }
-            
-            el.onclick = (e) => {
-                if (!isProcessingTurn && isMyTurn && canPlay) {
-                    // Immediately disable to prevent double-click
-                    e.currentTarget.classList.add('disabled');
-                    e.currentTarget.classList.remove('highlight');
-                    isProcessingTurn = true; 
-                    showLoading(true);
-                    socket.emit('playCard', { roomID: myRoom, cardObject: c }); 
-                }
-            };
-            hDiv.appendChild(el); 
-        });
-    }
-
-    function createCardUI(c) {
-        const div = document.createElement('div'); 
-        div.className = `card ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
-        div.innerHTML = `
-            <div style="font-size:10px">${c.rank}</div>
-            <div style="font-size:28px;text-align:center">${icons[c.suit]}</div>
-            <div style="font-size:10px;transform:rotate(180deg)">${c.rank}</div>
-        `;
-        return div;
-    }
-
-    function showDiscarded(list) {
-        const dArea = document.getElementById('discard-area'); 
-        dArea.innerHTML = list.length ? '<div style="font-size:8px; opacity:0.5;">FATE</div>' : '';
-        list.forEach(c => { 
-            const div = document.createElement('div'); 
-            div.className = `mini ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`; 
-            div.innerHTML = icons[c.suit]; 
-            dArea.appendChild(div); 
-        });
-    }
-    
-    // HAND SWAP EVENTS
-    socket.on('receiveSwapRequest', d => { 
-        pendingSwapRequest = d.fromUserID; 
-        document.getElementById('swap-txt').innerText = d.fromName + " wants your hand!"; 
-        document.getElementById('swap-modal').style.display = 'block';
-        
-        // Auto-decline after 15 seconds
-        let timeLeft = 15;
-        const timerEl = document.getElementById('swap-timer');
-        timerEl.innerText = `${timeLeft}s remaining`;
-        
-        const countdown = setInterval(() => {
-            timeLeft--;
-            timerEl.innerText = `${timeLeft}s remaining`;
-            if (timeLeft <= 0) {
-                clearInterval(countdown);
-            }
-        }, 1000);
-        
-        swapTimeoutId = setTimeout(() => {
-            clearInterval(countdown);
-            if (pendingSwapRequest === d.fromUserID) {
-                answerSwap(false);
-                showToast("Swap request expired");
-            }
-        }, 15000);
-    });
-    
-    socket.on('swapOccurred', d => { 
-        sfx.absorb.play().catch(() => {}); 
-        showToast(d.msg, true);
-        
-        // Award XP for hand absorption (to the accepter who gave their hand)
-        if (d.accepterUserID === userID) {
-            addXP(2, "Hand Given Away!");
-            stats.handsAbsorbed = (stats.handsAbsorbed || 0) + 1;
-            localStorage.setItem('pStats', JSON.stringify(stats));
-        }
-        
-        update(d); 
-    });
-
-    // Initialize
-    updateStatsUI();
-    
-    // Prevent accidental page refresh during game
-    window.addEventListener('beforeunload', (e) => {
-        if (myRoom && document.getElementById('lobby').style.display === 'none') {
-            e.preventDefault();
-            e.returnValue = 'Game in progress. Are you sure you want to leave?';
-        }
-    });
+function getStatValue(t){switch(t){case'level':return getLevel();case'pangkahs':return stats.pangkahs||0;case'streak':return stats.bestStreak||0;case'wins':return stats.wins||0;case'games':return stats.games||0;case'xp':return stats.xp||0;case'handsAbsorbed':return stats.handsAbsorbed||0;case'nightGames':return stats.nightGames||0;case'uniquePlayers':return(stats.uniquePlayers||[]).length;case'topTwo':return stats.topTwo||0;case'secondPlace':return stats.secondPlace||0;case'thirdPlace':return stats.thirdPlace||0;case'cardsPlayed':return stats.cardsPlayed||0;default:return 0;}}
+function checkAllTitles(){TITLES.forEach(t=>{if(!stats.unlockedTitles.includes(t.id)&&getStatValue(t.req.t)>=t.req.v){stats.unlockedTitles.push(t.id);showAchievement(t);}});saveStats();}
+function showAchievement(t){const p=document.getElementById('achievement-popup');p.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:24px">${t.icon}</span><div><div style="font-size:10px;color:var(--gold);font-weight:800">TITLE UNLOCKED!</div><div style="font-size:16px;font-weight:800">${t.name}</div></div></div><div style="font-size:11px;opacity:0.7">${t.desc}</div><div class="title-rarity ${t.rarity}" style="margin-top:10px">${t.rarity.toUpperCase()}</div>`;p.style.display='block';setTimeout(()=>p.style.display='none',4000);}
+function equipTitle(id){if(stats.unlockedTitles.includes(id)){stats.equippedTitle=id;saveStats();updateStatsUI();renderTitleGrid();if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:getEquippedTitleData()});showToast('Equipped!',true);}}
+function unequipTitle(){stats.equippedTitle=null;saveStats();updateStatsUI();renderTitleGrid();if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:null});}
+function getEquippedTitleData(){if(!stats.equippedTitle)return null;const t=TITLES.find(x=>x.id===stats.equippedTitle);return t?{id:t.id,name:t.name,rarity:t.rarity,icon:t.icon}:null;}
+function renderTitleGrid(){const grid=document.getElementById('title-grid'),filters=document.getElementById('title-filters');filters.innerHTML=['all','legendary','epic','rare','common'].map(r=>`<div class="filter-tab ${currentFilter===r?'active':''}" onclick="currentFilter='${r}';renderTitleGrid()">${r==='all'?'ALL':r.toUpperCase()}</div>`).join('');const filtered=currentFilter==='all'?TITLES:TITLES.filter(t=>t.rarity===currentFilter);grid.innerHTML=filtered.map(t=>{const unlocked=stats.unlockedTitles.includes(t.id),equipped=stats.equippedTitle===t.id,prog=getStatValue(t.req.t),max=t.req.v,pct=Math.min(prog/max*100,100).toFixed(0);return`<div class="title-item ${unlocked?'':'locked'} ${equipped?'equipped':''}" onclick="${unlocked?(equipped?'unequipTitle()':`equipTitle('${t.id}')`):''}">${equipped?'<span style="position:absolute;top:8px;right:8px">✓</span>':''}<span class="title-rarity ${t.rarity}">${t.rarity.toUpperCase()}</span><div class="title-name">${t.icon} ${t.name}</div><div class="title-desc">${t.desc}</div>${!unlocked?`<div class="title-progress">${Math.min(prog,max)}/${max} (${pct}%)</div>`:''}</div>`;}).join('');}
+function openTitles(){document.getElementById('profile-modal').style.display='none';document.getElementById('titles-modal').style.display='flex';renderTitleGrid();}
+function closeTitles(){document.getElementById('titles-modal').style.display='none';document.getElementById('profile-modal').style.display='flex';}
+function getLevel(){return Math.floor((stats.xp||0)/XP_PER_LEVEL)+1;}
+function getRankTitle(l){return l<=5?'APPRENTICE':l<=10?'WARRIOR':l<=15?'MASTER':l<=20?'GRANDMASTER':l<=30?'ELDER':l<=50?'SECT LEADER':'ANCIENT ANCESTOR';}
+function saveStats(){localStorage.setItem('pStats',JSON.stringify(stats));}
+function addXP(amt,reason,popup=true){const old=getLevel();stats.xp=Math.max(0,(stats.xp||0)+amt);saveStats();if(getLevel()>old)showToast(`⚡ LEVEL UP! Lv.${getLevel()}`,true);if(popup&&amt){const p=document.createElement('div');p.className='xp-popup';p.style.color=amt>0?'var(--primary-action)':'var(--danger)';p.innerText=`${amt>0?'+':''}${amt} XP`;document.body.appendChild(p);setTimeout(()=>p.remove(),1500);}updateStatsUI();checkAllTitles();}
+function updateStatsUI(){const lv=getLevel(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('level-title').innerText=`LEVEL ${lv} - ${rt}`;document.getElementById('lobby-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:10px">${eq.icon} ${eq.name}</span>`:'';document.getElementById('prof-level').innerText=`LEVEL ${lv}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;}
+function editName(){const n=prompt("Enter Name:",myName);if(n?.trim()&&n.trim().length<=20){myName=n.trim();localStorage.setItem('pName',myName);updateStatsUI();}}
+function openProfile(){updateStatsUI();document.getElementById('profile-modal').style.display='flex';}
+function closeProfile(){document.getElementById('profile-modal').style.display='none';}
+function showToast(msg,pos=false){const t=document.getElementById('toast');t.innerText=msg;t.style.background=pos?'var(--primary-action)':'var(--danger)';t.style.display='block';setTimeout(()=>t.style.display='none',3000);}
+function showLoading(s){document.getElementById('loading').style.display=s?'flex':'none';}
+function flashScreen(type){const f=document.createElement('div');f.className=type+'-flash';document.body.appendChild(f);setTimeout(()=>f.remove(),500);}
+function enter(type){myRoom=document.getElementById('rid').value.trim();if(!myRoom)return showToast("Sect ID Required");showLoading(true);const data={roomID:myRoom,playerName:myName,userID,equippedTitle:getEquippedTitleData()};if(type==='create'){data.maxPlayers=document.getElementById('maxp').value;isHost=true;}socket.emit(type==='create'?'createRoom':'joinRoom',data);}
+function start(){showLoading(true);socket.emit('startGame',myRoom);}
+function closeRoom(){if(myRoom&&confirm("Disband this sect?"))socket.emit('requestCloseRoom',{roomID:myRoom});}
+function sortHand(){const o={Spades:4,Hearts:3,Diamonds:2,Clubs:1};myCurrentHand.sort((a,b)=>(o[b.suit]-o[a.suit])||(b.val-a.val));renderHand();}
+function answerSwap(accept){if(swapTimeoutId)clearTimeout(swapTimeoutId);document.getElementById('swap-modal').style.display='none';if(accept&&pendingSwapRequest)socket.emit('acceptSwap',{roomID:myRoom,fromUserID:pendingSwapRequest,myUserID:userID});pendingSwapRequest=null;}
+function requestRematch(){if(rematchRequested)return;rematchRequested=true;document.getElementById('rematch-btn').innerText='✓ READY';document.getElementById('rematch-btn').style.opacity='0.7';socket.emit('rematchReady',{roomID:myRoom,userID});}
+socket.on('connect',()=>{document.getElementById('connection-status').innerHTML='🟢 Connected';socket.emit('checkSession',{userID});});
+socket.on('disconnect',()=>{document.getElementById('connection-status').innerHTML='🔴 Disconnected';showToast("Connection lost...");});
+socket.on('reconnectSuccess',d=>{myRoom=d.roomID;isFirstMove=d.isFirstMove||false;currentLeadSuit=d.currentSuit;if(d.players[0]?.userID===userID){isHost=true;document.getElementById('close-room-btn').style.display='block';}showLoading(false);document.getElementById('lobby').style.display='none';document.getElementById('room-tag').innerText="SECT: "+myRoom;showToast("Reconnected!",true);update(d);});
+socket.on('roomList',list=>{const box=document.getElementById('room-box');box.innerHTML=list.length?"":'<div style="padding:15px;opacity:0.3">No active sects...</div>';list.forEach(r=>{const d=document.createElement('div');d.className=`room-item ${r.inGame?'in-game':''}`;d.innerHTML=`<span>#${r.id}</span><span>${r.count}/${r.max}${r.inGame?' 🎮':''}</span>`;d.onclick=()=>{if(!r.inGame)document.getElementById('rid').value=r.id;};box.appendChild(d);});});
+socket.on('updatePlayers',p=>{showLoading(false);document.getElementById('lobby').style.display='none';document.getElementById('room-tag').innerText="SECT: "+myRoom;isHost=p[0]?.userID===userID;document.getElementById('close-room-btn').style.display=isHost?'block':'none';document.getElementById('start-btn').style.display=isHost&&p.length>=4?'block':'none';p.forEach(pl=>{if(pl.userID!==userID&&!stats.uniquePlayers.includes(pl.userID))stats.uniquePlayers.push(pl.userID);});saveStats();render(p,-1);});
+socket.on('gameInit',d=>{showLoading(false);document.getElementById('round-popup').style.display='none';document.getElementById('gameover-modal').style.display='none';document.getElementById('start-btn').style.display='none';isProcessingTurn=false;isFirstMove=d.isFirstMove!==undefined?d.isFirstMove:true;currentLeadSuit=null;rematchRequested=false;const h=new Date().getHours();if(h>=0&&h<6){stats.nightGames=(stats.nightGames||0)+1;saveStats();}update(d);});
+socket.on('clearTable',d=>{if(d.msg.toLowerCase()==='pangkah!'){flashScreen('pangkah');if(d.winnerUserID===userID){stats.pangkahs=(stats.pangkahs||0)+1;addXP(3,"Pangkah!");}}else{flashScreen('clean');if(d.winnerUserID===userID)addXP(1,"Clean Round");}currentLeadSuit=null;const pop=document.getElementById('round-popup');document.getElementById('pop-title').className=d.msg==='Pangkah!'?'pangkah-text':'clean-text';document.getElementById('pop-title').innerText=d.msg.toUpperCase();document.getElementById('pop-desc').innerText=d.winner+" has the lead.";pop.style.display='block';setTimeout(()=>{pop.style.display='none';update(d);},2000);});
+socket.on('updateTable',d=>{if(d.currentSuit)currentLeadSuit=d.currentSuit;if(d.table?.length>0)isFirstMove=false;stats.cardsPlayed=(stats.cardsPlayed||0)+1;saveStats();update(d);});
+socket.on('nextTurn',d=>{if(d.currentSuit)currentLeadSuit=d.currentSuit;update(d);});
+socket.on('errorMsg',m=>{showLoading(false);isProcessingTurn=false;showToast(m);});
+socket.on('roomClosed',()=>{showToast("Sect disbanded");setTimeout(()=>location.reload(),2000);});
+socket.on('rematchStatus',d=>{document.getElementById('rematch-status').innerText=`${d.readyCount}/${d.totalCount} players ready`;if(d.allReady)document.getElementById('rematch-status').innerText='Starting...';});
+socket.on('gameOver',data=>{stats.games=(stats.games||0)+1;const myPos=data.finishOrder.indexOf(userID)+1;if(myPos===1){stats.wins=(stats.wins||0)+1;stats.currentStreak=(stats.currentStreak||0)+1;if(stats.currentStreak>(stats.bestStreak||0))stats.bestStreak=stats.currentStreak;addXP(15+stats.currentStreak*2,`1st! Streak:${stats.currentStreak}`,false);}else if(myPos===2){stats.secondPlace=(stats.secondPlace||0)+1;stats.topTwo=(stats.topTwo||0)+1;stats.currentStreak=0;addXP(8,"2nd Place",false);}else if(myPos===3){stats.thirdPlace=(stats.thirdPlace||0)+1;stats.currentStreak=0;addXP(5,"3rd Place",false);}else if(data.loserUserID===userID){stats.losses=(stats.losses||0)+1;stats.currentStreak=0;addXP(-2,"Defeated",false);}else{stats.currentStreak=0;addXP(3,`${myPos}th`,false);}if(myPos<=2)stats.topTwo=(stats.topTwo||0)+1;saveStats();checkAllTitles();updateStatsUI();document.getElementById('game-number').innerText=`Game #${data.gameNumber}`;document.getElementById('finish-list').innerHTML=data.performanceData.sort((a,b)=>a.position-b.position).map(p=>{const isW=p.position===1,isL=p.position===data.performanceData.length,isMe=p.userID===userID;let xp=isW?15:p.position===2?8:p.position===3?5:isL?-2:3;const tHtml=p.equippedTitle?`<span class="title-rarity ${p.equippedTitle.rarity}" style="font-size:8px;margin-left:5px">${p.equippedTitle.icon}</span>`:'';return`<div class="finish-item ${isW?'winner':''} ${isL?'loser':''}" style="${isMe?'border-width:2px':''}"><div style="font-size:18px;font-weight:800;width:30px">${isW?'👑':isL?'💀':'#'+p.position}</div><div style="flex:1;text-align:left;margin-left:10px;font-weight:600">${p.name}${tHtml}${isMe?' (You)':''}</div><div style="font-size:12px;color:var(--primary-action);font-weight:800">${xp>0?'+':''}${xp} XP</div></div>`;}).join('');const myData=data.performanceData.find(p=>p.userID===userID);let bonuses=[];if(myPos===1){bonuses.push({n:'🏆 Victory',x:15});if(stats.currentStreak>1)bonuses.push({n:`🔥 Streak x${stats.currentStreak}`,x:stats.currentStreak*2});}else if(myPos===2)bonuses.push({n:'🥈 2nd',x:8});else if(myPos===3)bonuses.push({n:'🥉 3rd',x:5});else if(data.loserUserID===userID)bonuses.push({n:'💀 Defeated',x:-2});if(myData?.stats?.pangkahsDealt)bonuses.push({n:`⚡ Pangkahs (${myData.stats.pangkahsDealt})`,x:myData.stats.pangkahsDealt*3});if(myData?.stats?.cleanWins)bonuses.push({n:`✨ Clean (${myData.stats.cleanWins})`,x:myData.stats.cleanWins});const total=bonuses.reduce((s,b)=>s+b.x,0);document.getElementById('bonus-list').innerHTML=`<div style="font-weight:800;margin-bottom:10px;color:var(--gold)">🎁 YOUR BONUSES</div>${bonuses.map(b=>`<div class="bonus-item"><span>${b.n}</span><span style="color:${b.x>=0?'var(--primary-action)':'var(--danger)'};font-weight:800">${b.x>0?'+':''}${b.x} XP</span></div>`).join('')}<div class="bonus-item" style="border-top:2px solid var(--gold);margin-top:10px;padding-top:10px"><span style="font-weight:800">TOTAL</span><span style="color:var(--gold);font-weight:800;font-size:16px">${total>0?'+':''}${total} XP</span></div>`;document.getElementById('rematch-btn').innerText='⚡ REMATCH';document.getElementById('rematch-btn').style.opacity='1';document.getElementById('rematch-status').innerText='Waiting...';rematchRequested=false;document.getElementById('gameover-modal').style.display='flex';});
+socket.on('receiveSwapRequest',d=>{pendingSwapRequest=d.fromUserID;document.getElementById('swap-txt').innerText=d.fromName+" wants your hand!";document.getElementById('swap-modal').style.display='block';let t=15;const timer=document.getElementById('swap-timer');timer.innerText=`${t}s`;const cd=setInterval(()=>{t--;timer.innerText=`${t}s`;if(t<=0)clearInterval(cd);},1000);swapTimeoutId=setTimeout(()=>{clearInterval(cd);if(pendingSwapRequest===d.fromUserID){answerSwap(false);showToast("Swap expired");}},15000);});
+socket.on('swapOccurred',d=>{showToast(d.msg,true);if(d.requesterUserID===userID){stats.handsAbsorbed=(stats.handsAbsorbed||0)+1;addXP(5,"Hand Absorbed!");}if(d.accepterUserID===userID)addXP(3,"Hand Given!");saveStats();checkAllTitles();update(d);});
+function update(d){isProcessingTurn=false;showLoading(false);const me=d.players.find(p=>p.userID===userID);if(me)myCurrentHand=me.hand;const active=d.players[d.turn];document.getElementById('your-turn-btn').style.display=active?.userID===userID?'block':'none';const sInd=document.getElementById('suit-indicator');if(d.table?.length>0){sInd.style.display='flex';currentLeadSuit=d.table[0].card.suit;document.getElementById('suit-symbol').innerText=icons[currentLeadSuit];document.getElementById('suit-symbol').style.color=['Hearts','Diamonds'].includes(currentLeadSuit)?'var(--danger)':'white';}else{sInd.style.display='none';currentLeadSuit=null;}render(d.players,d.turn,d.table||[]);if(d.discarded)showDiscarded(d.discarded);}
+function render(players,turn,table=[]){const pLayer=document.getElementById('p-layer');pLayer.innerHTML="";const radius=document.getElementById('table-wrap').offsetWidth/2;const myIdx=players.findIndex(p=>p.userID===userID);players.forEach((p,i)=>{const angle=(i*(360/players.length)-90)*(Math.PI/180);const x=Math.cos(angle)*(radius+25),y=Math.sin(angle)*(radius+25);let swapBtn="";if(players.length>1&&i!==myIdx&&p.hand.length>0){let nxt=(myIdx+1)%players.length,att=0;while(players[nxt].hand.length===0&&att<players.length){nxt=(nxt+1)%players.length;att++;}if(i===nxt&&att<players.length)swapBtn=`<button class="btn-swap" onclick="socket.emit('sendSwapRequest',{roomID:'${myRoom}',fromUserID:'${userID}'})">TAKE HAND</button>`;}const titleHtml=p.equippedTitle?`<div class="player-title ${p.equippedTitle.rarity}">${p.equippedTitle.icon} ${p.equippedTitle.name}</div>`:'';const div=document.createElement('div');div.className=`player ${i===turn?'active':''} ${p.hand.length===0?'eliminated':''}`;div.style.left=`calc(50% + ${x}px)`;div.style.top=`calc(50% + ${y}px)`;div.innerHTML=`${swapBtn}<div class="av"><span>🎴 ${p.hand.length}</span></div><div style="font-size:10px;margin-top:8px;color:${p.userID===userID?'var(--ui-blue)':'white'};font-weight:${p.userID===userID?'800':'600'}">${p.name}</div>${titleHtml}`;pLayer.appendChild(div);});renderHand();const tLayer=document.getElementById('t-layer');tLayer.innerHTML="";table.forEach((tc,idx)=>{const el=createCardUI(tc.card);el.className=`card table-card ${['Hearts','Diamonds'].includes(tc.card.suit)?'red':''}`;el.style.transform=`translate(-50%,-50%) rotate(${idx*15-(table.length*7)}deg)`;tLayer.appendChild(el);});}
+function renderHand(){const hDiv=document.getElementById('my-cards');hDiv.innerHTML="";const isMyTurn=document.getElementById('your-turn-btn').style.display==='block';const hasLead=currentLeadSuit&&myCurrentHand.some(c=>c.suit===currentLeadSuit);myCurrentHand.forEach(c=>{const el=createCardUI(c);let canPlay=true,highlight=false;if(!isMyTurn||isProcessingTurn)canPlay=false;else if(isFirstMove){canPlay=c.suit==='Spades'&&c.rank==='K';highlight=canPlay;}else if(currentLeadSuit&&hasLead){canPlay=c.suit===currentLeadSuit;highlight=canPlay;}else highlight=isMyTurn;if(!canPlay)el.classList.add('disabled');else if(highlight)el.classList.add('highlight');el.onclick=e=>{if(!isProcessingTurn&&isMyTurn&&canPlay){e.currentTarget.classList.add('disabled');e.currentTarget.classList.remove('highlight');isProcessingTurn=true;showLoading(true);socket.emit('playCard',{roomID:myRoom,cardObject:c});}};hDiv.appendChild(el);});}
+function createCardUI(c){const d=document.createElement('div');d.className=`card ${['Hearts','Diamonds'].includes(c.suit)?'red':''}`;d.innerHTML=`<div style="font-size:10px">${c.rank}</div><div style="font-size:28px;text-align:center">${icons[c.suit]}</div><div style="font-size:10px;transform:rotate(180deg)">${c.rank}</div>`;return d;}
+function showDiscarded(list){const d=document.getElementById('discard-area');d.innerHTML=list.length?'<div style="font-size:8px;opacity:0.5">FATE</div>':'';list.slice(-8).forEach(c=>{const div=document.createElement('div');div.className=`mini ${['Hearts','Diamonds'].includes(c.suit)?'red':''}`;div.innerHTML=icons[c.suit];d.appendChild(div);});}
+updateStatsUI();checkAllTitles();
+window.addEventListener('beforeunload',e=>{if(myRoom&&document.getElementById('lobby').style.display==='none'){e.preventDefault();e.returnValue='';}});
 </script>
 </body>
 </html>

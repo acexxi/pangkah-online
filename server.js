@@ -152,7 +152,7 @@ io.on('connection', (socket) => {
     /**
      * CREATE ROOM
      */
-    socket.on('createRoom', ({ roomID, playerName, maxPlayers, userID, equippedTitle }) => {
+    socket.on('createRoom', ({ roomID, playerName, maxPlayers, userID, equippedTitle, level }) => {
         if (!roomID || !playerName || !userID) {
             return socket.emit('errorMsg', 'Missing required fields');
         }
@@ -175,6 +175,7 @@ io.on('connection', (socket) => {
                 userID: userID, 
                 hand: [],
                 equippedTitle: equippedTitle || null,
+                level: level || 1,
                 gameStats: null,
                 rematchReady: false
             }],
@@ -199,7 +200,7 @@ io.on('connection', (socket) => {
     /**
      * JOIN ROOM
      */
-    socket.on('joinRoom', ({ roomID, playerName, userID, equippedTitle }) => {
+    socket.on('joinRoom', ({ roomID, playerName, userID, equippedTitle, level }) => {
         if (!roomID || !playerName || !userID) {
             return socket.emit('errorMsg', 'Missing required fields');
         }
@@ -213,6 +214,7 @@ io.on('connection', (socket) => {
         if (existing) {
             existing.id = socket.id;
             existing.equippedTitle = equippedTitle || existing.equippedTitle;
+            existing.level = level || existing.level || 1;
             socket.join(roomID);
             console.log(`${playerName} rejoined room ${roomID}`);
         } else {
@@ -230,6 +232,7 @@ io.on('connection', (socket) => {
                 userID: userID, 
                 hand: [],
                 equippedTitle: equippedTitle || null,
+                level: level || 1,
                 gameStats: null,
                 rematchReady: false
             });

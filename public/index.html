@@ -51,6 +51,7 @@
         .card:active { transform: translateY(-4px); }
         .card.red { color: var(--danger) !important; }
         .card.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+        .card.highlight { border: 2px solid var(--primary-action); box-shadow: 0 0 10px var(--primary-action); }
         
         .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70px; height: 105px; border: 2px solid #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.6); pointer-events: none; z-index: 50; animation: cardDrop 0.3s ease; }
         @keyframes cardDrop { from { transform: translate(-50%, -150%) scale(0.5); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
@@ -72,12 +73,15 @@
         .loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); z-index: 9998; display: none; align-items: center; justify-content: center; }
         .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: var(--primary-action); border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        
+        #connection-status { position: fixed; bottom: 10px; right: 10px; font-size: 10px; padding: 4px 8px; background: rgba(0,0,0,0.5); border-radius: 8px; }
     </style>
 </head>
 <body>
 
 <div id="toast">MESSAGE</div>
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
+<div id="connection-status">🟢 Connected</div>
 
 <div id="profile-modal">
     <div class="profile-card">
@@ -96,6 +100,7 @@
 
 <div id="swap-modal">
     <div id="swap-txt" style="font-size: 14px; margin-bottom: 20px; font-weight: 600;">Player wants your hand!</div>
+    <div id="swap-timer" style="font-size: 12px; margin-bottom: 15px; color: #f59e0b;">15s remaining</div>
     <div style="display: flex; gap: 12px;">
         <button class="btn btn-p" onclick="answerSwap(true)">ACCEPT</button>
         <button class="btn" onclick="answerSwap(false)" style="background: rgba(255,255,255,0.1); color: white;">DECLINE</button>
@@ -173,8 +178,16 @@
     };
     
     // Game state
-    let myRoom = "", myCurrentHand = [], pendingSwapRequest = null, isProcessingTurn = false, isHost = false;
-    let finishOrder = []; // Track who finishes first, second, etc.
+    let myRoom = "";
+    let myCurrentHand = [];
+    let pendingSwapRequest = null;
+    let swapTimeoutId = null;
+    let isProcessingTurn = false;
+    let isHost = false;
+    let isFirstMove = true;
+    let currentLeadSuit = null;
+    let finishOrder = [];
+    
     const icons = { 'Spades': '♠', 'Hearts': '♥', 'Diamonds': '♦', 'Clubs': '♣' };
 
     // ENHANCED LEVEL SYSTEM - 100 XP per level
@@ -299,8 +312,15 @@
         renderHand(); 
     }
     
-    function answerSwap(accept) { 
+    function answerSwap(accept) {
+        // Clear timeout
+        if (swapTimeoutId) {
+            clearTimeout(swapTimeoutId);
+            swapTimeoutId = null;
+        }
+        
         document.getElementById('swap-modal').style.display = 'none'; 
+        
         if (accept && pendingSwapRequest) {
             socket.emit('acceptSwap', { 
                 roomID: myRoom, 
@@ -314,6 +334,8 @@
     // SOCKET EVENTS
     socket.on('connect', () => {
         console.log('Connected to server');
+        document.getElementById('connection-status').innerHTML = '🟢 Connected';
+        
         // Attempt reconnection if user was in a room
         if (userID) {
             socket.emit('checkSession', { userID });
@@ -322,13 +344,26 @@
 
     socket.on('disconnect', () => {
         console.log('Disconnected from server');
+        document.getElementById('connection-status').innerHTML = '🔴 Disconnected';
         showToast("Connection lost. Reconnecting...");
     });
 
     socket.on('reconnectSuccess', (data) => {
         console.log('Reconnected to room:', data.roomID);
         myRoom = data.roomID;
+        isFirstMove = data.isFirstMove || false;
+        currentLeadSuit = data.currentSuit;
+        
+        // Restore isHost status
+        if (data.players.length > 0 && data.players[0].userID === userID) {
+            isHost = true;
+            document.getElementById('close-room-btn').style.display = 'block';
+        }
+        
         showLoading(false);
+        document.getElementById('lobby').style.display = 'none';
+        document.getElementById('room-tag').innerText = "SECT: " + myRoom;
+        
         showToast("Reconnected!", true);
         update(data);
     });
@@ -350,13 +385,16 @@
         document.getElementById('lobby').style.display = 'none';
         document.getElementById('room-tag').innerText = "SECT: " + myRoom;
         
-        // Check if current user is host
+        // Check if current user is host (first player in list)
         if (p.length > 0 && p[0].userID === userID) {
             isHost = true;
             document.getElementById('close-room-btn').style.display = 'block';
             if (p.length >= 4) {
                 document.getElementById('start-btn').style.display = 'block';
             }
+        } else {
+            isHost = false;
+            document.getElementById('close-room-btn').style.display = 'none';
         }
         
         render(p, -1);
@@ -367,6 +405,8 @@
         document.getElementById('round-popup').style.display = 'none';
         document.getElementById('start-btn').style.display = 'none'; 
         isProcessingTurn = false;
+        isFirstMove = d.isFirstMove !== undefined ? d.isFirstMove : true;
+        currentLeadSuit = null;
         finishOrder = []; // Reset finish order for new game
         update(d); 
     });
@@ -383,6 +423,9 @@
         } else {
             sfx.sweep.play().catch(() => {});
         }
+        
+        // Reset lead suit for new round
+        currentLeadSuit = null;
         
         // Show round result popup
         const pop = document.getElementById('round-popup');
@@ -405,10 +448,26 @@
 
     socket.on('updateTable', d => { 
         sfx.place.play().catch(() => {}); 
+        
+        // Update lead suit from server
+        if (d.currentSuit) {
+            currentLeadSuit = d.currentSuit;
+        }
+        
+        // First card played means no longer first move
+        if (d.table && d.table.length > 0) {
+            isFirstMove = false;
+        }
+        
         update(d); 
     });
     
-    socket.on('nextTurn', d => update(d));
+    socket.on('nextTurn', d => {
+        if (d.currentSuit) {
+            currentLeadSuit = d.currentSuit;
+        }
+        update(d);
+    });
     
     socket.on('errorMsg', m => { 
         showLoading(false);
@@ -422,7 +481,6 @@
     });
 
     socket.on('gameOver', data => {
-        // This event might not be needed since we handle it in update()
         console.log('Game over:', data);
     });
 
@@ -515,11 +573,13 @@
         if (d.table && d.table.length > 0) {
             sInd.style.display = 'flex'; 
             const leadSuit = d.table[0].card.suit;
+            currentLeadSuit = leadSuit;
             document.getElementById('suit-symbol').innerText = icons[leadSuit];
             document.getElementById('suit-symbol').style.color = 
                 ['Hearts','Diamonds'].includes(leadSuit) ? 'var(--danger)' : 'white';
         } else {
             sInd.style.display = 'none';
+            currentLeadSuit = null;
         }
 
         render(d.players, d.turn, d.table || []);
@@ -586,23 +646,46 @@
         const hDiv = document.getElementById('my-cards'); 
         hDiv.innerHTML = "";
         
+        const isMyTurn = document.getElementById('your-turn-btn').style.display === 'block';
+        const hasLeadSuit = currentLeadSuit && myCurrentHand.some(c => c.suit === currentLeadSuit);
+        
         myCurrentHand.forEach(c => { 
-            const el = createCardUI(c); 
+            const el = createCardUI(c);
             
-            // Disable card if not player's turn
-            const me = socket.id;
-            const isMyTurn = document.getElementById('your-turn-btn').style.display === 'block';
+            // Determine if card is playable
+            let canPlay = true;
+            let shouldHighlight = false;
             
             if (!isMyTurn || isProcessingTurn) {
-                el.classList.add('disabled');
+                canPlay = false;
+            } else if (isFirstMove) {
+                // First move: only K♠ is playable
+                canPlay = (c.suit === 'Spades' && c.rank === 'K');
+                shouldHighlight = canPlay;
+            } else if (currentLeadSuit && hasLeadSuit) {
+                // Must follow suit
+                canPlay = (c.suit === currentLeadSuit);
+                shouldHighlight = canPlay;
+            } else {
+                // Can play anything
+                shouldHighlight = isMyTurn;
             }
             
-            el.onclick = () => { 
-                if (!isProcessingTurn && isMyTurn) { 
+            if (!canPlay) {
+                el.classList.add('disabled');
+            } else if (shouldHighlight) {
+                el.classList.add('highlight');
+            }
+            
+            el.onclick = (e) => {
+                if (!isProcessingTurn && isMyTurn && canPlay) {
+                    // Immediately disable to prevent double-click
+                    e.currentTarget.classList.add('disabled');
+                    e.currentTarget.classList.remove('highlight');
                     isProcessingTurn = true; 
                     showLoading(true);
                     socket.emit('playCard', { roomID: myRoom, cardObject: c }); 
-                } 
+                }
             };
             hDiv.appendChild(el); 
         });
@@ -634,7 +717,28 @@
     socket.on('receiveSwapRequest', d => { 
         pendingSwapRequest = d.fromUserID; 
         document.getElementById('swap-txt').innerText = d.fromName + " wants your hand!"; 
-        document.getElementById('swap-modal').style.display = 'block'; 
+        document.getElementById('swap-modal').style.display = 'block';
+        
+        // Auto-decline after 15 seconds
+        let timeLeft = 15;
+        const timerEl = document.getElementById('swap-timer');
+        timerEl.innerText = `${timeLeft}s remaining`;
+        
+        const countdown = setInterval(() => {
+            timeLeft--;
+            timerEl.innerText = `${timeLeft}s remaining`;
+            if (timeLeft <= 0) {
+                clearInterval(countdown);
+            }
+        }, 1000);
+        
+        swapTimeoutId = setTimeout(() => {
+            clearInterval(countdown);
+            if (pendingSwapRequest === d.fromUserID) {
+                answerSwap(false);
+                showToast("Swap request expired");
+            }
+        }, 15000);
     });
     
     socket.on('swapOccurred', d => { 
@@ -642,9 +746,8 @@
         showToast(d.msg, true);
         
         // Award XP for hand absorption (to the accepter who gave their hand)
-        const accepterName = d.msg.split('absorbed cards from ')[1].replace('!', '');
-        if (accepterName === myName) {
-            addXP(2, "Hand Absorbed!");
+        if (d.accepterUserID === userID) {
+            addXP(2, "Hand Given Away!");
             stats.handsAbsorbed = (stats.handsAbsorbed || 0) + 1;
             localStorage.setItem('pStats', JSON.stringify(stats));
         }

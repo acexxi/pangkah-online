@@ -123,7 +123,7 @@ io.on('connection', (socket) => {
                     players: rooms[rid].players, 
                     turn: rooms[rid].turn, 
                     table: rooms[rid].table,
-                    discarded: rooms[rid].discarded,
+                    fateAces: rooms[rid].fateAces || [],
                     gameStarted: rooms[rid].gameStarted,
                     isFirstMove: rooms[rid].isFirstMove,
                     currentSuit: rooms[rid].currentSuit,
@@ -182,7 +182,8 @@ io.on('connection', (socket) => {
             table: [], 
             currentSuit: null, 
             isFirstMove: true, 
-            discarded: [], 
+            discarded: [],
+            fateAces: [],
             gameStarted: false,
             resolving: false,
             gameNumber: 0,
@@ -280,6 +281,7 @@ io.on('connection', (socket) => {
         
         let deck = generateDeck();
         room.discarded = [];
+        room.fateAces = []; // Separate array for initial discarded aces
 
         // Cultivation Rule: Remove Aces for 5-6 players
         if (room.players.length === 5 || room.players.length === 6) {
@@ -292,7 +294,7 @@ io.on('connection', (socket) => {
             shuffle(aceIndices);
             let toRemove = aceIndices.slice(0, discardCount).sort((a, b) => b - a);
             toRemove.forEach(idx => { 
-                room.discarded.push(deck.splice(idx, 1)[0]); 
+                room.fateAces.push(deck.splice(idx, 1)[0]); 
             });
         }
 
@@ -313,7 +315,7 @@ io.on('connection', (socket) => {
         io.to(roomID).emit('gameInit', { 
             players: room.players, 
             turn: room.turn, 
-            discarded: room.discarded,
+            fateAces: room.fateAces,
             isFirstMove: room.isFirstMove,
             gameNumber: room.gameNumber
         });
@@ -609,7 +611,7 @@ io.on('connection', (socket) => {
                         winner: winner.name,
                         winnerUserID: winner.userID,
                         players: room.players,
-                        discarded: room.discarded,
+                        fateAces: room.fateAces,
                         msg: isPangkah ? "Pangkah!" : "Clean"
                     });
                 }

@@ -21,60 +21,73 @@
         #lobby { position: fixed; inset: 0; z-index: 5000; backdrop-filter: blur(30px); background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; }
         .panel { width: 90%; max-width: 400px; padding: 35px; border-radius: 32px; background: var(--glass); border: 1px solid var(--border); backdrop-filter: blur(15px); text-align: center; }
         .room-list { height: 120px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 16px; margin: 15px 0; border: 1px solid var(--border); }
-        .room-item { padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; cursor: pointer; font-size: 0.85rem; }
+        .room-item { padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; cursor: pointer; font-size: 0.85rem; transition: background 0.2s; }
+        .room-item:hover { background: rgba(255,255,255,0.05); }
 
         #profile-modal { position: fixed; inset: 0; z-index: 6000; background: var(--glass-heavy); backdrop-filter: blur(15px); display: none; align-items: center; justify-content: center; }
         .profile-card { width: 85%; max-width: 340px; padding: 40px 20px; background: var(--glass); border: 1px solid var(--ui-blue); border-radius: 32px; text-align: center; }
         .bar-container { width: 100%; height: 10px; background: rgba(255,255,255,0.05); border-radius: 20px; margin: 15px 0; overflow: hidden; border: 1px solid var(--border); }
         .bar-fill { height: 100%; background: linear-gradient(90deg, var(--ui-blue), var(--primary-action)); width: 0%; transition: width 0.6s ease; }
         
-        #swap-modal { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: var(--glass-heavy); backdrop-filter: blur(20px); padding: 30px; border-radius: 24px; border: 1px solid #f59e0b; z-index: 10001; display: none; text-align: center; width: 300px; }
-        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--glass-heavy); border: 1px solid var(--ui-blue); padding: 40px; border-radius: 24px; text-align: center; z-index: 9999; display: none; min-width: 280px; }
+        #swap-modal { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: var(--glass-heavy); backdrop-filter: blur(20px); padding: 30px; border-radius: 24px; border: 1px solid #f59e0b; z-index: 10001; display: none; text-align: center; width: 90%; max-width: 320px; }
+        #round-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--glass-heavy); border: 1px solid var(--ui-blue); padding: 40px; border-radius: 24px; text-align: center; z-index: 9999; display: none; min-width: 280px; max-width: 90%; }
 
         .header { height: 70px; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.1); backdrop-filter: blur(10px); }
-        #your-turn-btn { background: var(--primary-action); color: #000; font-size: 11px; font-weight: 900; padding: 8px 18px; border-radius: 25px; border: none; display: none; animation: pulse-glow 1.5s infinite; }
+        #your-turn-btn { background: var(--primary-action); color: #000; font-size: 11px; font-weight: 900; padding: 8px 18px; border-radius: 25px; border: none; display: none; animation: pulse-glow 1.5s infinite; pointer-events: none; }
         @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px var(--primary-action); } 50% { box-shadow: 0 0 20px var(--primary-action); } }
 
         #game-view { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
         .safe-wrap { position: relative; width: 100%; height: 100%; max-width: 45vh; max-height: 45vh; aspect-ratio: 1/1; }
         .ring { position: absolute; inset: 0; border-radius: 50%; border: 1px dashed rgba(255,255,255,0.05); }
         .player { position: absolute; transform: translate(-50%, -50%); text-align: center; z-index: 100; transition: all 0.5s ease; }
-        .av { width: 54px; height: 66px; border-radius: 12px; background: #0f172a; border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 10px 20px rgba(0,0,0,0.3); font-weight: 800; }
+        .av { width: 54px; height: 66px; border-radius: 12px; background: #0f172a; border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 10px 20px rgba(0,0,0,0.3); font-weight: 800; transition: all 0.3s ease; }
         .active .av { border-color: var(--primary-action); box-shadow: 0 0 25px var(--primary-action); border-width: 2px; }
+        .player.eliminated .av { opacity: 0.3; border-color: var(--danger); }
 
         #hand-area { height: 28vh; background: rgba(2, 6, 23, 0.75); backdrop-filter: blur(25px); border-top: 1px solid var(--border); padding: 15px; overflow-y: auto; z-index: 2000; }
         .hand-flex { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; padding-bottom: 20px; }
-        .card { width: 50px; height: 75px; background: white; color: black; border-radius: 10px; padding: 6px; font-weight: 800; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 1px solid #ddd; transition: transform 0.1s; position: relative; }
+        .card { width: 50px; height: 75px; background: white; color: black; border-radius: 10px; padding: 6px; font-weight: 800; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 1px solid #ddd; transition: transform 0.15s, box-shadow 0.15s; position: relative; }
+        .card:hover { transform: translateY(-8px); box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
+        .card:active { transform: translateY(-4px); }
         .card.red { color: var(--danger) !important; }
+        .card.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
         
-        /* Updated Table Card Style */
-        .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 52px; height: 78px; border: 2px solid #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.6); pointer-events: none; z-index: 50; transition: all 0.3s ease; }
+        .table-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70px; height: 105px; border: 2px solid #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.6); pointer-events: none; z-index: 50; animation: cardDrop 0.3s ease; }
+        @keyframes cardDrop { from { transform: translate(-50%, -150%) scale(0.5); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
 
-        #toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: var(--danger); padding: 12px 24px; border-radius: 12px; z-index: 10000; display: none; font-weight: 800; font-size: 13px; }
-        .btn-swap { background: #f59e0b; color: #000; border: none; border-radius: 20px; font-size: 8px; font-weight: 900; padding: 4px 10px; position: absolute; top: -30px; left: 50%; transform: translateX(-50%); width: 80px; }
+        #toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: var(--danger); padding: 12px 24px; border-radius: 12px; z-index: 10000; display: none; font-weight: 800; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        .btn-swap { background: #f59e0b; color: #000; border: none; border-radius: 20px; font-size: 8px; font-weight: 900; padding: 4px 10px; position: absolute; top: -30px; left: 50%; transform: translateX(-50%); width: 80px; cursor: pointer; transition: transform 0.2s; }
+        .btn-swap:hover { transform: translateX(-50%) scale(1.05); }
         .btn { padding: 14px; border-radius: 14px; font-weight: 800; cursor: pointer; width: 100%; border: none; transition: 0.2s; }
+        .btn:hover { transform: scale(1.02); }
+        .btn:active { transform: scale(0.98); }
         .btn-p { background: linear-gradient(135deg, var(--ui-blue), #2563eb); color: #fff; }
         .btn-s { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: #fff; font-size: 11px; }
         input, select { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 14px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid var(--border); outline: none; }
-        .pangkah-text { color: var(--danger); font-size: 2.2rem; font-weight: 900; }
-        .clean-text { color: var(--ui-blue); font-size: 2.2rem; font-weight: 900; }
+        input:focus, select:focus { border-color: var(--ui-blue); }
+        .pangkah-text { color: var(--danger); font-size: 2.2rem; font-weight: 900; text-shadow: 0 0 20px var(--danger); }
+        .clean-text { color: var(--ui-blue); font-size: 2.2rem; font-weight: 900; text-shadow: 0 0 20px var(--ui-blue); }
         #discard-area { position: absolute; left: 15px; top: 85px; display: flex; flex-direction: column; gap: 5px; z-index: 10; }
-        .mini { width: 28px; height: 38px; background: white; color: black; border-radius: 6px; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+        .mini { width: 28px; height: 38px; background: white; color: black; border-radius: 6px; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: 900; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        .loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); z-index: 9998; display: none; align-items: center; justify-content: center; }
+        .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: var(--primary-action); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
 <div id="toast">MESSAGE</div>
+<div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 
 <div id="profile-modal">
     <div class="profile-card">
         <h3 style="color: var(--ui-blue); margin-top: 0; letter-spacing: 2px;">CULTIVATION</h3>
         <div id="prof-level" style="font-size: 28px; font-weight: 800;">LEVEL 1</div>
         <div id="prof-title" style="color: var(--primary-action); letter-spacing: 2px; margin-bottom: 15px;">APPRENTICE</div>
-        <div style="text-align: right; font-size: 10px; color: #aaa; margin-bottom: 4px;" id="prof-progress-text">Progress: 0/5</div>
+        <div style="text-align: right; font-size: 10px; color: #aaa; margin-bottom: 4px;" id="prof-progress-text">XP: 0/100</div>
         <div class="bar-container"><div id="prof-bar-fill" class="bar-fill"></div></div>
         <div style="display: flex; justify-content: space-around; margin: 25px 0;">
-            <div><div style="font-size: 22px; font-weight: 800;" id="prof-points">0</div><div style="font-size: 10px; opacity: 0.6;">POINTS</div></div>
+            <div><div style="font-size: 22px; font-weight: 800;" id="prof-points">0</div><div style="font-size: 10px; opacity: 0.6;">TOTAL XP</div></div>
             <div><div style="font-size: 22px; font-weight: 800;" id="prof-pangkahs">0</div><div style="font-size: 10px; opacity: 0.6;">PANGKAHS</div></div>
         </div>
         <button class="btn btn-p" onclick="closeProfile()">RETURN</button>
@@ -101,7 +114,7 @@
             <button class="btn btn-s" onclick="openProfile()" style="margin-top:12px;">VIEW STATS 📜</button>
         </div>
         <div class="room-list" id="room-box"></div>
-        <input id="rid" placeholder="Enter Sect ID">
+        <input id="rid" placeholder="Enter Sect ID" maxlength="20">
         <select id="maxp"><option value="4">4 Players</option><option value="5">5 Players</option><option value="6">6 Players</option></select>
         <button class="btn btn-p" onclick="enter('create')">CREATE SECT</button>
         <button class="btn btn-s" onclick="enter('join')" style="margin-top:8px;">JOIN SECT</button>
@@ -114,7 +127,7 @@
     <div id="room-tag" style="color:var(--ui-blue); font-weight:800; font-size: 11px;">LOBBY</div>
     <div class="header-center"><button id="your-turn-btn">YOUR TURN</button></div>
     <div style="display: flex; align-items: center; gap: 12px;">
-        <button id="close-room-btn" onclick="closeRoom()" style="display:none; background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 10px; font-weight: 800;">DISBAND</button>
+        <button id="close-room-btn" onclick="closeRoom()" style="display:none; background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 10px; font-weight: 800; cursor: pointer;">DISBAND</button>
         <div id="suit-indicator" style="display:none; align-items:center; background:rgba(255,255,255,0.05); padding:4px 10px; border-radius:10px; border:1px solid var(--border);"><span id="suit-symbol" style="font-size: 1.2rem;"></span></div>
     </div>
 </div>
@@ -137,205 +150,518 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
     const socket = io();
-    const sfx = { place: new Audio('place.mp3'), sweep: new Audio('sweep.mp3'), strike: new Audio('strike.mp3'), absorb: new Audio('absorb.mp3') };
     
+    // Audio files (optional - graceful fallback if missing)
+    const sfx = { 
+        place: new Audio('place.mp3'), 
+        sweep: new Audio('sweep.mp3'), 
+        strike: new Audio('strike.mp3'), 
+        absorb: new Audio('absorb.mp3') 
+    };
+    Object.values(sfx).forEach(audio => audio.volume = 0.3);
+    
+    // User persistence
     let userID = localStorage.getItem('pUserID') || 'uid_' + Math.random().toString(36).substr(2, 9);
     localStorage.setItem('pUserID', userID);
     let myName = localStorage.getItem('pName') || 'Disciple' + Math.floor(Math.random()*999);
-    let stats = JSON.parse(localStorage.getItem('pStats')) || { points: 0, pangkahs: 0 };
+    let stats = JSON.parse(localStorage.getItem('pStats')) || { 
+        xp: 0, 
+        pangkahs: 0, 
+        finishRanks: { first: 0, second: 0, third: 0, other: 0 },
+        handsAbsorbed: 0,
+        losses: 0
+    };
     
-    let myRoom = "", myCurrentHand = [], pendingSwapRequest = null, isProcessingTurn = false;
+    // Game state
+    let myRoom = "", myCurrentHand = [], pendingSwapRequest = null, isProcessingTurn = false, isHost = false;
+    let finishOrder = []; // Track who finishes first, second, etc.
     const icons = { 'Spades': '♠', 'Hearts': '♥', 'Diamonds': '♦', 'Clubs': '♣' };
 
-    function getLevel() { return Math.floor((stats.points || 0) / 5) + 1; }
+    // ENHANCED LEVEL SYSTEM - 100 XP per level
+    const XP_PER_LEVEL = 100;
+    
+    function getLevel() { 
+        return Math.floor((stats.xp || 0) / XP_PER_LEVEL) + 1; 
+    }
+    
     function getTitle(lvl) {
-        if (lvl <= 5) return "APPRENTICE"; if (lvl <= 10) return "WARRIOR";
-        if (lvl <= 15) return "MASTER"; if (lvl <= 20) return "GRANDMASTER";
+        if (lvl <= 5) return "APPRENTICE"; 
+        if (lvl <= 10) return "WARRIOR";
+        if (lvl <= 15) return "MASTER"; 
+        if (lvl <= 20) return "GRANDMASTER";
         return "ANCIENT ANCESTOR";
+    }
+    
+    function getCurrentLevelXP() {
+        return (stats.xp || 0) % XP_PER_LEVEL;
+    }
+    
+    function addXP(amount, reason) {
+        const oldLevel = getLevel();
+        stats.xp = (stats.xp || 0) + amount;
+        
+        // Prevent negative XP
+        if (stats.xp < 0) stats.xp = 0;
+        
+        localStorage.setItem('pStats', JSON.stringify(stats));
+        
+        const newLevel = getLevel();
+        if (newLevel > oldLevel) {
+            showToast(`⚡ LEVEL UP! Now ${getTitle(newLevel)} (Lv.${newLevel})`, true);
+        }
+        
+        if (amount > 0) {
+            showToast(`+${amount} XP: ${reason}`, true);
+        } else if (amount < 0) {
+            showToast(`${amount} XP: ${reason}`, false);
+        }
+        
+        updateStatsUI();
     }
 
     function updateStatsUI() {
         const level = getLevel();
-        if(document.getElementById('display-name')) document.getElementById('display-name').innerText = myName;
-        if(document.getElementById('level-title')) document.getElementById('level-title').innerText = `LEVEL ${level} - ${getTitle(level)}`;
-        if(document.getElementById('prof-level')) document.getElementById('prof-level').innerText = `LEVEL ${level}`;
-        if(document.getElementById('prof-title')) document.getElementById('prof-title').innerText = getTitle(level);
-        if(document.getElementById('prof-points')) document.getElementById('prof-points').innerText = stats.points || 0;
-        if(document.getElementById('prof-pangkahs')) document.getElementById('prof-pangkahs').innerText = stats.pangkahs || 0;
-        const prog = (stats.points || 0) % 5;
-        if(document.getElementById('prof-progress-text')) document.getElementById('prof-progress-text').innerText = `Progress: ${prog}/5`;
-        if(document.getElementById('prof-bar-fill')) document.getElementById('prof-bar-fill').style.width = (prog / 5 * 100) + "%";
+        const title = getTitle(level);
+        const currentXP = getCurrentLevelXP();
+        const xpProgress = (currentXP / XP_PER_LEVEL * 100).toFixed(1);
+        
+        document.getElementById('display-name').innerText = myName;
+        document.getElementById('level-title').innerText = `LEVEL ${level} - ${title}`;
+        document.getElementById('prof-level').innerText = `LEVEL ${level}`;
+        document.getElementById('prof-title').innerText = title;
+        document.getElementById('prof-points').innerText = stats.xp || 0;
+        document.getElementById('prof-pangkahs').innerText = stats.pangkahs || 0;
+        document.getElementById('prof-progress-text').innerText = `XP: ${currentXP}/${XP_PER_LEVEL}`;
+        document.getElementById('prof-bar-fill').style.width = xpProgress + "%";
     }
 
     function editName() { 
         const n = prompt("Enter Name:", myName); 
-        if(n && n.trim()) { myName = n.trim(); localStorage.setItem('pName', myName); updateStatsUI(); } 
+        if (n && n.trim().length > 0 && n.trim().length <= 20) { 
+            myName = n.trim(); 
+            localStorage.setItem('pName', myName); 
+            updateStatsUI(); 
+        } else if (n && n.trim().length > 20) {
+            showToast("Name too long (max 20 chars)");
+        }
     }
     
     function openProfile() { updateStatsUI(); document.getElementById('profile-modal').style.display = 'flex'; }
     function closeProfile() { document.getElementById('profile-modal').style.display = 'none'; }
-    function showToast(msg, isPos = false) { const t = document.getElementById('toast'); t.innerText = msg; t.style.background = isPos ? 'var(--primary-action)' : 'var(--danger)'; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000); }
-
-    function enter(type) {
-        myRoom = document.getElementById('rid').value;
-        if(!myRoom) return alert("Sect ID Required");
-        socket.emit(type === 'create' ? 'createRoom' : 'joinRoom', { roomID: myRoom, playerName: myName, maxPlayers: document.getElementById('maxp').value, userID: userID });
+    
+    function showToast(msg, isPos = false) { 
+        const t = document.getElementById('toast'); 
+        t.innerText = msg; 
+        t.style.background = isPos ? 'var(--primary-action)' : 'var(--danger)'; 
+        t.style.display = 'block'; 
+        setTimeout(() => t.style.display = 'none', 3000); 
     }
 
-    function start() { socket.emit('startGame', myRoom); }
-    function closeRoom() { if(myRoom && confirm("Disband this sect?")) socket.emit('requestCloseRoom', { roomID: myRoom }); }
-    function sortHand() { const order = { 'Spades': 4, 'Hearts': 3, 'Diamonds': 2, 'Clubs': 1 }; myCurrentHand.sort((a, b) => (order[b.suit] - order[a.suit]) || (b.val - a.val)); renderHand(); }
-    function answerSwap(accept) { document.getElementById('swap-modal').style.display = 'none'; if(accept && pendingSwapRequest) socket.emit('acceptSwap', { roomID: myRoom, fromUserID: pendingSwapRequest, myUserID: userID }); pendingSwapRequest = null; }
+    function showLoading(show) {
+        document.getElementById('loading').style.display = show ? 'flex' : 'none';
+    }
+
+    // LOBBY ACTIONS
+    function enter(type) {
+        myRoom = document.getElementById('rid').value.trim();
+        if (!myRoom) return showToast("Sect ID Required");
+        if (myRoom.length > 20) return showToast("Sect ID too long");
+        
+        showLoading(true);
+        const data = { 
+            roomID: myRoom, 
+            playerName: myName, 
+            userID: userID 
+        };
+        
+        if (type === 'create') {
+            data.maxPlayers = document.getElementById('maxp').value;
+            isHost = true;
+        }
+        
+        socket.emit(type === 'create' ? 'createRoom' : 'joinRoom', data);
+    }
+
+    function start() { 
+        showLoading(true);
+        socket.emit('startGame', myRoom); 
+    }
+    
+    function closeRoom() { 
+        if (myRoom && confirm("Disband this sect? All players will be kicked.")) {
+            socket.emit('requestCloseRoom', { roomID: myRoom }); 
+        }
+    }
+    
+    function sortHand() { 
+        const order = { 'Spades': 4, 'Hearts': 3, 'Diamonds': 2, 'Clubs': 1 }; 
+        myCurrentHand.sort((a, b) => (order[b.suit] - order[a.suit]) || (b.val - a.val)); 
+        renderHand(); 
+    }
+    
+    function answerSwap(accept) { 
+        document.getElementById('swap-modal').style.display = 'none'; 
+        if (accept && pendingSwapRequest) {
+            socket.emit('acceptSwap', { 
+                roomID: myRoom, 
+                fromUserID: pendingSwapRequest, 
+                myUserID: userID 
+            }); 
+        }
+        pendingSwapRequest = null; 
+    }
+
+    // SOCKET EVENTS
+    socket.on('connect', () => {
+        console.log('Connected to server');
+        // Attempt reconnection if user was in a room
+        if (userID) {
+            socket.emit('checkSession', { userID });
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Disconnected from server');
+        showToast("Connection lost. Reconnecting...");
+    });
+
+    socket.on('reconnectSuccess', (data) => {
+        console.log('Reconnected to room:', data.roomID);
+        myRoom = data.roomID;
+        showLoading(false);
+        showToast("Reconnected!", true);
+        update(data);
+    });
 
     socket.on('roomList', list => {
-        const box = document.getElementById('room-box'); box.innerHTML = list.length ? "" : '<div style="padding:15px; opacity:0.3;">Searching...</div>';
+        const box = document.getElementById('room-box'); 
+        box.innerHTML = list.length ? "" : '<div style="padding:15px; opacity:0.3;">No active sects...</div>';
         list.forEach(r => {
-            const d = document.createElement('div'); d.className = 'room-item'; d.innerHTML = `<span>#${r.id}</span> <span>${r.count}/${r.max}</span>`;
-            d.onclick = () => document.getElementById('rid').value = r.id; box.appendChild(d);
+            const d = document.createElement('div'); 
+            d.className = 'room-item'; 
+            d.innerHTML = `<span>#${r.id}</span> <span>${r.count}/${r.max}</span>`;
+            d.onclick = () => document.getElementById('rid').value = r.id; 
+            box.appendChild(d);
         });
     });
 
     socket.on('updatePlayers', p => {
+        showLoading(false);
         document.getElementById('lobby').style.display = 'none';
         document.getElementById('room-tag').innerText = "SECT: " + myRoom;
-        if(p.length > 0 && p[0].userID === userID) {
+        
+        // Check if current user is host
+        if (p.length > 0 && p[0].userID === userID) {
+            isHost = true;
             document.getElementById('close-room-btn').style.display = 'block';
-            if(p.length >= 4) document.getElementById('start-btn').style.display = 'block';
+            if (p.length >= 4) {
+                document.getElementById('start-btn').style.display = 'block';
+            }
         }
+        
         render(p, -1);
     });
 
     socket.on('gameInit', d => { 
+        showLoading(false);
         document.getElementById('round-popup').style.display = 'none';
         document.getElementById('start-btn').style.display = 'none'; 
         isProcessingTurn = false;
+        finishOrder = []; // Reset finish order for new game
         update(d); 
     });
     
     socket.on('clearTable', d => {
-        if(d.msg.toLowerCase() === 'pangkah!') {
-            sfx.strike.play().catch(()=>{}); 
-            if(d.winner === myName) { stats.points = (stats.points || 0) + 2; stats.pangkahs = (stats.pangkahs || 0) + 1; localStorage.setItem('pStats', JSON.stringify(stats)); updateStatsUI(); }
-        } else sfx.sweep.play().catch(()=>{});
+        // Handle Pangkah rewards
+        if (d.msg.toLowerCase() === 'pangkah!') {
+            sfx.strike.play().catch(() => {});
+            
+            if (d.winner === myName) { 
+                stats.pangkahs = (stats.pangkahs || 0) + 1; 
+                addXP(2, "Successful Pangkah!");
+            }
+        } else {
+            sfx.sweep.play().catch(() => {});
+        }
         
+        // Show round result popup
         const pop = document.getElementById('round-popup');
         document.getElementById('pop-title').className = d.msg === 'Pangkah!' ? 'pangkah-text' : 'clean-text';
         document.getElementById('pop-title').innerText = d.msg.toUpperCase();
         document.getElementById('pop-desc').innerText = d.winner + " has the lead."; 
         pop.style.display = 'block';
 
+        // Check if game is ending
         const playersWithCards = d.players.filter(p => p.hand.length > 0);
         if (playersWithCards.length <= 1) {
             setTimeout(() => update(d), 1500); 
         } else {
-            setTimeout(() => { pop.style.display = 'none'; update(d); }, 2000);
+            setTimeout(() => { 
+                pop.style.display = 'none'; 
+                update(d); 
+            }, 2000);
         }
     });
 
-    socket.on('updateTable', d => { sfx.place.play().catch(()=>{}); update(d); });
+    socket.on('updateTable', d => { 
+        sfx.place.play().catch(() => {}); 
+        update(d); 
+    });
+    
     socket.on('nextTurn', d => update(d));
-    socket.on('errorMsg', m => { isProcessingTurn = false; showToast(m); });
-    socket.on('roomClosed', () => { alert("Sect disbanded."); window.location.reload(); });
+    
+    socket.on('errorMsg', m => { 
+        showLoading(false);
+        isProcessingTurn = false; 
+        showToast(m); 
+    });
+    
+    socket.on('roomClosed', () => { 
+        showToast("Sect disbanded by leader");
+        setTimeout(() => window.location.reload(), 2000);
+    });
 
+    socket.on('gameOver', data => {
+        // This event might not be needed since we handle it in update()
+        console.log('Game over:', data);
+    });
+
+    // UPDATE GAME STATE
     function update(d) {
         isProcessingTurn = false; 
+        showLoading(false);
 
+        // Check if game is over
         const playersWithCards = d.players.filter(p => p.hand.length > 0);
-        if(playersWithCards.length <= 1) {
+        
+        // Track players who just finished (have 0 cards but not yet in finishOrder)
+        d.players.forEach(p => {
+            if (p.hand.length === 0 && !finishOrder.some(f => f.userID === p.userID)) {
+                finishOrder.push({ 
+                    userID: p.userID, 
+                    name: p.name, 
+                    position: finishOrder.length + 1 
+                });
+                
+                // Award XP for finishing position (only for current player)
+                if (p.userID === userID) {
+                    const position = finishOrder.length;
+                    if (position === 1) {
+                        addXP(10, "1st to finish!");
+                        stats.finishRanks.first = (stats.finishRanks.first || 0) + 1;
+                    } else if (position === 2) {
+                        addXP(7, "2nd to finish!");
+                        stats.finishRanks.second = (stats.finishRanks.second || 0) + 1;
+                    } else if (position === 3) {
+                        addXP(5, "3rd to finish!");
+                        stats.finishRanks.third = (stats.finishRanks.third || 0) + 1;
+                    } else {
+                        addXP(3, `${position}th to finish!`);
+                        stats.finishRanks.other = (stats.finishRanks.other || 0) + 1;
+                    }
+                    localStorage.setItem('pStats', JSON.stringify(stats));
+                }
+            }
+        });
+        
+        if (playersWithCards.length <= 1) {
             const loser = playersWithCards[0];
             const loserName = loser ? loser.name : "None";
+            
+            // Award/deduct XP for loser
+            if (loser && loser.userID === userID) {
+                addXP(-1, "Defeated");
+                stats.losses = (stats.losses || 0) + 1;
+                localStorage.setItem('pStats', JSON.stringify(stats));
+            }
+            
             const pop = document.getElementById('round-popup');
             const popTitle = document.getElementById('pop-title');
             const popDesc = document.getElementById('pop-desc');
+
             popTitle.className = 'pangkah-text';
             popTitle.innerText = "DUEL OVER";
-            const isHost = d.players[0] && d.players[0].userID === userID;
-            let controls = isHost ? `
-                <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
-                    <button class="btn btn-p" style="width:auto; padding:10px 20px; font-size:12px;" onclick="start()">RESTART</button>
-                    <button class="btn" style="width:auto; padding:10px 20px; font-size:12px; background:var(--danger); color:white;" onclick="closeRoom()">END</button>
-                </div>` : `<div style="margin-top:15px; font-size:11px; opacity:0.6;">Waiting for Sect Leader...</div>`;
-            popDesc.innerHTML = `<div style="font-weight:800; font-size:1.2rem;">${loserName} LOST</div>${controls}`;
+            
+            let controls = "";
+            if (isHost) {
+                controls = `
+                    <div style="margin-top:20px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+                        <button class="btn btn-p" style="width:auto; padding:10px 20px; font-size:12px;" onclick="start()">RESTART</button>
+                        <button class="btn" style="width:auto; padding:10px 20px; font-size:12px; background:var(--danger); color:white;" onclick="closeRoom()">END</button>
+                    </div>
+                `;
+            } else {
+                controls = `<div style="margin-top:15px; font-size:11px; opacity:0.6;">Waiting for Sect Leader...</div>`;
+            }
+
+            popDesc.innerHTML = `<div style="font-weight:800; font-size:1.2rem; margin-bottom:10px;">${loserName} LOST</div>${controls}`;
             pop.style.display = 'block';
+            
             render(d.players, d.turn, d.table || []);
             return; 
         }
 
+        // Update current hand
         const me = d.players.find(p => p.userID === userID); 
-        if(me) myCurrentHand = me.hand;
-        const activeP = d.players[d.turn];
-        document.getElementById('your-turn-btn').style.display = (activeP && activeP.userID === userID) ? 'block' : 'none';
+        if (me) myCurrentHand = me.hand;
         
+        // Update turn indicator
+        const activeP = d.players[d.turn];
+        document.getElementById('your-turn-btn').style.display = 
+            (activeP && activeP.userID === userID) ? 'block' : 'none';
+        
+        // Update suit indicator
         const sInd = document.getElementById('suit-indicator'); 
         if (d.table && d.table.length > 0) {
             sInd.style.display = 'flex'; 
-            document.getElementById('suit-symbol').innerText = icons[d.table[0].card.suit];
-            document.getElementById('suit-symbol').style.color = ['Hearts','Diamonds'].includes(d.table[0].card.suit) ? 'var(--danger)' : 'white';
-        } else sInd.style.display = 'none';
+            const leadSuit = d.table[0].card.suit;
+            document.getElementById('suit-symbol').innerText = icons[leadSuit];
+            document.getElementById('suit-symbol').style.color = 
+                ['Hearts','Diamonds'].includes(leadSuit) ? 'var(--danger)' : 'white';
+        } else {
+            sInd.style.display = 'none';
+        }
 
         render(d.players, d.turn, d.table || []);
-        if(d.discarded) showDiscarded(d.discarded);
+        if (d.discarded) showDiscarded(d.discarded);
     }
 
+    // RENDER FUNCTIONS
     function render(players, turn, table = []) {
-        const pLayer = document.getElementById('p-layer'); pLayer.innerHTML = "";
+        const pLayer = document.getElementById('p-layer'); 
+        pLayer.innerHTML = "";
         const radius = document.getElementById('table-wrap').offsetWidth / 2;
         const myIdx = players.findIndex(p => p.userID === userID);
         
         players.forEach((p, i) => {
             const angle = (i * (360 / players.length) - 90) * (Math.PI / 180);
-            const x = Math.cos(angle) * (radius + 25); const y = Math.sin(angle) * (radius + 25);
+            const x = Math.cos(angle) * (radius + 25); 
+            const y = Math.sin(angle) * (radius + 25);
+            
+            // Show "Take Hand" button only for next valid player
             let swapBtnHTML = ""; 
-            if(players.length > 1 && i !== myIdx && p.hand.length > 0) {
+            if (players.length > 1 && i !== myIdx && p.hand.length > 0) {
                 let nextValid = (myIdx + 1) % players.length;
-                while(players[nextValid].hand.length === 0 && nextValid !== myIdx) nextValid = (nextValid + 1) % players.length;
-                if(i === nextValid) swapBtnHTML = `<button class="btn-swap" onclick="socket.emit('sendSwapRequest', {roomID:myRoom, fromUserID:'${userID}'})">TAKE HAND</button>`;
+                let attempts = 0;
+                while (players[nextValid].hand.length === 0 && attempts < players.length) {
+                    nextValid = (nextValid + 1) % players.length;
+                    attempts++;
+                }
+                
+                if (i === nextValid && attempts < players.length) {
+                    swapBtnHTML = `<button class="btn-swap" onclick="socket.emit('sendSwapRequest', {roomID:'${myRoom}', fromUserID:'${userID}'})">TAKE HAND</button>`;
+                }
             }
-            const div = document.createElement('div'); div.className = `player ${i === turn ? 'active' : ''}`;
-            div.style.left = `calc(50% + ${x}px)`; div.style.top = `calc(50% + ${y}px)`;
-            div.innerHTML = `${swapBtnHTML}<div class="av"><span>🎴 ${p.hand.length}</span></div><div style="font-size:10px; margin-top:8px; color:${p.userID === userID ? 'var(--ui-blue)':'white'}">${p.name}</div>`;
+
+            const div = document.createElement('div'); 
+            div.className = `player ${i === turn ? 'active' : ''} ${p.hand.length === 0 ? 'eliminated' : ''}`;
+            div.style.left = `calc(50% + ${x}px)`; 
+            div.style.top = `calc(50% + ${y}px)`;
+            div.innerHTML = `
+                ${swapBtnHTML}
+                <div class="av">
+                    <span>🎴 ${p.hand.length}</span>
+                </div>
+                <div style="font-size:10px; margin-top:8px; color:${p.userID === userID ? 'var(--ui-blue)' : 'white'}; font-weight:${p.userID === userID ? '800' : '600'}">
+                    ${p.name}
+                </div>
+            `;
             pLayer.appendChild(div);
         });
-
+        
         renderHand();
-
-        // Spread Table Cards Horizontally
-        const tLayer = document.getElementById('t-layer'); tLayer.innerHTML = "";
-        const spacing = 45; 
-        const totalW = (table.length - 1) * spacing;
+        
+        // Render table cards
+        const tLayer = document.getElementById('t-layer'); 
+        tLayer.innerHTML = "";
         table.forEach((tc, idx) => {
             const el = createCardUI(tc.card); 
             el.className = `card table-card ${['Hearts','Diamonds'].includes(tc.card.suit) ? 'red' : ''}`;
-            const posX = (idx * spacing) - (totalW / 2);
-            el.style.transform = `translate(calc(-50% + ${posX}px), -50%)`; 
+            el.style.transform = `translate(-50%, -50%) rotate(${idx * 15}deg)`; 
             tLayer.appendChild(el);
         });
     }
 
     function renderHand() {
-        const hDiv = document.getElementById('my-cards'); hDiv.innerHTML = "";
+        const hDiv = document.getElementById('my-cards'); 
+        hDiv.innerHTML = "";
+        
         myCurrentHand.forEach(c => { 
             const el = createCardUI(c); 
-            el.onclick = () => { if(!isProcessingTurn) { isProcessingTurn = true; socket.emit('playCard', { roomID: myRoom, cardObject: c }); } };
+            
+            // Disable card if not player's turn
+            const me = socket.id;
+            const isMyTurn = document.getElementById('your-turn-btn').style.display === 'block';
+            
+            if (!isMyTurn || isProcessingTurn) {
+                el.classList.add('disabled');
+            }
+            
+            el.onclick = () => { 
+                if (!isProcessingTurn && isMyTurn) { 
+                    isProcessingTurn = true; 
+                    showLoading(true);
+                    socket.emit('playCard', { roomID: myRoom, cardObject: c }); 
+                } 
+            };
             hDiv.appendChild(el); 
         });
     }
 
     function createCardUI(c) {
-        const div = document.createElement('div'); div.className = `card ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
-        div.innerHTML = `<div style="font-size:10px">${c.rank}</div><div style="font-size:28px;text-align:center">${icons[c.suit]}</div><div style="font-size:10px;transform:rotate(180deg)">${c.rank}</div>`;
+        const div = document.createElement('div'); 
+        div.className = `card ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`;
+        div.innerHTML = `
+            <div style="font-size:10px">${c.rank}</div>
+            <div style="font-size:28px;text-align:center">${icons[c.suit]}</div>
+            <div style="font-size:10px;transform:rotate(180deg)">${c.rank}</div>
+        `;
         return div;
     }
 
     function showDiscarded(list) {
-        const dArea = document.getElementById('discard-area'); dArea.innerHTML = list.length ? '<div style="font-size:8px; opacity:0.5;">FATE</div>' : '';
-        list.forEach(c => { const div = document.createElement('div'); div.className = `mini ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`; div.innerHTML = icons[c.suit]; dArea.appendChild(div); });
+        const dArea = document.getElementById('discard-area'); 
+        dArea.innerHTML = list.length ? '<div style="font-size:8px; opacity:0.5;">FATE</div>' : '';
+        list.forEach(c => { 
+            const div = document.createElement('div'); 
+            div.className = `mini ${['Hearts','Diamonds'].includes(c.suit) ? 'red' : ''}`; 
+            div.innerHTML = icons[c.suit]; 
+            dArea.appendChild(div); 
+        });
     }
     
-    socket.on('receiveSwapRequest', d => { pendingSwapRequest = d.fromUserID; document.getElementById('swap-txt').innerText = d.fromName + " wants your hand!"; document.getElementById('swap-modal').style.display = 'block'; });
-    socket.on('swapOccurred', d => { sfx.absorb.play().catch(()=>{}); update(d); });
+    // HAND SWAP EVENTS
+    socket.on('receiveSwapRequest', d => { 
+        pendingSwapRequest = d.fromUserID; 
+        document.getElementById('swap-txt').innerText = d.fromName + " wants your hand!"; 
+        document.getElementById('swap-modal').style.display = 'block'; 
+    });
+    
+    socket.on('swapOccurred', d => { 
+        sfx.absorb.play().catch(() => {}); 
+        showToast(d.msg, true);
+        
+        // Award XP for hand absorption (to the accepter who gave their hand)
+        const accepterName = d.msg.split('absorbed cards from ')[1].replace('!', '');
+        if (accepterName === myName) {
+            addXP(2, "Hand Absorbed!");
+            stats.handsAbsorbed = (stats.handsAbsorbed || 0) + 1;
+            localStorage.setItem('pStats', JSON.stringify(stats));
+        }
+        
+        update(d); 
+    });
 
+    // Initialize
     updateStatsUI();
+    
+    // Prevent accidental page refresh during game
+    window.addEventListener('beforeunload', (e) => {
+        if (myRoom && document.getElementById('lobby').style.display === 'none') {
+            e.preventDefault();
+            e.returnValue = 'Game in progress. Are you sure you want to leave?';
+        }
+    });
 </script>
 </body>
 </html>

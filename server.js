@@ -16,6 +16,17 @@ const MAX_PLAYERS = 6;
 let rooms = {};
 
 /**
+ * Fisher-Yates shuffle - unbiased randomization
+ */
+function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+/**
  * Generate a shuffled 52-card deck
  */
 function generateDeck() {
@@ -27,7 +38,7 @@ function generateDeck() {
     ];
     let deck = [];
     suits.forEach(s => ranks.forEach(r => deck.push({ suit: s, rank: r.n, val: r.v })));
-    return deck.sort(() => Math.random() - 0.5);
+    return shuffle(deck);
 }
 
 /**
@@ -63,6 +74,17 @@ function getNextActivePlayer(room, startIdx) {
 }
 
 /**
+ * Health check endpoint for Render
+ */
+app.get('/health', (req, res) => {
+    res.status(200).json({ 
+        status: 'ok', 
+        rooms: Object.keys(rooms).length,
+        uptime: process.uptime()
+    });
+});
+
+/**
  * Main socket connection handler
  */
 io.on('connection', (socket) => {
@@ -87,7 +109,10 @@ io.on('connection', (socket) => {
                     turn: rooms[rid].turn, 
                     table: rooms[rid].table,
                     discarded: rooms[rid].discarded,
-                    gameStarted: rooms[rid].gameStarted
+                    gameStarted: rooms[rid].gameStarted,
+                    isFirstMove: rooms[rid].isFirstMove,
+                    currentSuit: rooms[rid].currentSuit,
+                    resolving: rooms[rid].resolving || false
                 });
                 console.log(`User ${userID} reconnected to room ${rid}`);
                 return;
@@ -150,7 +175,8 @@ io.on('connection', (socket) => {
             currentSuit: null, 
             isFirstMove: true, 
             discarded: [], 
-            gameStarted: false
+            gameStarted: false,
+            resolving: false // NEW: Prevent plays during resolution
         };
         
         socket.join(roomID);
@@ -186,6 +212,10 @@ io.on('connection', (socket) => {
                 return socket.emit('errorMsg', 'Room full!');
             }
             
+            if (room.gameStarted) {
+                return socket.emit('errorMsg', 'Game already in progress!');
+            }
+            
             room.players.push({ 
                 id: socket.id, 
                 name: playerName, 
@@ -213,19 +243,23 @@ io.on('connection', (socket) => {
         }
         
         room.gameStarted = true;
+        room.resolving = false;
+        room.table = [];
+        room.currentSuit = null;
+        
         let deck = generateDeck();
         room.discarded = [];
 
         // Cultivation Rule: Remove Aces for 5-6 players
-        if (room.maxPlayers === 5 || room.maxPlayers === 6) {
-            const discardCount = room.maxPlayers === 5 ? 2 : 4;
+        if (room.players.length === 5 || room.players.length === 6) {
+            const discardCount = room.players.length === 5 ? 2 : 4;
             let aceIndices = [];
             deck.forEach((card, idx) => { 
                 if (card.rank === 'A') aceIndices.push(idx); 
             });
             
             // Randomly select aces to remove
-            aceIndices.sort(() => Math.random() - 0.5);
+            shuffle(aceIndices);
             let toRemove = aceIndices.slice(0, discardCount).sort((a, b) => b - a);
             toRemove.forEach(idx => { 
                 room.discarded.push(deck.splice(idx, 1)[0]); 
@@ -249,7 +283,8 @@ io.on('connection', (socket) => {
         io.to(roomID).emit('gameInit', { 
             players: room.players, 
             turn: room.turn, 
-            discarded: room.discarded 
+            discarded: room.discarded,
+            isFirstMove: room.isFirstMove
         });
         
         console.log(`Game started in room ${roomID}. ${room.players[room.turn].name} has K♠`);
@@ -309,7 +344,11 @@ io.on('connection', (socket) => {
         accepter.hand = [];
         
         io.to(roomID).emit('swapOccurred', { 
-            msg: `${requester.name} absorbed ${accepter.name}'s hand!`, 
+            msg: `${requester.name} absorbed ${accepter.name}'s hand!`,
+            requesterUserID: requester.userID,
+            accepterUserID: accepter.userID,
+            requesterName: requester.name,
+            accepterName: accepter.name,
             players: room.players,
             turn: room.turn,
             table: room.table
@@ -325,6 +364,11 @@ io.on('connection', (socket) => {
     socket.on('playCard', ({ roomID, cardObject }) => {
         const room = rooms[roomID];
         if (!room) return;
+        
+        // Prevent plays during round resolution
+        if (room.resolving) {
+            return socket.emit('errorMsg', 'Round is being resolved, please wait...');
+        }
         
         // Validate it's player's turn
         if (room.players[room.turn].id !== socket.id) {
@@ -373,19 +417,26 @@ io.on('connection', (socket) => {
         io.to(roomID).emit('updateTable', { 
             table: room.table, 
             turn: room.turn, 
-            players: room.players 
+            players: room.players,
+            currentSuit: room.currentSuit
         });
 
         // Determine if Pangkah occurred
         let isPangkah = playedCard.suit !== room.currentSuit;
         
-        // Count active players (those with cards)
-        let activeCount = room.players.filter(p => p.hand.length > 0).length;
+        // Count active players (those with cards OR who just played their last card this round)
+        let playersInRound = room.players.filter(p => 
+            p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p))
+        ).length;
         
-        // Check if round is complete
-        let roundComplete = room.table.length === activeCount;
+        // Check if round is complete (everyone who should play has played)
+        let activePlayers = room.players.filter(p => p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p)));
+        let roundComplete = room.table.length >= activePlayers.length;
 
         if (isPangkah || roundComplete) {
+            // Lock the room to prevent more plays
+            room.resolving = true;
+            
             // Resolve the round after delay
             setTimeout(() => {
                 // Find winner (highest card of lead suit)
@@ -405,9 +456,13 @@ io.on('connection', (socket) => {
                     console.warn('Warning: No player played lead suit!');
                 }
                 
-                // If Pangkah, winner takes all cards
+                // Handle round outcome
                 if (isPangkah) {
+                    // Pangkah: winner takes all cards
                     room.players[winnerIdx].hand.push(...room.table.map(t => t.card));
+                } else {
+                    // Clean round: discard all cards
+                    room.discarded.push(...room.table.map(t => t.card));
                 }
                 
                 // Check for game over
@@ -415,26 +470,39 @@ io.on('connection', (socket) => {
                 
                 if (survivors.length <= 1) {
                     io.to(roomID).emit('gameOver', { 
-                        loser: survivors[0]?.name || 'None' 
+                        loser: survivors[0]?.name || 'None',
+                        loserUserID: survivors[0]?.userID || null
                     });
                     
                     console.log(`Game over in room ${roomID}. Loser: ${survivors[0]?.name || 'None'}`);
                     
-                    // Clean up room
-                    io.in(roomID).socketsLeave(roomID);
-                    delete rooms[roomID];
-                    broadcastRooms();
-                } else {
-                    // Continue game
-                    room.turn = winnerIdx;
+                    // Reset room for potential restart instead of deleting
+                    room.gameStarted = false;
+                    room.resolving = false;
                     room.table = [];
                     room.currentSuit = null;
+                    room.isFirstMove = true;
+                    
+                    broadcastRooms();
+                } else {
+                    // Continue game - find next active player
+                    // If winner has no cards, find next player with cards
+                    if (room.players[winnerIdx].hand.length === 0) {
+                        room.turn = getNextActivePlayer(room, winnerIdx);
+                    } else {
+                        room.turn = winnerIdx;
+                    }
+                    
+                    room.table = [];
+                    room.currentSuit = null;
+                    room.resolving = false;
                     
                     io.to(roomID).emit('clearTable', { 
                         turn: room.turn, 
                         winner: room.players[winnerIdx].name, 
-                        players: room.players, 
-                        msg: isPangkah ? "Pangkah!" : "Clean" 
+                        players: room.players,
+                        discarded: room.discarded,
+                        msg: isPangkah ? "Pangkah!" : "Clean"
                     });
                 }
             }, ROUND_RESOLUTION_DELAY);
@@ -451,7 +519,8 @@ io.on('connection', (socket) => {
             io.to(roomID).emit('nextTurn', { 
                 turn: room.turn, 
                 players: room.players, 
-                table: room.table 
+                table: room.table,
+                currentSuit: room.currentSuit
             });
         }
     });

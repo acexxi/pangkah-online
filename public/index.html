@@ -101,6 +101,31 @@
         #connection-status { position: fixed; bottom: 10px; right: 10px; font-size: 10px; padding: 4px 8px; background: rgba(0,0,0,0.5); border-radius: 8px; z-index: 100; }
         .xp-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; font-weight: 900; color: var(--primary-action); z-index: 10004; pointer-events: none; animation: xpFloat 1.5s ease forwards; }
         @keyframes xpFloat { 0% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -100%) scale(1.5); } }
+        
+        /* Screen Edge Glow - Your Turn Indicator */
+        #turn-glow { position: fixed; inset: 0; pointer-events: none; z-index: 9000; opacity: 0; transition: opacity 0.3s; }
+        #turn-glow.active { opacity: 1; }
+        #turn-glow::before { content: ''; position: absolute; inset: 0; border: 4px solid var(--primary-action); border-radius: 0; box-shadow: inset 0 0 60px var(--primary-action), 0 0 30px var(--primary-action); animation: glowPulse 1.5s ease-in-out infinite; }
+        @keyframes glowPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+        #turn-text { position: fixed; top: 75px; left: 50%; transform: translateX(-50%); background: var(--primary-action); color: #000; padding: 8px 20px; border-radius: 20px; font-weight: 900; font-size: 12px; z-index: 9001; display: none; animation: bounceIn 0.5s ease; }
+        #turn-text.active { display: block; }
+        @keyframes bounceIn { 0% { transform: translateX(-50%) scale(0); } 50% { transform: translateX(-50%) scale(1.2); } 100% { transform: translateX(-50%) scale(1); } }
+        
+        /* Quick Emotes */
+        #emote-bar { position: fixed; bottom: 30vh; right: 10px; display: flex; flex-direction: column; gap: 8px; z-index: 3000; }
+        .emote-btn { width: 44px; height: 44px; border-radius: 50%; background: var(--glass-heavy); border: 1px solid var(--border); font-size: 20px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+        .emote-btn:hover { transform: scale(1.2); background: rgba(255,255,255,0.1); }
+        .emote-btn:active { transform: scale(0.9); }
+        .emote-float { position: fixed; font-size: 48px; pointer-events: none; z-index: 10005; animation: emoteFloat 2s ease forwards; }
+        @keyframes emoteFloat { 0% { opacity: 1; transform: scale(0.5) translateY(0); } 20% { transform: scale(1.2) translateY(-20px); } 100% { opacity: 0; transform: scale(1) translateY(-150px); } }
+        .emote-from { position: absolute; background: var(--glass-heavy); padding: 4px 8px; border-radius: 8px; font-size: 10px; white-space: nowrap; bottom: -20px; left: 50%; transform: translateX(-50%); }
+        
+        /* Confetti */
+        .confetti { position: fixed; width: 10px; height: 10px; top: -10px; z-index: 10006; pointer-events: none; animation: confettiFall linear forwards; }
+        @keyframes confettiFall { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+        .confetti.square { border-radius: 2px; }
+        .confetti.circle { border-radius: 50%; }
+        .confetti.star { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
     </style>
 </head>
 <body>
@@ -109,6 +134,20 @@
 <div id="connection-status">🟢 Connected</div>
 <div id="achievement-popup"></div>
 <div id="streak-indicator"><span>🔥</span><span id="streak-count">0</span><div style="font-size:9px;opacity:0.6">WIN STREAK</div></div>
+
+<!-- Screen Edge Glow for Your Turn -->
+<div id="turn-glow"></div>
+<div id="turn-text">⚡ YOUR TURN</div>
+
+<!-- Quick Emotes Bar -->
+<div id="emote-bar">
+    <button class="emote-btn" onclick="sendEmote('😂')">😂</button>
+    <button class="emote-btn" onclick="sendEmote('👍')">👍</button>
+    <button class="emote-btn" onclick="sendEmote('😡')">😡</button>
+    <button class="emote-btn" onclick="sendEmote('🔥')">🔥</button>
+    <button class="emote-btn" onclick="sendEmote('💀')">💀</button>
+    <button class="emote-btn" onclick="sendEmote('👏')">👏</button>
+</div>
 
 <div class="modal-overlay" id="profile-modal">
     <div class="profile-card">
@@ -188,7 +227,7 @@
 
 <div class="header">
     <div id="room-tag" style="color:var(--ui-blue);font-weight:800;font-size:11px">LOBBY</div>
-    <button id="your-turn-btn">YOUR TURN</button>
+    <div></div>
     <div style="display:flex;align-items:center;gap:12px">
         <button id="close-room-btn" onclick="closeRoom()" style="display:none;background:var(--danger);color:white;border:none;padding:6px 12px;border-radius:8px;font-size:10px;font-weight:800;cursor:pointer">DISBAND</button>
         <div id="suit-indicator" style="display:none;align-items:center;background:rgba(255,255,255,0.05);padding:4px 10px;border-radius:10px"><span id="suit-symbol" style="font-size:1.2rem"></span></div>
@@ -285,6 +324,51 @@ function closeProfile(){document.getElementById('profile-modal').style.display='
 function showToast(msg,pos=false){const t=document.getElementById('toast');t.innerText=msg;t.style.background=pos?'var(--primary-action)':'var(--danger)';t.style.display='block';setTimeout(()=>t.style.display='none',3000);}
 function showLoading(s){document.getElementById('loading').style.display=s?'flex':'none';}
 function flashScreen(type){const f=document.createElement('div');f.className=type+'-flash';document.body.appendChild(f);setTimeout(()=>f.remove(),500);}
+
+// Turn Indicator - Screen Edge Glow
+function setTurnIndicator(isMyTurn){
+    document.getElementById('turn-glow').classList.toggle('active',isMyTurn);
+    document.getElementById('turn-text').classList.toggle('active',isMyTurn);
+}
+
+// Quick Emotes
+function sendEmote(emoji){
+    if(!myRoom)return;
+    socket.emit('sendEmote',{roomID:myRoom,userID,playerName:myName,emoji});
+    showEmote(emoji,myName,true);
+}
+function showEmote(emoji,fromName,isMe=false){
+    const e=document.createElement('div');
+    e.className='emote-float';
+    e.innerHTML=`${emoji}<div class="emote-from">${isMe?'You':fromName}</div>`;
+    e.style.left=Math.random()*60+20+'%';
+    e.style.top='50%';
+    document.body.appendChild(e);
+    setTimeout(()=>e.remove(),2000);
+}
+socket.on('receiveEmote',d=>{
+    if(d.userID!==userID)showEmote(d.emoji,d.playerName);
+});
+
+// Confetti Effect
+function launchConfetti(){
+    const colors=['#fbbf24','#f59e0b','#10b981','#3b82f6','#a855f7','#f43f5e','#ffffff'];
+    const shapes=['square','circle','star'];
+    for(let i=0;i<100;i++){
+        setTimeout(()=>{
+            const c=document.createElement('div');
+            c.className='confetti '+shapes[Math.floor(Math.random()*shapes.length)];
+            c.style.left=Math.random()*100+'%';
+            c.style.backgroundColor=colors[Math.floor(Math.random()*colors.length)];
+            c.style.animationDuration=(Math.random()*2+2)+'s';
+            c.style.width=(Math.random()*8+6)+'px';
+            c.style.height=c.style.width;
+            document.body.appendChild(c);
+            setTimeout(()=>c.remove(),4000);
+        },i*30);
+    }
+}
+
 function enter(type){myRoom=document.getElementById('rid').value.trim();if(!myRoom)return showToast("Sect ID Required");showLoading(true);const data={roomID:myRoom,playerName:myName,userID,equippedTitle:getEquippedTitleData()};if(type==='create'){data.maxPlayers=document.getElementById('maxp').value;isHost=true;}socket.emit(type==='create'?'createRoom':'joinRoom',data);}
 function start(){showLoading(true);socket.emit('startGame',myRoom);}
 function closeRoom(){if(myRoom&&confirm("Disband this sect?"))socket.emit('requestCloseRoom',{roomID:myRoom});}
@@ -303,12 +387,12 @@ socket.on('nextTurn',d=>{if(d.currentSuit)currentLeadSuit=d.currentSuit;update(d
 socket.on('errorMsg',m=>{showLoading(false);isProcessingTurn=false;showToast(m);});
 socket.on('roomClosed',()=>{showToast("Sect disbanded");setTimeout(()=>location.reload(),2000);});
 socket.on('rematchStatus',d=>{document.getElementById('rematch-status').innerText=`${d.readyCount}/${d.totalCount} players ready`;if(d.allReady)document.getElementById('rematch-status').innerText='Starting...';});
-socket.on('gameOver',data=>{stats.games=(stats.games||0)+1;const myPos=data.finishOrder.indexOf(userID)+1;if(myPos===1){stats.wins=(stats.wins||0)+1;stats.currentStreak=(stats.currentStreak||0)+1;if(stats.currentStreak>(stats.bestStreak||0))stats.bestStreak=stats.currentStreak;addXP(15+stats.currentStreak*2,`1st! Streak:${stats.currentStreak}`,false);}else if(myPos===2){stats.secondPlace=(stats.secondPlace||0)+1;stats.topTwo=(stats.topTwo||0)+1;stats.currentStreak=0;addXP(8,"2nd Place",false);}else if(myPos===3){stats.thirdPlace=(stats.thirdPlace||0)+1;stats.currentStreak=0;addXP(5,"3rd Place",false);}else if(data.loserUserID===userID){stats.losses=(stats.losses||0)+1;stats.currentStreak=0;addXP(-2,"Defeated",false);}else{stats.currentStreak=0;addXP(3,`${myPos}th`,false);}if(myPos<=2)stats.topTwo=(stats.topTwo||0)+1;saveStats();checkAllTitles();updateStatsUI();document.getElementById('game-number').innerText=`Game #${data.gameNumber}`;document.getElementById('finish-list').innerHTML=data.performanceData.sort((a,b)=>a.position-b.position).map(p=>{const isW=p.position===1,isL=p.position===data.performanceData.length,isMe=p.userID===userID;let xp=isW?15:p.position===2?8:p.position===3?5:isL?-2:3;const tHtml=p.equippedTitle?`<span class="title-rarity ${p.equippedTitle.rarity}" style="font-size:8px;margin-left:5px">${p.equippedTitle.icon}</span>`:'';return`<div class="finish-item ${isW?'winner':''} ${isL?'loser':''}" style="${isMe?'border-width:2px':''}"><div style="font-size:18px;font-weight:800;width:30px">${isW?'👑':isL?'💀':'#'+p.position}</div><div style="flex:1;text-align:left;margin-left:10px;font-weight:600">${p.name}${tHtml}${isMe?' (You)':''}</div><div style="font-size:12px;color:var(--primary-action);font-weight:800">${xp>0?'+':''}${xp} XP</div></div>`;}).join('');const myData=data.performanceData.find(p=>p.userID===userID);let bonuses=[];if(myPos===1){bonuses.push({n:'🏆 Victory',x:15});if(stats.currentStreak>1)bonuses.push({n:`🔥 Streak x${stats.currentStreak}`,x:stats.currentStreak*2});}else if(myPos===2)bonuses.push({n:'🥈 2nd',x:8});else if(myPos===3)bonuses.push({n:'🥉 3rd',x:5});else if(data.loserUserID===userID)bonuses.push({n:'💀 Defeated',x:-2});if(myData?.stats?.pangkahsDealt)bonuses.push({n:`⚡ Pangkahs (${myData.stats.pangkahsDealt})`,x:myData.stats.pangkahsDealt*3});if(myData?.stats?.cleanWins)bonuses.push({n:`✨ Clean (${myData.stats.cleanWins})`,x:myData.stats.cleanWins});const total=bonuses.reduce((s,b)=>s+b.x,0);document.getElementById('bonus-list').innerHTML=`<div style="font-weight:800;margin-bottom:10px;color:var(--gold)">🎁 YOUR BONUSES</div>${bonuses.map(b=>`<div class="bonus-item"><span>${b.n}</span><span style="color:${b.x>=0?'var(--primary-action)':'var(--danger)'};font-weight:800">${b.x>0?'+':''}${b.x} XP</span></div>`).join('')}<div class="bonus-item" style="border-top:2px solid var(--gold);margin-top:10px;padding-top:10px"><span style="font-weight:800">TOTAL</span><span style="color:var(--gold);font-weight:800;font-size:16px">${total>0?'+':''}${total} XP</span></div>`;document.getElementById('rematch-btn').innerText='⚡ REMATCH';document.getElementById('rematch-btn').style.opacity='1';document.getElementById('rematch-status').innerText='Waiting...';rematchRequested=false;document.getElementById('gameover-modal').style.display='flex';});
+socket.on('gameOver',data=>{setTurnIndicator(false);stats.games=(stats.games||0)+1;const myPos=data.finishOrder.indexOf(userID)+1;if(myPos===1){stats.wins=(stats.wins||0)+1;stats.currentStreak=(stats.currentStreak||0)+1;if(stats.currentStreak>(stats.bestStreak||0))stats.bestStreak=stats.currentStreak;addXP(15+stats.currentStreak*2,`1st! Streak:${stats.currentStreak}`,false);launchConfetti();}else if(myPos===2){stats.secondPlace=(stats.secondPlace||0)+1;stats.topTwo=(stats.topTwo||0)+1;stats.currentStreak=0;addXP(8,"2nd Place",false);}else if(myPos===3){stats.thirdPlace=(stats.thirdPlace||0)+1;stats.currentStreak=0;addXP(5,"3rd Place",false);}else if(data.loserUserID===userID){stats.losses=(stats.losses||0)+1;stats.currentStreak=0;addXP(-2,"Defeated",false);}else{stats.currentStreak=0;addXP(3,`${myPos}th`,false);}if(myPos<=2)stats.topTwo=(stats.topTwo||0)+1;saveStats();checkAllTitles();updateStatsUI();document.getElementById('game-number').innerText=`Game #${data.gameNumber}`;document.getElementById('finish-list').innerHTML=data.performanceData.sort((a,b)=>a.position-b.position).map(p=>{const isW=p.position===1,isL=p.position===data.performanceData.length,isMe=p.userID===userID;let xp=isW?15:p.position===2?8:p.position===3?5:isL?-2:3;const tHtml=p.equippedTitle?`<span class="title-rarity ${p.equippedTitle.rarity}" style="font-size:8px;margin-left:5px">${p.equippedTitle.icon}</span>`:'';return`<div class="finish-item ${isW?'winner':''} ${isL?'loser':''}" style="${isMe?'border-width:2px':''}"><div style="font-size:18px;font-weight:800;width:30px">${isW?'👑':isL?'💀':'#'+p.position}</div><div style="flex:1;text-align:left;margin-left:10px;font-weight:600">${p.name}${tHtml}${isMe?' (You)':''}</div><div style="font-size:12px;color:var(--primary-action);font-weight:800">${xp>0?'+':''}${xp} XP</div></div>`;}).join('');const myData=data.performanceData.find(p=>p.userID===userID);let bonuses=[];if(myPos===1){bonuses.push({n:'🏆 Victory',x:15});if(stats.currentStreak>1)bonuses.push({n:`🔥 Streak x${stats.currentStreak}`,x:stats.currentStreak*2});}else if(myPos===2)bonuses.push({n:'🥈 2nd',x:8});else if(myPos===3)bonuses.push({n:'🥉 3rd',x:5});else if(data.loserUserID===userID)bonuses.push({n:'💀 Defeated',x:-2});if(myData?.stats?.pangkahsDealt)bonuses.push({n:`⚡ Pangkahs (${myData.stats.pangkahsDealt})`,x:myData.stats.pangkahsDealt*3});if(myData?.stats?.cleanWins)bonuses.push({n:`✨ Clean (${myData.stats.cleanWins})`,x:myData.stats.cleanWins});const total=bonuses.reduce((s,b)=>s+b.x,0);document.getElementById('bonus-list').innerHTML=`<div style="font-weight:800;margin-bottom:10px;color:var(--gold)">🎁 YOUR BONUSES</div>${bonuses.map(b=>`<div class="bonus-item"><span>${b.n}</span><span style="color:${b.x>=0?'var(--primary-action)':'var(--danger)'};font-weight:800">${b.x>0?'+':''}${b.x} XP</span></div>`).join('')}<div class="bonus-item" style="border-top:2px solid var(--gold);margin-top:10px;padding-top:10px"><span style="font-weight:800">TOTAL</span><span style="color:var(--gold);font-weight:800;font-size:16px">${total>0?'+':''}${total} XP</span></div>`;document.getElementById('rematch-btn').innerText='⚡ REMATCH';document.getElementById('rematch-btn').style.opacity='1';document.getElementById('rematch-status').innerText='Waiting...';rematchRequested=false;document.getElementById('gameover-modal').style.display='flex';});
 socket.on('receiveSwapRequest',d=>{pendingSwapRequest=d.fromUserID;document.getElementById('swap-txt').innerText=d.fromName+" wants your hand!";document.getElementById('swap-modal').style.display='block';let t=15;const timer=document.getElementById('swap-timer');timer.innerText=`${t}s`;const cd=setInterval(()=>{t--;timer.innerText=`${t}s`;if(t<=0)clearInterval(cd);},1000);swapTimeoutId=setTimeout(()=>{clearInterval(cd);if(pendingSwapRequest===d.fromUserID){answerSwap(false);showToast("Swap expired");}},15000);});
 socket.on('swapOccurred',d=>{playSound('absorb');showToast(d.msg,true);if(d.requesterUserID===userID){stats.handsAbsorbed=(stats.handsAbsorbed||0)+1;addXP(5,"Hand Absorbed!");}if(d.accepterUserID===userID)addXP(3,"Hand Given!");saveStats();checkAllTitles();update(d);});
-function update(d){isProcessingTurn=false;showLoading(false);const me=d.players.find(p=>p.userID===userID);if(me)myCurrentHand=me.hand;const active=d.players[d.turn];document.getElementById('your-turn-btn').style.display=active?.userID===userID?'block':'none';const sInd=document.getElementById('suit-indicator');if(d.table?.length>0){sInd.style.display='flex';currentLeadSuit=d.table[0].card.suit;document.getElementById('suit-symbol').innerText=icons[currentLeadSuit];document.getElementById('suit-symbol').style.color=['Hearts','Diamonds'].includes(currentLeadSuit)?'var(--danger)':'white';}else{sInd.style.display='none';currentLeadSuit=null;}render(d.players,d.turn,d.table||[]);if(d.fateAces)showDiscarded(d.fateAces);}
+function update(d){isProcessingTurn=false;showLoading(false);const me=d.players.find(p=>p.userID===userID);if(me)myCurrentHand=me.hand;const active=d.players[d.turn];const isMyTurn=active?.userID===userID;setTurnIndicator(isMyTurn);const sInd=document.getElementById('suit-indicator');if(d.table?.length>0){sInd.style.display='flex';currentLeadSuit=d.table[0].card.suit;document.getElementById('suit-symbol').innerText=icons[currentLeadSuit];document.getElementById('suit-symbol').style.color=['Hearts','Diamonds'].includes(currentLeadSuit)?'var(--danger)':'white';}else{sInd.style.display='none';currentLeadSuit=null;}render(d.players,d.turn,d.table||[]);if(d.fateAces)showDiscarded(d.fateAces);}
 function render(players,turn,table=[]){const pLayer=document.getElementById('p-layer');pLayer.innerHTML="";const radius=document.getElementById('table-wrap').offsetWidth/2;const myIdx=players.findIndex(p=>p.userID===userID);players.forEach((p,i)=>{const angle=(i*(360/players.length)-90)*(Math.PI/180);const x=Math.cos(angle)*(radius+25),y=Math.sin(angle)*(radius+25);let swapBtn="";if(players.length>1&&i!==myIdx&&p.hand.length>0){let nxt=(myIdx+1)%players.length,att=0;while(players[nxt].hand.length===0&&att<players.length){nxt=(nxt+1)%players.length;att++;}if(i===nxt&&att<players.length)swapBtn=`<button class="btn-swap" onclick="socket.emit('sendSwapRequest',{roomID:'${myRoom}',fromUserID:'${userID}'})">TAKE HAND</button>`;}const titleHtml=p.equippedTitle?`<div class="player-title ${p.equippedTitle.rarity}">${p.equippedTitle.icon} ${p.equippedTitle.name}</div>`:'';const div=document.createElement('div');div.className=`player ${i===turn?'active':''} ${p.hand.length===0?'eliminated':''}`;div.style.left=`calc(50% + ${x}px)`;div.style.top=`calc(50% + ${y}px)`;div.innerHTML=`${swapBtn}<div class="av"><span>🎴 ${p.hand.length}</span></div><div style="font-size:10px;margin-top:8px;color:${p.userID===userID?'var(--ui-blue)':'white'};font-weight:${p.userID===userID?'800':'600'}">${p.name}</div>${titleHtml}`;pLayer.appendChild(div);});renderHand();const tLayer=document.getElementById('t-layer');tLayer.innerHTML="";if(table.length>0){const rowDiv=document.createElement('div');rowDiv.className='table-cards-row';table.forEach((tc)=>{const el=createCardUI(tc.card);el.className=`card table-card ${['Hearts','Diamonds'].includes(tc.card.suit)?'red':''}`;rowDiv.appendChild(el);});tLayer.appendChild(rowDiv);}}
-function renderHand(){const hDiv=document.getElementById('my-cards');hDiv.innerHTML="";const isMyTurn=document.getElementById('your-turn-btn').style.display==='block';const hasLead=currentLeadSuit&&myCurrentHand.some(c=>c.suit===currentLeadSuit);myCurrentHand.forEach(c=>{const el=createCardUI(c);let canPlay=true,highlight=false;if(!isMyTurn||isProcessingTurn)canPlay=false;else if(isFirstMove){canPlay=c.suit==='Spades'&&c.rank==='K';highlight=canPlay;}else if(currentLeadSuit&&hasLead){canPlay=c.suit===currentLeadSuit;highlight=canPlay;}else highlight=isMyTurn;if(!canPlay)el.classList.add('disabled');else if(highlight)el.classList.add('highlight');el.onclick=e=>{if(!isProcessingTurn&&isMyTurn&&canPlay){e.currentTarget.classList.add('disabled');e.currentTarget.classList.remove('highlight');isProcessingTurn=true;showLoading(true);socket.emit('playCard',{roomID:myRoom,cardObject:c});}};hDiv.appendChild(el);});}
+function renderHand(){const hDiv=document.getElementById('my-cards');hDiv.innerHTML="";const isMyTurn=document.getElementById('turn-glow').classList.contains('active');const hasLead=currentLeadSuit&&myCurrentHand.some(c=>c.suit===currentLeadSuit);myCurrentHand.forEach(c=>{const el=createCardUI(c);let canPlay=true,highlight=false;if(!isMyTurn||isProcessingTurn)canPlay=false;else if(isFirstMove){canPlay=c.suit==='Spades'&&c.rank==='K';highlight=canPlay;}else if(currentLeadSuit&&hasLead){canPlay=c.suit===currentLeadSuit;highlight=canPlay;}else highlight=isMyTurn;if(!canPlay)el.classList.add('disabled');else if(highlight)el.classList.add('highlight');el.onclick=e=>{if(!isProcessingTurn&&isMyTurn&&canPlay){e.currentTarget.classList.add('disabled');e.currentTarget.classList.remove('highlight');isProcessingTurn=true;showLoading(true);socket.emit('playCard',{roomID:myRoom,cardObject:c});}};hDiv.appendChild(el);});}
 function createCardUI(c){const d=document.createElement('div');d.className=`card ${['Hearts','Diamonds'].includes(c.suit)?'red':''}`;d.innerHTML=`<div style="font-size:10px">${c.rank}</div><div style="font-size:28px;text-align:center">${icons[c.suit]}</div><div style="font-size:10px;transform:rotate(180deg)">${c.rank}</div>`;return d;}
 function showDiscarded(list){const d=document.getElementById('discard-area');if(!list||list.length===0){d.innerHTML='';d.style.display='none';return;}d.style.display='flex';const isBlack=s=>['Spades','Clubs'].includes(s);d.innerHTML=`<div class="fate-label">⚰️ FATE (${list.length} Aces)</div>`;list.forEach(c=>{const div=document.createElement('div');div.className=`fate-card ${isBlack(c.suit)?'black':'red'}`;div.innerHTML=`<div style="font-size:12px">A</div><div style="font-size:22px">${icons[c.suit]}</div>`;d.appendChild(div);});}
 updateStatsUI();checkAllTitles();

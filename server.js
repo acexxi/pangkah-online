@@ -635,6 +635,15 @@ io.on('connection', (socket) => {
     });
 
     /**
+     * EMOTE HANDLER
+     */
+    socket.on('sendEmote', ({ roomID, userID, playerName, emoji }) => {
+        if (!roomID) return;
+        // Broadcast emote to all players in room except sender
+        socket.to(roomID).emit('receiveEmote', { userID, playerName, emoji });
+    });
+
+    /**
      * DISCONNECT HANDLER
      */
     socket.on('disconnect', () => {

@@ -48,7 +48,8 @@ const broadcastRooms = () => {
     const list = Object.keys(rooms).map(id => ({
         id, 
         count: rooms[id].players.length, 
-        max: rooms[id].maxPlayers
+        max: rooms[id].maxPlayers,
+        inGame: rooms[id].gameStarted
     }));
     io.emit('roomList', list);
 };
@@ -64,13 +65,28 @@ function getNextActivePlayer(room, startIdx) {
         nextIdx = (nextIdx + 1) % room.players.length;
         attempts++;
         
-        // Prevent infinite loop if no active players
         if (attempts >= room.players.length) {
             return -1;
         }
     } while (room.players[nextIdx].hand.length === 0);
     
     return nextIdx;
+}
+
+/**
+ * Initialize player game stats for a new game
+ */
+function initPlayerGameStats(player) {
+    player.gameStats = {
+        pangkahsDealt: 0,      // Times they pangkah'd someone
+        pangkahsReceived: 0,   // Times they got pangkah'd
+        cleanWins: 0,          // Clean rounds they won
+        cardsPlayed: 0,        // Total cards played
+        perfectRounds: 0,      // Rounds where they played optimally
+        comebacks: 0,          // Times they recovered from 15+ cards
+        hadMostCards: false,   // At some point had most cards
+        finishPosition: 0      // Final position (1st, 2nd, etc.)
+    };
 }
 
 /**
@@ -93,7 +109,6 @@ io.on('connection', (socket) => {
 
     /**
      * SESSION RECONNECTION
-     * Check if user was in a room and reconnect them
      */
     socket.on('checkSession', ({ userID }) => {
         if (!userID) return;
@@ -112,7 +127,8 @@ io.on('connection', (socket) => {
                     gameStarted: rooms[rid].gameStarted,
                     isFirstMove: rooms[rid].isFirstMove,
                     currentSuit: rooms[rid].currentSuit,
-                    resolving: rooms[rid].resolving || false
+                    resolving: rooms[rid].resolving || false,
+                    gameNumber: rooms[rid].gameNumber || 1
                 });
                 console.log(`User ${userID} reconnected to room ${rid}`);
                 return;
@@ -122,31 +138,21 @@ io.on('connection', (socket) => {
 
     /**
      * CLOSE ROOM
-     * Host can disband the room
      */
     socket.on('requestCloseRoom', ({ roomID }) => {
         if (!roomID || !rooms[roomID]) return;
         
-        // Notify all players
         io.to(roomID).emit('roomClosed');
-        
-        // Remove all sockets from the room
         io.in(roomID).socketsLeave(roomID);
-        
-        // Delete room from memory
         delete rooms[roomID];
-        
-        // Update lobby
         broadcastRooms();
         console.log(`Room ${roomID} disbanded.`);
     });
 
     /**
      * CREATE ROOM
-     * Initialize a new game room
      */
-    socket.on('createRoom', ({ roomID, playerName, maxPlayers, userID }) => {
-        // Validation
+    socket.on('createRoom', ({ roomID, playerName, maxPlayers, userID, equippedTitle }) => {
         if (!roomID || !playerName || !userID) {
             return socket.emit('errorMsg', 'Missing required fields');
         }
@@ -160,7 +166,6 @@ io.on('connection', (socket) => {
             return socket.emit('errorMsg', `Max players must be ${MIN_PLAYERS}-${MAX_PLAYERS}`);
         }
         
-        // Create room
         rooms[roomID] = {
             id: roomID, 
             maxPlayers: max,
@@ -168,7 +173,10 @@ io.on('connection', (socket) => {
                 id: socket.id, 
                 name: playerName, 
                 userID: userID, 
-                hand: [] 
+                hand: [],
+                equippedTitle: equippedTitle || null,
+                gameStats: null,
+                rematchReady: false
             }],
             turn: 0, 
             table: [], 
@@ -176,7 +184,9 @@ io.on('connection', (socket) => {
             isFirstMove: true, 
             discarded: [], 
             gameStarted: false,
-            resolving: false // NEW: Prevent plays during resolution
+            resolving: false,
+            gameNumber: 0,
+            finishOrder: []
         };
         
         socket.join(roomID);
@@ -187,10 +197,8 @@ io.on('connection', (socket) => {
 
     /**
      * JOIN ROOM
-     * Add player to existing room
      */
-    socket.on('joinRoom', ({ roomID, playerName, userID }) => {
-        // Validation
+    socket.on('joinRoom', ({ roomID, playerName, userID, equippedTitle }) => {
         if (!roomID || !playerName || !userID) {
             return socket.emit('errorMsg', 'Missing required fields');
         }
@@ -200,14 +208,13 @@ io.on('connection', (socket) => {
             return socket.emit('errorMsg', 'Room not found!');
         }
         
-        // Check if player is reconnecting
         let existing = room.players.find(p => p.userID === userID);
         if (existing) {
             existing.id = socket.id;
+            existing.equippedTitle = equippedTitle || existing.equippedTitle;
             socket.join(roomID);
             console.log(`${playerName} rejoined room ${roomID}`);
         } else {
-            // New player
             if (room.players.length >= room.maxPlayers) {
                 return socket.emit('errorMsg', 'Room full!');
             }
@@ -220,7 +227,10 @@ io.on('connection', (socket) => {
                 id: socket.id, 
                 name: playerName, 
                 userID: userID, 
-                hand: [] 
+                hand: [],
+                equippedTitle: equippedTitle || null,
+                gameStats: null,
+                rematchReady: false
             });
             socket.join(roomID);
             console.log(`${playerName} joined room ${roomID}`);
@@ -231,8 +241,21 @@ io.on('connection', (socket) => {
     });
 
     /**
+     * UPDATE EQUIPPED TITLE
+     */
+    socket.on('updateTitle', ({ roomID, userID, title }) => {
+        const room = rooms[roomID];
+        if (!room) return;
+        
+        const player = room.players.find(p => p.userID === userID);
+        if (player) {
+            player.equippedTitle = title;
+            io.to(roomID).emit('updatePlayers', room.players);
+        }
+    });
+
+    /**
      * START GAME
-     * Deal cards and begin the duel
      */
     socket.on('startGame', (roomID) => {
         const room = rooms[roomID];
@@ -246,6 +269,14 @@ io.on('connection', (socket) => {
         room.resolving = false;
         room.table = [];
         room.currentSuit = null;
+        room.gameNumber = (room.gameNumber || 0) + 1;
+        room.finishOrder = [];
+        
+        // Reset rematch flags
+        room.players.forEach(p => {
+            p.rematchReady = false;
+            initPlayerGameStats(p);
+        });
         
         let deck = generateDeck();
         room.discarded = [];
@@ -258,7 +289,6 @@ io.on('connection', (socket) => {
                 if (card.rank === 'A') aceIndices.push(idx); 
             });
             
-            // Randomly select aces to remove
             shuffle(aceIndices);
             let toRemove = aceIndices.slice(0, discardCount).sort((a, b) => b - a);
             toRemove.forEach(idx => { 
@@ -284,15 +314,46 @@ io.on('connection', (socket) => {
             players: room.players, 
             turn: room.turn, 
             discarded: room.discarded,
-            isFirstMove: room.isFirstMove
+            isFirstMove: room.isFirstMove,
+            gameNumber: room.gameNumber
         });
         
-        console.log(`Game started in room ${roomID}. ${room.players[room.turn].name} has K♠`);
+        console.log(`Game #${room.gameNumber} started in room ${roomID}. ${room.players[room.turn].name} has K♠`);
+    });
+
+    /**
+     * REMATCH - Player ready
+     */
+    socket.on('rematchReady', ({ roomID, userID }) => {
+        const room = rooms[roomID];
+        if (!room) return;
+        
+        const player = room.players.find(p => p.userID === userID);
+        if (player) {
+            player.rematchReady = true;
+            
+            // Check if all players are ready
+            const allReady = room.players.every(p => p.rematchReady);
+            
+            io.to(roomID).emit('rematchStatus', {
+                readyCount: room.players.filter(p => p.rematchReady).length,
+                totalCount: room.players.length,
+                allReady
+            });
+            
+            // Auto-start if all ready
+            if (allReady) {
+                setTimeout(() => {
+                    if (rooms[roomID]) {
+                        socket.emit('startGame', roomID);
+                    }
+                }, 1000);
+            }
+        }
     });
 
     /**
      * HAND SWAP - Send Request
-     * Request to absorb next player's hand
      */
     socket.on('sendSwapRequest', ({ roomID, fromUserID }) => {
         const room = rooms[roomID];
@@ -303,7 +364,6 @@ io.on('connection', (socket) => {
             return socket.emit('errorMsg', 'Player not found');
         }
         
-        // Find next player with cards
         let targetIdx = (myIdx + 1) % room.players.length;
         let attempts = 0;
         
@@ -326,7 +386,6 @@ io.on('connection', (socket) => {
 
     /**
      * HAND SWAP - Accept Request
-     * Target player accepts absorption
      */
     socket.on('acceptSwap', ({ roomID, fromUserID, myUserID }) => {
         const room = rooms[roomID];
@@ -339,7 +398,6 @@ io.on('connection', (socket) => {
             return socket.emit('errorMsg', 'Invalid swap participants');
         }
         
-        // Requester absorbs accepter's hand
         requester.hand.push(...accepter.hand);
         accepter.hand = [];
         
@@ -358,19 +416,16 @@ io.on('connection', (socket) => {
     });
 
     /**
-     * PLAY CARD
-     * Core game logic
+     * PLAY CARD - Core game logic
      */
     socket.on('playCard', ({ roomID, cardObject }) => {
         const room = rooms[roomID];
         if (!room) return;
         
-        // Prevent plays during round resolution
         if (room.resolving) {
             return socket.emit('errorMsg', 'Round is being resolved, please wait...');
         }
         
-        // Validate it's player's turn
         if (room.players[room.turn].id !== socket.id) {
             return socket.emit('errorMsg', 'Not your turn!');
         }
@@ -394,7 +449,7 @@ io.on('connection', (socket) => {
             room.isFirstMove = false;
         }
 
-        // RULE 2: Must follow suit if possible (Pangkah detection)
+        // RULE 2: Must follow suit if possible
         if (room.table.length > 0 && playedCard.suit !== room.currentSuit) {
             if (player.hand.some(c => c.suit === room.currentSuit)) {
                 return socket.emit('errorMsg', `Must follow suit: ${room.currentSuit}`);
@@ -408,6 +463,11 @@ io.on('connection', (socket) => {
             playerName: player.name, 
             card: playedCard 
         });
+        
+        // Track stats
+        if (player.gameStats) {
+            player.gameStats.cardsPlayed++;
+        }
         
         // Set lead suit if first card
         if (room.table.length === 1) {
@@ -424,20 +484,20 @@ io.on('connection', (socket) => {
         // Determine if Pangkah occurred
         let isPangkah = playedCard.suit !== room.currentSuit;
         
-        // Count active players (those with cards OR who just played their last card this round)
-        let playersInRound = room.players.filter(p => 
-            p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p))
-        ).length;
+        // Track pangkah stats
+        if (isPangkah && player.gameStats) {
+            player.gameStats.pangkahsDealt++;
+        }
         
-        // Check if round is complete (everyone who should play has played)
-        let activePlayers = room.players.filter(p => p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p)));
+        // Count active players
+        let activePlayers = room.players.filter(p => 
+            p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p))
+        );
         let roundComplete = room.table.length >= activePlayers.length;
 
         if (isPangkah || roundComplete) {
-            // Lock the room to prevent more plays
             room.resolving = true;
             
-            // Resolve the round after delay
             setTimeout(() => {
                 // Find winner (highest card of lead suit)
                 let winnerIdx = -1;
@@ -450,33 +510,81 @@ io.on('connection', (socket) => {
                     }
                 });
                 
-                // Fallback: if no one played lead suit (shouldn't happen)
                 if (winnerIdx === -1) {
                     winnerIdx = room.table[0].playerIdx;
                     console.warn('Warning: No player played lead suit!');
                 }
                 
+                const winner = room.players[winnerIdx];
+                
                 // Handle round outcome
                 if (isPangkah) {
-                    // Pangkah: winner takes all cards
-                    room.players[winnerIdx].hand.push(...room.table.map(t => t.card));
+                    // Track comeback potential
+                    const cardsBefore = winner.hand.length;
+                    
+                    winner.hand.push(...room.table.map(t => t.card));
+                    
+                    // Track stats
+                    if (winner.gameStats) {
+                        winner.gameStats.pangkahsReceived++;
+                        
+                        // Check for most cards
+                        const maxCards = Math.max(...room.players.map(p => p.hand.length));
+                        if (winner.hand.length === maxCards && winner.hand.length >= 15) {
+                            winner.gameStats.hadMostCards = true;
+                        }
+                    }
                 } else {
-                    // Clean round: discard all cards
+                    // Clean round
                     room.discarded.push(...room.table.map(t => t.card));
+                    
+                    if (winner.gameStats) {
+                        winner.gameStats.cleanWins++;
+                    }
                 }
                 
                 // Check for game over
                 let survivors = room.players.filter(p => p.hand.length > 0);
                 
+                // Track finish order
+                room.players.forEach((p, idx) => {
+                    if (p.hand.length === 0 && !room.finishOrder.includes(p.userID)) {
+                        room.finishOrder.push(p.userID);
+                        p.gameStats.finishPosition = room.finishOrder.length;
+                        
+                        // Check for comeback achievement
+                        if (p.gameStats.hadMostCards && p.gameStats.finishPosition <= 2) {
+                            p.gameStats.comebacks++;
+                        }
+                    }
+                });
+                
                 if (survivors.length <= 1) {
+                    // Game over - mark loser
+                    if (survivors[0]) {
+                        survivors[0].gameStats.finishPosition = room.players.length;
+                        room.finishOrder.push(survivors[0].userID);
+                    }
+                    
+                    // Calculate performance bonuses for each player
+                    const performanceData = room.players.map(p => ({
+                        userID: p.userID,
+                        name: p.name,
+                        position: p.gameStats.finishPosition,
+                        stats: p.gameStats,
+                        equippedTitle: p.equippedTitle
+                    }));
+                    
                     io.to(roomID).emit('gameOver', { 
                         loser: survivors[0]?.name || 'None',
-                        loserUserID: survivors[0]?.userID || null
+                        loserUserID: survivors[0]?.userID || null,
+                        finishOrder: room.finishOrder,
+                        performanceData,
+                        gameNumber: room.gameNumber
                     });
                     
-                    console.log(`Game over in room ${roomID}. Loser: ${survivors[0]?.name || 'None'}`);
+                    console.log(`Game #${room.gameNumber} over in room ${roomID}. Loser: ${survivors[0]?.name || 'None'}`);
                     
-                    // Reset room for potential restart instead of deleting
                     room.gameStarted = false;
                     room.resolving = false;
                     room.table = [];
@@ -485,8 +593,7 @@ io.on('connection', (socket) => {
                     
                     broadcastRooms();
                 } else {
-                    // Continue game - find next active player
-                    // If winner has no cards, find next player with cards
+                    // Continue game
                     if (room.players[winnerIdx].hand.length === 0) {
                         room.turn = getNextActivePlayer(room, winnerIdx);
                     } else {
@@ -499,7 +606,8 @@ io.on('connection', (socket) => {
                     
                     io.to(roomID).emit('clearTable', { 
                         turn: room.turn, 
-                        winner: room.players[winnerIdx].name, 
+                        winner: winner.name,
+                        winnerUserID: winner.userID,
                         players: room.players,
                         discarded: room.discarded,
                         msg: isPangkah ? "Pangkah!" : "Clean"
@@ -507,7 +615,6 @@ io.on('connection', (socket) => {
                 }
             }, ROUND_RESOLUTION_DELAY);
         } else {
-            // Move to next active player
             let nextIdx = getNextActivePlayer(room, room.turn);
             
             if (nextIdx === -1) {
@@ -527,15 +634,11 @@ io.on('connection', (socket) => {
 
     /**
      * DISCONNECT HANDLER
-     * Clean up when player disconnects
      */
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
-        
-        // Optional: Mark player as disconnected but keep them in game
-        // for potential reconnection via checkSession
     });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🎴 Pangkah Server active on port ${PORT}`));
+server.listen(PORT, () => console.log(`🎴 Pangkah Server v2 active on port ${PORT}`));

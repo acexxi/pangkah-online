@@ -269,21 +269,21 @@ io.on('connection', (socket) => {
     });
 
     /**
-     * START GAME
+     * START GAME - Core Logic
      */
-    socket.on('startGame', (roomID) => {
+    function startGameForRoom(roomID) {
         const room = rooms[roomID];
-        if (!room) return;
+        if (!room) return false;
         
         const playerCount = room.players.length;
         
         if (playerCount < MIN_PLAYERS) {
-            return socket.emit('errorMsg', `Need at least ${MIN_PLAYERS} players to start`);
+            return false;
         }
         
         // Check if player count is valid (has a fate config)
         if (FATE_CONFIG[playerCount] === undefined) {
-            return socket.emit('errorMsg', `Cannot start with ${playerCount} players. Valid: 4, 5, 6, 7, 8, or 10 players.`);
+            return false;
         }
         
         room.gameStarted = true;
@@ -341,6 +341,27 @@ io.on('connection', (socket) => {
         });
         
         console.log(`Game #${room.gameNumber} started in room ${roomID} with ${playerCount} players. ${room.players[room.turn].name} has K♠`);
+        return true;
+    }
+
+    /**
+     * START GAME - Socket Handler
+     */
+    socket.on('startGame', (roomID) => {
+        const room = rooms[roomID];
+        if (!room) return;
+        
+        const playerCount = room.players.length;
+        
+        if (playerCount < MIN_PLAYERS) {
+            return socket.emit('errorMsg', `Need at least ${MIN_PLAYERS} players to start`);
+        }
+        
+        if (FATE_CONFIG[playerCount] === undefined) {
+            return socket.emit('errorMsg', `Cannot start with ${playerCount} players. Valid: 4, 5, 6, 7, 8, or 10 players.`);
+        }
+        
+        startGameForRoom(roomID);
     });
 
     /**
@@ -366,10 +387,8 @@ io.on('connection', (socket) => {
             // Auto-start if all ready
             if (allReady) {
                 setTimeout(() => {
-                    if (rooms[roomID]) {
-                        socket.emit('startGame', roomID);
-                    }
-                }, 1000);
+                    startGameForRoom(roomID);
+                }, 1500);
             }
         }
     });

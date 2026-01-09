@@ -756,7 +756,7 @@ io.on('connection', (socket) => {
     });
 
     /**
-     * HAND SWAP - Send Request
+     * HAND SWAP - Send Request (only allowed on your turn)
      */
     socket.on('sendSwapRequest', ({ roomID, fromUserID }) => {
         const room = rooms[roomID];
@@ -765,6 +765,11 @@ io.on('connection', (socket) => {
         const myIdx = room.players.findIndex(p => p.userID === fromUserID);
         if (myIdx === -1) {
             return socket.emit('errorMsg', 'Player not found');
+        }
+        
+        // Check if it's the requester's turn
+        if (room.turn !== myIdx) {
+            return socket.emit('errorMsg', 'You can only take hand on your turn!');
         }
         
         let targetIdx = (myIdx + 1) % room.players.length;

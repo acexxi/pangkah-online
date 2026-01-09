@@ -769,7 +769,7 @@ io.on('connection', (socket) => {
         
         // Check if it's the requester's turn
         if (room.turn !== myIdx) {
-            return socket.emit('errorMsg', 'You can only take hand on your turn!');
+            return socket.emit('errorMsg', 'Wait for your turn!');
         }
         
         let targetIdx = (myIdx + 1) % room.players.length;

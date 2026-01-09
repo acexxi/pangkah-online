@@ -136,9 +136,9 @@
         #turn-glow::before { content: ''; position: absolute; inset: 0; border: 4px solid var(--primary-action); border-radius: 0; box-shadow: inset 0 0 60px var(--primary-action), 0 0 30px var(--primary-action); animation: glowPulse 1.5s ease-in-out infinite; }
         @keyframes glowPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
         
-        /* Quick Emotes */
-        #emote-bar { position: fixed; bottom: 30vh; right: 10px; display: flex; flex-direction: column; gap: 8px; z-index: 3000; background: var(--glass-heavy); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); padding: 10px; border-radius: 28px; border: 1px solid var(--border-light); box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
-        .emote-btn { width: 40px; height: 40px; border-radius: 50%; background: var(--glass-light); border: 1px solid var(--border); font-size: 18px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+        /* Quick Emotes - in hand area */
+        #emote-bar { display: flex; flex-direction: row; gap: 6px; background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 6px 10px; border-radius: 20px; border: 1px solid var(--border-light); }
+        .emote-btn { width: 32px; height: 32px; border-radius: 50%; background: var(--glass-light); border: 1px solid var(--border); font-size: 16px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
         .emote-btn:hover { transform: scale(1.15); background: rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(255,255,255,0.1); }
         .emote-btn:active { transform: scale(0.95); }
         .emote-float { position: fixed; font-size: 48px; pointer-events: none; z-index: 10005; animation: emoteFloat 2s ease forwards; }
@@ -162,16 +162,6 @@
 
 <!-- Screen Edge Glow for Your Turn -->
 <div id="turn-glow"></div>
-
-<!-- Quick Emotes Bar -->
-<div id="emote-bar">
-    <button class="emote-btn" onclick="sendEmote('😂')">😂</button>
-    <button class="emote-btn" onclick="sendEmote('👍')">👍</button>
-    <button class="emote-btn" onclick="sendEmote('😡')">😡</button>
-    <button class="emote-btn" onclick="sendEmote('🔥')">🔥</button>
-    <button class="emote-btn" onclick="sendEmote('💀')">💀</button>
-    <button class="emote-btn" onclick="sendEmote('👏')">👏</button>
-</div>
 
 <div class="modal-overlay" id="profile-modal">
     <div class="profile-card">
@@ -242,12 +232,12 @@
         <div class="room-list" id="room-box"></div>
         <input id="rid" placeholder="Enter Sect ID" maxlength="20">
         <select id="maxp">
-            <option value="4">4 Players (0 Fate)</option>
-            <option value="5">5 Players (2 Fate)</option>
-            <option value="6">6 Players (4 Fate)</option>
-            <option value="7">7 Players (3 Fate)</option>
-            <option value="8">8 Players (4 Fate)</option>
-            <option value="10">10 Players (2 Fate)</option>
+            <option value="4">4 Players</option>
+            <option value="5">5 Players</option>
+            <option value="6">6 Players</option>
+            <option value="7">7 Players</option>
+            <option value="8">8 Players</option>
+            <option value="10">10 Players</option>
         </select>
         <button class="btn btn-p" onclick="enter('create')">CREATE SECT</button>
         <button class="btn btn-s" onclick="enter('join')" style="margin-top:8px">JOIN SECT</button>
@@ -277,6 +267,14 @@
     <div class="hand-header">
         <div id="turn-indicator-inline">⚡ YOUR TURN</div>
         <button class="btn" style="width:auto;padding:6px 18px;font-size:11px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid var(--border-light);border-radius:12px" onclick="sortHand()">SORT ⇅</button>
+        <div id="emote-bar">
+            <button class="emote-btn" onclick="sendEmote('😂')">😂</button>
+            <button class="emote-btn" onclick="sendEmote('👍')">👍</button>
+            <button class="emote-btn" onclick="sendEmote('😡')">😡</button>
+            <button class="emote-btn" onclick="sendEmote('🔥')">🔥</button>
+            <button class="emote-btn" onclick="sendEmote('💀')">💀</button>
+            <button class="emote-btn" onclick="sendEmote('👏')">👏</button>
+        </div>
     </div>
     <div class="hand-flex" id="my-cards"></div>
 </div>

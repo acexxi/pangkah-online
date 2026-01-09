@@ -243,13 +243,18 @@
     <div class="panel">
         <img src="/PM-logo.png" alt="Pangkah Murim" class="murim-logo">
         <div style="margin-bottom:20px;padding:15px;background:rgba(255,255,255,0.03);border-radius:20px;border:1px solid var(--border)">
-            <div style="display:flex;justify-content:center;align-items:center;gap:8px">
-                <span id="display-name" style="color:var(--ui-blue);font-size:1.1rem;font-weight:800"></span>
-                <span onclick="editName()" style="color:var(--primary-action);cursor:pointer;font-size:0.7rem">[EDIT]</span>
+            <div style="display:flex;align-items:center;gap:15px">
+                <img id="lobby-badge" src="/badge/apprentice-badge.png" alt="badge" style="width:52px;height:52px;flex-shrink:0">
+                <div style="flex:1;text-align:left">
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <span id="display-name" style="color:var(--ui-blue);font-size:1rem;font-weight:800"></span>
+                        <span onclick="editName()" style="color:var(--primary-action);cursor:pointer;font-size:0.65rem">[EDIT]</span>
+                    </div>
+                    <div id="lobby-title" style="margin:4px 0;min-height:16px"></div>
+                    <div id="level-title" style="color:var(--primary-action);font-size:11px">LEVEL 1 - APPRENTICE</div>
+                </div>
             </div>
-            <div id="lobby-title" style="margin:8px 0"></div>
-            <div id="level-title" style="color:var(--primary-action);font-size:12px">LEVEL 1</div>
-            <button class="btn btn-s" onclick="openProfile()" style="margin-top:12px">VIEW PROFILE 📜</button>
+            <button class="btn btn-s" onclick="openProfile()" style="margin-top:12px;width:100%">VIEW PROFILE</button>
         </div>
         <div class="room-list" id="room-box"></div>
         <input id="rid" placeholder="Enter Sect ID" maxlength="20">
@@ -596,7 +601,7 @@ function getRankTitle(l){return l<=5?'APPRENTICE':l<=10?'WARRIOR':l<=15?'MASTER'
 function getBadgeImage(l){return l<=5?'/badge/apprentice-badge.png':l<=10?'/badge/warrior-badge.png':l<=15?'/badge/master-badge.png':l<=20?'/badge/grandmaster-badge.png':l<=30?'/badge/elder-badge.png':l<=50?'/badge/sectleader-badge.png':'/badge/ancientancestor-badge.png';}
 function saveStats(){localStorage.setItem('pStats',JSON.stringify(stats));}
 function addXP(amt,reason,popup=true){const old=getLevel();stats.xp=Math.max(0,(stats.xp||0)+amt);saveStats();if(getLevel()>old)showToast(`⚡ LEVEL UP! Lv.${getLevel()}`,true);if(popup&&amt){const p=document.createElement('div');p.className='xp-popup';p.style.color=amt>0?'var(--primary-action)':'var(--danger)';p.innerText=`${amt>0?'+':''}${amt} XP`;document.body.appendChild(p);setTimeout(()=>p.remove(),1500);}updateStatsUI();checkAllTitles();}
-function updateStatsUI(){const lv=getLevel(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('level-title').innerText=`LEVEL ${lv} - ${rt}`;document.getElementById('lobby-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:10px">${eq.icon} ${eq.name}</span>`:'';document.getElementById('prof-level').innerText=`LEVEL ${lv}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;}
+function updateStatsUI(){const lv=getLevel(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('level-title').innerText=`LEVEL ${lv} - ${rt}`;document.getElementById('lobby-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:10px">${eq.icon} ${eq.name}</span>`:'';document.getElementById('lobby-badge').src=getBadgeImage(lv);document.getElementById('prof-level').innerText=`LEVEL ${lv}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;}
 function editName(){const n=prompt("Enter Name:",myName);if(n?.trim()&&n.trim().length<=20){myName=n.trim();localStorage.setItem('pName',myName);updateStatsUI();}}
 function openProfile(){updateStatsUI();document.getElementById('profile-modal').style.display='flex';}
 function closeProfile(){document.getElementById('profile-modal').style.display='none';}

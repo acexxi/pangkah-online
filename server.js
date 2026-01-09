@@ -12,6 +12,7 @@ app.use(express.static('public'));
 const ROUND_RESOLUTION_DELAY = 1500;
 const MIN_PLAYERS = 4;
 const MAX_PLAYERS = 10;
+const TURN_TIMER_SECONDS = 15;
 
 // Fate configuration: how many aces to discard per player count
 const FATE_CONFIG = {
@@ -24,6 +25,7 @@ const FATE_CONFIG = {
 };
 
 let rooms = {};
+let turnTimers = {}; // Store turn timers per room
 
 /**
  * Fisher-Yates shuffle - unbiased randomization
@@ -49,6 +51,305 @@ function generateDeck() {
     let deck = [];
     suits.forEach(s => ranks.forEach(r => deck.push({ suit: s, rank: r.n, val: r.v })));
     return shuffle(deck);
+}
+
+/**
+ * Clear turn timer for a room
+ */
+function clearTurnTimer(roomID) {
+    if (turnTimers[roomID]) {
+        clearTimeout(turnTimers[roomID].timeout);
+        clearInterval(turnTimers[roomID].interval);
+        delete turnTimers[roomID];
+    }
+}
+
+/**
+ * Start turn timer for current player
+ */
+function startTurnTimer(roomID) {
+    const room = rooms[roomID];
+    if (!room || !room.gameStarted) return;
+    
+    // Clear existing timer
+    clearTurnTimer(roomID);
+    
+    const player = room.players[room.turn];
+    if (!player || player.hand.length === 0) return;
+    
+    let timeLeft = TURN_TIMER_SECONDS;
+    
+    // Emit initial timer
+    io.to(roomID).emit('turnTimer', { timeLeft, playerIdx: room.turn });
+    
+    // Countdown interval
+    turnTimers[roomID] = {
+        interval: setInterval(() => {
+            timeLeft--;
+            io.to(roomID).emit('turnTimer', { timeLeft, playerIdx: room.turn });
+            if (timeLeft <= 0) {
+                clearInterval(turnTimers[roomID]?.interval);
+            }
+        }, 1000),
+        timeout: setTimeout(() => {
+            autoPlayCard(roomID);
+        }, TURN_TIMER_SECONDS * 1000)
+    };
+}
+
+/**
+ * Auto-play card when timer expires
+ */
+function autoPlayCard(roomID) {
+    const room = rooms[roomID];
+    if (!room || room.resolving) return;
+    
+    const player = room.players[room.turn];
+    if (!player || player.hand.length === 0) return;
+    
+    let cardToPlay = null;
+    
+    // First move - must play King of Spades
+    if (room.isFirstMove) {
+        cardToPlay = player.hand.find(c => c.suit === 'Spades' && c.rank === 'K');
+    } 
+    // Has lead suit - play highest of that suit
+    else if (room.currentSuit) {
+        const suitCards = player.hand.filter(c => c.suit === room.currentSuit);
+        if (suitCards.length > 0) {
+            cardToPlay = suitCards.reduce((max, c) => c.val > max.val ? c : max);
+        }
+    }
+    
+    // No lead suit or starting new round - play lowest card
+    if (!cardToPlay) {
+        cardToPlay = player.hand.reduce((min, c) => c.val < min.val ? c : min);
+    }
+    
+    if (cardToPlay) {
+        console.log(`Auto-play for ${player.name}: ${cardToPlay.rank} of ${cardToPlay.suit}`);
+        
+        // Emit auto-play notification
+        io.to(roomID).emit('autoPlayed', { 
+            playerName: player.name, 
+            card: cardToPlay 
+        });
+        
+        // Process the card play (simulate the playCard logic)
+        processCardPlay(roomID, room.turn, cardToPlay);
+    }
+}
+
+/**
+ * Process card play (shared logic for manual and auto play)
+ */
+function processCardPlay(roomID, playerIdx, cardObject) {
+    const room = rooms[roomID];
+    if (!room) return;
+    
+    const player = room.players[playerIdx];
+    const cardIndex = player.hand.findIndex(c => 
+        c.suit === cardObject.suit && c.rank === cardObject.rank
+    );
+    
+    if (cardIndex === -1) return;
+    
+    const playedCard = player.hand[cardIndex];
+    
+    // Clear timer
+    clearTurnTimer(roomID);
+    
+    // Update first move flag
+    if (room.isFirstMove) {
+        room.isFirstMove = false;
+    }
+
+    // Play the card
+    player.hand.splice(cardIndex, 1);
+    room.table.push({ 
+        playerIdx: playerIdx, 
+        playerName: player.name, 
+        card: playedCard 
+    });
+    
+    // Track stats
+    if (player.gameStats) {
+        player.gameStats.cardsPlayed++;
+    }
+    
+    // Set lead suit if first card
+    if (room.table.length === 1) {
+        room.currentSuit = playedCard.suit;
+    }
+
+    io.to(roomID).emit('updateTable', { 
+        table: room.table, 
+        turn: room.turn, 
+        players: room.players,
+        currentSuit: room.currentSuit
+    });
+
+    // Determine if Pangkah occurred
+    let isPangkah = playedCard.suit !== room.currentSuit;
+    
+    // Track pangkah stats
+    if (isPangkah && player.gameStats) {
+        player.gameStats.pangkahsDealt++;
+    }
+    
+    // Count active players
+    let activePlayers = room.players.filter(p => 
+        p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p))
+    );
+    let roundComplete = room.table.length >= activePlayers.length;
+
+    if (isPangkah || roundComplete) {
+        room.resolving = true;
+        
+        setTimeout(() => {
+            resolveRound(roomID, isPangkah);
+        }, ROUND_RESOLUTION_DELAY);
+    } else {
+        // Next player's turn
+        advanceToNextPlayer(roomID);
+    }
+}
+
+/**
+ * Advance to next player with cards
+ */
+function advanceToNextPlayer(roomID) {
+    const room = rooms[roomID];
+    if (!room) return;
+    
+    let nextTurn = (room.turn + 1) % room.players.length;
+    let attempts = 0;
+    
+    while (room.players[nextTurn].hand.length === 0 && attempts < room.players.length) {
+        nextTurn = (nextTurn + 1) % room.players.length;
+        attempts++;
+    }
+    
+    room.turn = nextTurn;
+    
+    io.to(roomID).emit('nextTurn', { 
+        turn: room.turn, 
+        players: room.players,
+        currentSuit: room.currentSuit
+    });
+    
+    // Start timer for next player
+    startTurnTimer(roomID);
+}
+
+/**
+ * Resolve round (pangkah or clean)
+ */
+function resolveRound(roomID, isPangkah) {
+    const room = rooms[roomID];
+    if (!room) return;
+    
+    // Find winner (highest card of lead suit)
+    let winnerIdx = -1;
+    let highVal = -1;
+    
+    room.table.forEach(t => {
+        if (t.card.suit === room.currentSuit && t.card.val > highVal) {
+            highVal = t.card.val;
+            winnerIdx = t.playerIdx;
+        }
+    });
+    
+    if (winnerIdx === -1) {
+        winnerIdx = room.table[0].playerIdx;
+        console.warn('Warning: No player played lead suit!');
+    }
+    
+    const winner = room.players[winnerIdx];
+    
+    // Handle round outcome
+    if (isPangkah) {
+        winner.hand.push(...room.table.map(t => t.card));
+        
+        if (winner.gameStats) {
+            winner.gameStats.pangkahsReceived++;
+            const maxCards = Math.max(...room.players.map(p => p.hand.length));
+            if (winner.hand.length === maxCards && winner.hand.length >= 15) {
+                winner.gameStats.hadMostCards = true;
+            }
+        }
+    } else {
+        room.discarded.push(...room.table.map(t => t.card));
+        if (winner.gameStats) {
+            winner.gameStats.cleanWins++;
+        }
+    }
+    
+    // Check for game over
+    let survivors = room.players.filter(p => p.hand.length > 0);
+    
+    // Track finish order
+    room.players.forEach((p, idx) => {
+        if (p.hand.length === 0 && !room.finishOrder.includes(p.userID)) {
+            room.finishOrder.push(p.userID);
+            p.gameStats.finishPosition = room.finishOrder.length;
+            
+            if (p.gameStats.hadMostCards && p.gameStats.finishPosition <= 2) {
+                p.gameStats.comebacks++;
+            }
+        }
+    });
+    
+    if (survivors.length <= 1) {
+        // Game over
+        clearTurnTimer(roomID);
+        
+        if (survivors[0]) {
+            survivors[0].gameStats.finishPosition = room.players.length;
+            room.finishOrder.push(survivors[0].userID);
+        }
+        
+        const performanceData = room.players.map(p => ({
+            userID: p.userID,
+            name: p.name,
+            position: p.gameStats.finishPosition,
+            stats: p.gameStats,
+            equippedTitle: p.equippedTitle
+        }));
+        
+        io.to(roomID).emit('gameOver', { 
+            loser: survivors[0]?.name || 'None',
+            loserUserID: survivors[0]?.userID || null,
+            finishOrder: room.finishOrder,
+            gameNumber: room.gameNumber,
+            performanceData
+        });
+        
+        room.gameStarted = false;
+        broadcastRooms();
+        
+        console.log(`Game #${room.gameNumber} ended in room ${roomID}. Loser: ${survivors[0]?.name || 'None'}`);
+    } else {
+        // Continue game
+        room.table = [];
+        room.currentSuit = null;
+        room.turn = winnerIdx;
+        room.resolving = false;
+        
+        io.to(roomID).emit('clearTable', { 
+            msg: isPangkah ? 'Pangkah!' : 'Clean!', 
+            winner: winner.name,
+            winnerUserID: winner.userID,
+            turn: room.turn, 
+            players: room.players,
+            fateAces: room.fateAces
+        });
+        
+        // Start timer for winner (next round leader)
+        setTimeout(() => {
+            startTurnTimer(roomID);
+        }, 500);
+    }
 }
 
 /**
@@ -340,6 +641,11 @@ io.on('connection', (socket) => {
             gameNumber: room.gameNumber
         });
         
+        // Start turn timer for first player
+        setTimeout(() => {
+            startTurnTimer(roomID);
+        }, 1000);
+        
         console.log(`Game #${room.gameNumber} started in room ${roomID} with ${playerCount} players. ${room.players[room.turn].name} has K♠`);
         return true;
     }
@@ -487,7 +793,6 @@ io.on('connection', (socket) => {
             if (playedCard.suit !== 'Spades' || playedCard.rank !== 'K') {
                 return socket.emit('errorMsg', "First move MUST be King of Spades!");
             }
-            room.isFirstMove = false;
         }
 
         // RULE 2: Must follow suit if possible
@@ -497,180 +802,8 @@ io.on('connection', (socket) => {
             }
         }
 
-        // Play the card
-        player.hand.splice(cardIndex, 1);
-        room.table.push({ 
-            playerIdx: room.turn, 
-            playerName: player.name, 
-            card: playedCard 
-        });
-        
-        // Track stats
-        if (player.gameStats) {
-            player.gameStats.cardsPlayed++;
-        }
-        
-        // Set lead suit if first card
-        if (room.table.length === 1) {
-            room.currentSuit = playedCard.suit;
-        }
-
-        io.to(roomID).emit('updateTable', { 
-            table: room.table, 
-            turn: room.turn, 
-            players: room.players,
-            currentSuit: room.currentSuit
-        });
-
-        // Determine if Pangkah occurred
-        let isPangkah = playedCard.suit !== room.currentSuit;
-        
-        // Track pangkah stats
-        if (isPangkah && player.gameStats) {
-            player.gameStats.pangkahsDealt++;
-        }
-        
-        // Count active players
-        let activePlayers = room.players.filter(p => 
-            p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p))
-        );
-        let roundComplete = room.table.length >= activePlayers.length;
-
-        if (isPangkah || roundComplete) {
-            room.resolving = true;
-            
-            setTimeout(() => {
-                // Find winner (highest card of lead suit)
-                let winnerIdx = -1;
-                let highVal = -1;
-                
-                room.table.forEach(t => {
-                    if (t.card.suit === room.currentSuit && t.card.val > highVal) {
-                        highVal = t.card.val;
-                        winnerIdx = t.playerIdx;
-                    }
-                });
-                
-                if (winnerIdx === -1) {
-                    winnerIdx = room.table[0].playerIdx;
-                    console.warn('Warning: No player played lead suit!');
-                }
-                
-                const winner = room.players[winnerIdx];
-                
-                // Handle round outcome
-                if (isPangkah) {
-                    // Track comeback potential
-                    const cardsBefore = winner.hand.length;
-                    
-                    winner.hand.push(...room.table.map(t => t.card));
-                    
-                    // Track stats
-                    if (winner.gameStats) {
-                        winner.gameStats.pangkahsReceived++;
-                        
-                        // Check for most cards
-                        const maxCards = Math.max(...room.players.map(p => p.hand.length));
-                        if (winner.hand.length === maxCards && winner.hand.length >= 15) {
-                            winner.gameStats.hadMostCards = true;
-                        }
-                    }
-                } else {
-                    // Clean round
-                    room.discarded.push(...room.table.map(t => t.card));
-                    
-                    if (winner.gameStats) {
-                        winner.gameStats.cleanWins++;
-                    }
-                }
-                
-                // Check for game over
-                let survivors = room.players.filter(p => p.hand.length > 0);
-                
-                // Track finish order
-                room.players.forEach((p, idx) => {
-                    if (p.hand.length === 0 && !room.finishOrder.includes(p.userID)) {
-                        room.finishOrder.push(p.userID);
-                        p.gameStats.finishPosition = room.finishOrder.length;
-                        
-                        // Check for comeback achievement
-                        if (p.gameStats.hadMostCards && p.gameStats.finishPosition <= 2) {
-                            p.gameStats.comebacks++;
-                        }
-                    }
-                });
-                
-                if (survivors.length <= 1) {
-                    // Game over - mark loser
-                    if (survivors[0]) {
-                        survivors[0].gameStats.finishPosition = room.players.length;
-                        room.finishOrder.push(survivors[0].userID);
-                    }
-                    
-                    // Calculate performance bonuses for each player
-                    const performanceData = room.players.map(p => ({
-                        userID: p.userID,
-                        name: p.name,
-                        position: p.gameStats.finishPosition,
-                        stats: p.gameStats,
-                        equippedTitle: p.equippedTitle
-                    }));
-                    
-                    io.to(roomID).emit('gameOver', { 
-                        loser: survivors[0]?.name || 'None',
-                        loserUserID: survivors[0]?.userID || null,
-                        finishOrder: room.finishOrder,
-                        performanceData,
-                        gameNumber: room.gameNumber
-                    });
-                    
-                    console.log(`Game #${room.gameNumber} over in room ${roomID}. Loser: ${survivors[0]?.name || 'None'}`);
-                    
-                    room.gameStarted = false;
-                    room.resolving = false;
-                    room.table = [];
-                    room.currentSuit = null;
-                    room.isFirstMove = true;
-                    
-                    broadcastRooms();
-                } else {
-                    // Continue game
-                    if (room.players[winnerIdx].hand.length === 0) {
-                        room.turn = getNextActivePlayer(room, winnerIdx);
-                    } else {
-                        room.turn = winnerIdx;
-                    }
-                    
-                    room.table = [];
-                    room.currentSuit = null;
-                    room.resolving = false;
-                    
-                    io.to(roomID).emit('clearTable', { 
-                        turn: room.turn, 
-                        winner: winner.name,
-                        winnerUserID: winner.userID,
-                        players: room.players,
-                        fateAces: room.fateAces,
-                        msg: isPangkah ? "Pangkah!" : "Clean"
-                    });
-                }
-            }, ROUND_RESOLUTION_DELAY);
-        } else {
-            let nextIdx = getNextActivePlayer(room, room.turn);
-            
-            if (nextIdx === -1) {
-                console.error('No active players found!');
-                return;
-            }
-            
-            room.turn = nextIdx;
-            io.to(roomID).emit('nextTurn', { 
-                turn: room.turn, 
-                players: room.players, 
-                table: room.table,
-                currentSuit: room.currentSuit
-            });
-        }
+        // Process the card play
+        processCardPlay(roomID, room.turn, cardObject);
     });
 
     /**

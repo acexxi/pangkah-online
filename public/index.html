@@ -495,9 +495,10 @@ function render(players,turn,table=[]){
             y=bottomY;
         }
         
-        // Check if this player is next for swap
+        // Check if this player is next for swap (only if it's MY turn)
         let canSwap=false;
-        if(players.length>1&&i!==myIdx&&p.hand.length>0){
+        const isMyTurn=turn===myIdx;
+        if(isMyTurn&&players.length>1&&i!==myIdx&&p.hand.length>0){
             let nxt=(myIdx+1)%players.length,att=0;
             while(players[nxt].hand.length===0&&att<players.length){nxt=(nxt+1)%players.length;att++;}
             if(i===nxt&&att<players.length)canSwap=true;

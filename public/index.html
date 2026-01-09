@@ -93,6 +93,7 @@
         .hand-header { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 10px; }
         #turn-indicator-inline { background: var(--primary-action); color: #000; font-size: 11px; font-weight: 900; padding: 8px 16px; border-radius: 20px; display: none; animation: pulse-glow 1.5s infinite; }
         #turn-indicator-inline.active { display: flex; align-items: center; gap: 5px; }
+        #turn-timer { font-weight: 900; margin-left: 4px; }
         .hand-flex { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; padding-bottom: 20px; }
         .card { width: 50px; height: 75px; background: rgba(255,255,255,0.95); color: black; border-radius: 12px; padding: 6px; font-weight: 800; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 1px solid rgba(255,255,255,0.5); transition: transform 0.15s, box-shadow 0.15s; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
         .card:hover { transform: translateY(-8px); box-shadow: 0 12px 28px rgba(0,0,0,0.35); }
@@ -265,7 +266,7 @@
 
 <div id="hand-area">
     <div class="hand-header">
-        <div id="turn-indicator-inline">⚡ YOUR TURN</div>
+        <div id="turn-indicator-inline">⚡ YOUR TURN <span id="turn-timer"></span></div>
         <button class="btn" style="width:auto;padding:6px 18px;font-size:11px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid var(--border-light);border-radius:12px" onclick="sortHand()">SORT ⇅</button>
         <div id="emote-bar">
             <button class="emote-btn" onclick="sendEmote('😂')">😂</button>
@@ -433,6 +434,23 @@ socket.on('rematchStatus',d=>{document.getElementById('rematch-status').innerTex
 socket.on('gameOver',data=>{setTurnIndicator(false);stats.games=(stats.games||0)+1;const myPos=data.finishOrder.indexOf(userID)+1;if(myPos===1){stats.wins=(stats.wins||0)+1;stats.currentStreak=(stats.currentStreak||0)+1;if(stats.currentStreak>(stats.bestStreak||0))stats.bestStreak=stats.currentStreak;addXP(15+stats.currentStreak*2,`1st! Streak:${stats.currentStreak}`,false);launchConfetti();}else if(myPos===2){stats.secondPlace=(stats.secondPlace||0)+1;stats.topTwo=(stats.topTwo||0)+1;stats.currentStreak=0;addXP(8,"2nd Place",false);}else if(myPos===3){stats.thirdPlace=(stats.thirdPlace||0)+1;stats.currentStreak=0;addXP(5,"3rd Place",false);}else if(data.loserUserID===userID){stats.losses=(stats.losses||0)+1;stats.currentStreak=0;addXP(-2,"Defeated",false);}else{stats.currentStreak=0;addXP(3,`${myPos}th`,false);}if(myPos<=2)stats.topTwo=(stats.topTwo||0)+1;saveStats();checkAllTitles();updateStatsUI();document.getElementById('game-number').innerText=`Game #${data.gameNumber}`;document.getElementById('finish-list').innerHTML=data.performanceData.sort((a,b)=>a.position-b.position).map(p=>{const isW=p.position===1,isL=p.position===data.performanceData.length,isMe=p.userID===userID;let xp=isW?15:p.position===2?8:p.position===3?5:isL?-2:3;const tHtml=p.equippedTitle?`<span class="title-rarity ${p.equippedTitle.rarity}" style="font-size:8px;margin-left:5px">${p.equippedTitle.icon}</span>`:'';return`<div class="finish-item ${isW?'winner':''} ${isL?'loser':''}" style="${isMe?'border-width:2px':''}"><div style="font-size:18px;font-weight:800;width:30px">${isW?'👑':isL?'💀':'#'+p.position}</div><div style="flex:1;text-align:left;margin-left:10px;font-weight:600">${p.name}${tHtml}${isMe?' (You)':''}</div><div style="font-size:12px;color:var(--primary-action);font-weight:800">${xp>0?'+':''}${xp} XP</div></div>`;}).join('');const myData=data.performanceData.find(p=>p.userID===userID);let bonuses=[];if(myPos===1){bonuses.push({n:'🏆 Victory',x:15});if(stats.currentStreak>1)bonuses.push({n:`🔥 Streak x${stats.currentStreak}`,x:stats.currentStreak*2});}else if(myPos===2)bonuses.push({n:'🥈 2nd',x:8});else if(myPos===3)bonuses.push({n:'🥉 3rd',x:5});else if(data.loserUserID===userID)bonuses.push({n:'💀 Defeated',x:-2});if(myData?.stats?.pangkahsDealt)bonuses.push({n:`⚡ Pangkahs (${myData.stats.pangkahsDealt})`,x:myData.stats.pangkahsDealt*3});if(myData?.stats?.cleanWins)bonuses.push({n:`✨ Clean (${myData.stats.cleanWins})`,x:myData.stats.cleanWins});const total=bonuses.reduce((s,b)=>s+b.x,0);document.getElementById('bonus-list').innerHTML=`<div style="font-weight:800;margin-bottom:10px;color:var(--gold)">🎁 YOUR BONUSES</div>${bonuses.map(b=>`<div class="bonus-item"><span>${b.n}</span><span style="color:${b.x>=0?'var(--primary-action)':'var(--danger)'};font-weight:800">${b.x>0?'+':''}${b.x} XP</span></div>`).join('')}<div class="bonus-item" style="border-top:2px solid var(--gold);margin-top:10px;padding-top:10px"><span style="font-weight:800">TOTAL</span><span style="color:var(--gold);font-weight:800;font-size:16px">${total>0?'+':''}${total} XP</span></div>`;document.getElementById('rematch-btn').innerText='⚡ REMATCH';document.getElementById('rematch-btn').style.opacity='1';document.getElementById('rematch-status').innerText='Waiting...';rematchRequested=false;document.getElementById('gameover-modal').style.display='flex';});
 socket.on('receiveSwapRequest',d=>{pendingSwapRequest=d.fromUserID;document.getElementById('swap-txt').innerText=d.fromName+" wants your hand!";document.getElementById('swap-modal').style.display='block';let t=15;const timer=document.getElementById('swap-timer');timer.innerText=`${t}s`;const cd=setInterval(()=>{t--;timer.innerText=`${t}s`;if(t<=0)clearInterval(cd);},1000);swapTimeoutId=setTimeout(()=>{clearInterval(cd);if(pendingSwapRequest===d.fromUserID){answerSwap(false);showToast("Swap expired");}},15000);});
 socket.on('swapOccurred',d=>{playSound('absorb');showToast(d.msg,true);if(d.requesterUserID===userID){stats.handsAbsorbed=(stats.handsAbsorbed||0)+1;addXP(5,"Hand Absorbed!");}if(d.accepterUserID===userID)addXP(3,"Hand Given!");saveStats();checkAllTitles();update(d);});
+
+// Turn Timer
+socket.on('turnTimer',d=>{
+    const timerEl=document.getElementById('turn-timer');
+    if(d.timeLeft>0){
+        timerEl.innerText=`(${d.timeLeft}s)`;
+        timerEl.style.color=d.timeLeft<=5?'var(--danger)':'inherit';
+    }else{
+        timerEl.innerText='';
+    }
+});
+
+// Auto-play notification
+socket.on('autoPlayed',d=>{
+    showToast(`⏱️ ${d.playerName} auto-played: ${d.card.rank}${icons[d.card.suit]}`,false);
+});
+
 function update(d){isProcessingTurn=false;showLoading(false);const me=d.players.find(p=>p.userID===userID);if(me)myCurrentHand=me.hand;const active=d.players[d.turn];const isMyTurn=active?.userID===userID;setTurnIndicator(isMyTurn);const sInd=document.getElementById('suit-indicator');if(d.table?.length>0){sInd.style.display='flex';currentLeadSuit=d.table[0].card.suit;document.getElementById('suit-symbol').innerText=icons[currentLeadSuit];document.getElementById('suit-symbol').style.color=['Hearts','Diamonds'].includes(currentLeadSuit)?'var(--danger)':'white';}else{sInd.style.display='none';currentLeadSuit=null;}render(d.players,d.turn,d.table||[]);if(d.fateAces)showFateInHeader(d.fateAces);}
 
 // 2-Row Layout Configuration

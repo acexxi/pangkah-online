@@ -60,10 +60,9 @@
         .header { height: 70px; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); background: var(--glass-heavy); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 4px 30px rgba(0,0,0,0.2); }
         #your-turn-btn { background: var(--primary-action); color: #000; font-size: 11px; font-weight: 900; padding: 8px 18px; border-radius: 25px; border: none; display: none; animation: pulse-glow 1.5s infinite; }
         @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px var(--primary-action); } 50% { box-shadow: 0 0 20px var(--primary-action); } }
-        #game-view { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
-        .safe-wrap { position: relative; width: 100%; height: 100%; max-width: 45vh; max-height: 45vh; aspect-ratio: 1/1; }
-        .ring { position: absolute; inset: 0; border-radius: 50%; border: 1px dashed rgba(255,255,255,0.1); }
-        .player { position: absolute; transform: translate(-50%, -50%); text-align: center; z-index: 100; transition: all 0.5s ease; }
+        #game-view { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+        .safe-wrap { position: relative; width: 100%; height: 100%; }
+        .player { position: absolute; text-align: center; z-index: 100; transition: all 0.3s ease; }
         
         /* Custom Avatar Frame - 205 x 70 */
         .av { position: relative; width: 205px; height: 70px; background: url('/avatar-frame.png') center/contain no-repeat; display: flex; align-items: center; }
@@ -116,6 +115,7 @@
         .btn-gold:hover { box-shadow: 0 6px 20px rgba(251,191,36,0.5); transform: translateY(-2px); }
         input, select { width: 100%; padding: 14px; margin-bottom: 12px; border-radius: 14px; background: var(--glass-light); color: #fff; border: 1px solid var(--border-light); outline: none; backdrop-filter: blur(10px); transition: all 0.2s; }
         input:focus, select:focus { border-color: var(--ui-blue); box-shadow: 0 0 15px rgba(59,130,246,0.3); }
+        select option { background: #1e293b; color: #fff; padding: 10px; }
         #discard-area { position: absolute; left: 15px; top: 85px; display: flex; flex-direction: row; gap: 8px; z-index: 10; align-items: flex-start; flex-wrap: wrap; max-width: 200px; background: var(--glass-heavy); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); padding: 12px; border-radius: 16px; border: 1px solid var(--border-light); }
         .fate-label { font-size: 10px; opacity: 0.8; width: 100%; margin-bottom: 5px; color: var(--gold); font-weight: 800; }
         .fate-card { width: 45px; height: 65px; background: rgba(255,255,255,0.95); border-radius: 10px; font-size: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 2px solid var(--gold); }
@@ -241,7 +241,14 @@
         </div>
         <div class="room-list" id="room-box"></div>
         <input id="rid" placeholder="Enter Sect ID" maxlength="20">
-        <select id="maxp"><option value="4">4 Players</option><option value="5">5 Players</option><option value="6">6 Players</option></select>
+        <select id="maxp">
+            <option value="4">4 Players (0 Fate)</option>
+            <option value="5">5 Players (2 Fate)</option>
+            <option value="6">6 Players (4 Fate)</option>
+            <option value="7">7 Players (3 Fate)</option>
+            <option value="8">8 Players (4 Fate)</option>
+            <option value="10">10 Players (2 Fate)</option>
+        </select>
         <button class="btn btn-p" onclick="enter('create')">CREATE SECT</button>
         <button class="btn btn-s" onclick="enter('join')" style="margin-top:8px">JOIN SECT</button>
     </div>
@@ -251,7 +258,7 @@
 
 <div class="header">
     <div id="room-tag" style="color:var(--ui-blue);font-weight:800;font-size:11px">LOBBY</div>
-    <div></div>
+    <div id="fate-display" style="display:none;align-items:center;background:rgba(0,0,0,0.3);padding:4px 12px;border-radius:10px;font-size:12px"></div>
     <div style="display:flex;align-items:center;gap:12px">
         <button id="close-room-btn" onclick="closeRoom()" style="display:none;background:var(--danger);color:white;border:none;padding:6px 12px;border-radius:8px;font-size:10px;font-weight:800;cursor:pointer">DISBAND</button>
         <div id="suit-indicator" style="display:none;align-items:center;background:rgba(255,255,255,0.05);padding:4px 10px;border-radius:10px"><span id="suit-symbol" style="font-size:1.2rem"></span></div>
@@ -259,9 +266,7 @@
 </div>
 
 <div id="game-view">
-    <div id="discard-area"></div>
     <div class="safe-wrap" id="table-wrap">
-        <div class="ring"></div>
         <div id="p-layer"></div>
         <div id="t-layer"></div>
         <button id="start-btn" class="btn" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:auto;padding:15px 30px;background:var(--primary-action);color:#000" onclick="start()">BEGIN DUEL</button>
@@ -417,21 +422,61 @@ socket.on('rematchStatus',d=>{document.getElementById('rematch-status').innerTex
 socket.on('gameOver',data=>{setTurnIndicator(false);stats.games=(stats.games||0)+1;const myPos=data.finishOrder.indexOf(userID)+1;if(myPos===1){stats.wins=(stats.wins||0)+1;stats.currentStreak=(stats.currentStreak||0)+1;if(stats.currentStreak>(stats.bestStreak||0))stats.bestStreak=stats.currentStreak;addXP(15+stats.currentStreak*2,`1st! Streak:${stats.currentStreak}`,false);launchConfetti();}else if(myPos===2){stats.secondPlace=(stats.secondPlace||0)+1;stats.topTwo=(stats.topTwo||0)+1;stats.currentStreak=0;addXP(8,"2nd Place",false);}else if(myPos===3){stats.thirdPlace=(stats.thirdPlace||0)+1;stats.currentStreak=0;addXP(5,"3rd Place",false);}else if(data.loserUserID===userID){stats.losses=(stats.losses||0)+1;stats.currentStreak=0;addXP(-2,"Defeated",false);}else{stats.currentStreak=0;addXP(3,`${myPos}th`,false);}if(myPos<=2)stats.topTwo=(stats.topTwo||0)+1;saveStats();checkAllTitles();updateStatsUI();document.getElementById('game-number').innerText=`Game #${data.gameNumber}`;document.getElementById('finish-list').innerHTML=data.performanceData.sort((a,b)=>a.position-b.position).map(p=>{const isW=p.position===1,isL=p.position===data.performanceData.length,isMe=p.userID===userID;let xp=isW?15:p.position===2?8:p.position===3?5:isL?-2:3;const tHtml=p.equippedTitle?`<span class="title-rarity ${p.equippedTitle.rarity}" style="font-size:8px;margin-left:5px">${p.equippedTitle.icon}</span>`:'';return`<div class="finish-item ${isW?'winner':''} ${isL?'loser':''}" style="${isMe?'border-width:2px':''}"><div style="font-size:18px;font-weight:800;width:30px">${isW?'👑':isL?'💀':'#'+p.position}</div><div style="flex:1;text-align:left;margin-left:10px;font-weight:600">${p.name}${tHtml}${isMe?' (You)':''}</div><div style="font-size:12px;color:var(--primary-action);font-weight:800">${xp>0?'+':''}${xp} XP</div></div>`;}).join('');const myData=data.performanceData.find(p=>p.userID===userID);let bonuses=[];if(myPos===1){bonuses.push({n:'🏆 Victory',x:15});if(stats.currentStreak>1)bonuses.push({n:`🔥 Streak x${stats.currentStreak}`,x:stats.currentStreak*2});}else if(myPos===2)bonuses.push({n:'🥈 2nd',x:8});else if(myPos===3)bonuses.push({n:'🥉 3rd',x:5});else if(data.loserUserID===userID)bonuses.push({n:'💀 Defeated',x:-2});if(myData?.stats?.pangkahsDealt)bonuses.push({n:`⚡ Pangkahs (${myData.stats.pangkahsDealt})`,x:myData.stats.pangkahsDealt*3});if(myData?.stats?.cleanWins)bonuses.push({n:`✨ Clean (${myData.stats.cleanWins})`,x:myData.stats.cleanWins});const total=bonuses.reduce((s,b)=>s+b.x,0);document.getElementById('bonus-list').innerHTML=`<div style="font-weight:800;margin-bottom:10px;color:var(--gold)">🎁 YOUR BONUSES</div>${bonuses.map(b=>`<div class="bonus-item"><span>${b.n}</span><span style="color:${b.x>=0?'var(--primary-action)':'var(--danger)'};font-weight:800">${b.x>0?'+':''}${b.x} XP</span></div>`).join('')}<div class="bonus-item" style="border-top:2px solid var(--gold);margin-top:10px;padding-top:10px"><span style="font-weight:800">TOTAL</span><span style="color:var(--gold);font-weight:800;font-size:16px">${total>0?'+':''}${total} XP</span></div>`;document.getElementById('rematch-btn').innerText='⚡ REMATCH';document.getElementById('rematch-btn').style.opacity='1';document.getElementById('rematch-status').innerText='Waiting...';rematchRequested=false;document.getElementById('gameover-modal').style.display='flex';});
 socket.on('receiveSwapRequest',d=>{pendingSwapRequest=d.fromUserID;document.getElementById('swap-txt').innerText=d.fromName+" wants your hand!";document.getElementById('swap-modal').style.display='block';let t=15;const timer=document.getElementById('swap-timer');timer.innerText=`${t}s`;const cd=setInterval(()=>{t--;timer.innerText=`${t}s`;if(t<=0)clearInterval(cd);},1000);swapTimeoutId=setTimeout(()=>{clearInterval(cd);if(pendingSwapRequest===d.fromUserID){answerSwap(false);showToast("Swap expired");}},15000);});
 socket.on('swapOccurred',d=>{playSound('absorb');showToast(d.msg,true);if(d.requesterUserID===userID){stats.handsAbsorbed=(stats.handsAbsorbed||0)+1;addXP(5,"Hand Absorbed!");}if(d.accepterUserID===userID)addXP(3,"Hand Given!");saveStats();checkAllTitles();update(d);});
-function update(d){isProcessingTurn=false;showLoading(false);const me=d.players.find(p=>p.userID===userID);if(me)myCurrentHand=me.hand;const active=d.players[d.turn];const isMyTurn=active?.userID===userID;setTurnIndicator(isMyTurn);const sInd=document.getElementById('suit-indicator');if(d.table?.length>0){sInd.style.display='flex';currentLeadSuit=d.table[0].card.suit;document.getElementById('suit-symbol').innerText=icons[currentLeadSuit];document.getElementById('suit-symbol').style.color=['Hearts','Diamonds'].includes(currentLeadSuit)?'var(--danger)':'white';}else{sInd.style.display='none';currentLeadSuit=null;}render(d.players,d.turn,d.table||[]);if(d.fateAces)showDiscarded(d.fateAces);}
-function render(players,turn,table=[]){const pLayer=document.getElementById('p-layer');pLayer.innerHTML="";const radius=document.getElementById('table-wrap').offsetWidth/2;const myIdx=players.findIndex(p=>p.userID===userID);players.forEach((p,i)=>{const angle=(i*(360/players.length)-90)*(Math.PI/180);const x=Math.cos(angle)*(radius+50),y=Math.sin(angle)*(radius+20);
-// Check if this player is next for swap
-let canSwap=false;
-if(players.length>1&&i!==myIdx&&p.hand.length>0){let nxt=(myIdx+1)%players.length,att=0;while(players[nxt].hand.length===0&&att<players.length){nxt=(nxt+1)%players.length;att++;}if(i===nxt&&att<players.length)canSwap=true;}
-// Get level from player or default
-const playerLevel=p.level||1;
-// Title text
-const titleText=p.equippedTitle?`${p.equippedTitle.name}`:'';
-// Build avatar HTML
-const div=document.createElement('div');
-div.className=`player ${i===turn?'active':''} ${p.hand.length===0?'eliminated':''}`;
-div.style.left=`calc(50% + ${x}px)`;
-div.style.top=`calc(50% + ${y}px)`;
-div.innerHTML=`<div class="av">
+function update(d){isProcessingTurn=false;showLoading(false);const me=d.players.find(p=>p.userID===userID);if(me)myCurrentHand=me.hand;const active=d.players[d.turn];const isMyTurn=active?.userID===userID;setTurnIndicator(isMyTurn);const sInd=document.getElementById('suit-indicator');if(d.table?.length>0){sInd.style.display='flex';currentLeadSuit=d.table[0].card.suit;document.getElementById('suit-symbol').innerText=icons[currentLeadSuit];document.getElementById('suit-symbol').style.color=['Hearts','Diamonds'].includes(currentLeadSuit)?'var(--danger)':'white';}else{sInd.style.display='none';currentLeadSuit=null;}render(d.players,d.turn,d.table||[]);if(d.fateAces)showFateInHeader(d.fateAces);}
+
+// 2-Row Layout Configuration
+function getRowConfig(playerCount){
+    const configs={4:[2,2],5:[3,2],6:[3,3],7:[4,3],8:[4,4],10:[5,5]};
+    return configs[playerCount]||[Math.ceil(playerCount/2),Math.floor(playerCount/2)];
+}
+
+function render(players,turn,table=[]){
+    const pLayer=document.getElementById('p-layer');
+    pLayer.innerHTML="";
+    const myIdx=players.findIndex(p=>p.userID===userID);
+    const [topCount,bottomCount]=getRowConfig(players.length);
+    const gameArea=document.getElementById('game-view');
+    const areaWidth=gameArea.offsetWidth;
+    const areaHeight=gameArea.offsetHeight;
+    
+    // Calculate positions
+    const avatarWidth=205;
+    const topY=20;
+    const bottomY=areaHeight-90;
+    
+    players.forEach((p,i)=>{
+        let x,y;
+        if(i<topCount){
+            // Top row - left to right
+            const spacing=areaWidth/(topCount+1);
+            x=spacing*(i+1);
+            y=topY;
+        }else{
+            // Bottom row - left to right (reversed order visually for clockwise)
+            const bottomIdx=i-topCount;
+            const spacing=areaWidth/(bottomCount+1);
+            x=spacing*(bottomCount-bottomIdx);
+            y=bottomY;
+        }
+        
+        // Check if this player is next for swap
+        let canSwap=false;
+        if(players.length>1&&i!==myIdx&&p.hand.length>0){
+            let nxt=(myIdx+1)%players.length,att=0;
+            while(players[nxt].hand.length===0&&att<players.length){nxt=(nxt+1)%players.length;att++;}
+            if(i===nxt&&att<players.length)canSwap=true;
+        }
+        
+        const playerLevel=p.level||1;
+        const titleText=p.equippedTitle?`${p.equippedTitle.name}`:'';
+        
+        const div=document.createElement('div');
+        div.className=`player ${i===turn?'active':''} ${p.hand.length===0?'eliminated':''}`;
+        div.style.position='absolute';
+        div.style.left=`${x}px`;
+        div.style.top=`${y}px`;
+        div.style.transform='translateX(-50%)';
+        div.innerHTML=`<div class="av">
 <div class="av-take-hand ${canSwap?'visible':''}" onclick="event.stopPropagation();socket.emit('sendSwapRequest',{roomID:'${myRoom}',fromUserID:'${userID}'})" title="Take Hand"></div>
 <div class="av-avatar"></div>
 <div class="av-info">
@@ -441,10 +486,41 @@ div.innerHTML=`<div class="av">
 </div>
 <div class="av-cards">${p.hand.length}</div>
 </div>`;
-pLayer.appendChild(div);});renderHand();const tLayer=document.getElementById('t-layer');tLayer.innerHTML="";if(table.length>0){const rowDiv=document.createElement('div');rowDiv.className='table-cards-row';table.forEach((tc)=>{const el=createCardUI(tc.card);el.className=`card table-card ${['Hearts','Diamonds'].includes(tc.card.suit)?'red':''}`;rowDiv.appendChild(el);});tLayer.appendChild(rowDiv);}}
+        pLayer.appendChild(div);
+    });
+    
+    renderHand();
+    
+    // Render table cards
+    const tLayer=document.getElementById('t-layer');
+    tLayer.innerHTML="";
+    if(table.length>0){
+        const rowDiv=document.createElement('div');
+        rowDiv.className='table-cards-row';
+        table.forEach((tc)=>{
+            const el=createCardUI(tc.card);
+            el.className=`card table-card ${['Hearts','Diamonds'].includes(tc.card.suit)?'red':''}`;
+            rowDiv.appendChild(el);
+        });
+        tLayer.appendChild(rowDiv);
+    }
+}
+
+// Show Fate aces in header instead of game area
+function showFateInHeader(list){
+    const fateEl=document.getElementById('fate-display');
+    if(!list||list.length===0){
+        fateEl.style.display='none';
+        return;
+    }
+    fateEl.style.display='flex';
+    const isBlack=s=>['Spades','Clubs'].includes(s);
+    fateEl.innerHTML=`<span style="color:var(--gold);margin-right:5px">⚰️</span>`+list.map(c=>`<span style="color:${isBlack(c.suit)?'#fff':'var(--danger)'};font-weight:800;margin:0 2px">A${icons[c.suit]}</span>`).join('');
+}
+
 function renderHand(){const hDiv=document.getElementById('my-cards');hDiv.innerHTML="";const isMyTurn=document.getElementById('turn-glow').classList.contains('active');const hasLead=currentLeadSuit&&myCurrentHand.some(c=>c.suit===currentLeadSuit);myCurrentHand.forEach(c=>{const el=createCardUI(c);let canPlay=true,highlight=false;if(!isMyTurn||isProcessingTurn)canPlay=false;else if(isFirstMove){canPlay=c.suit==='Spades'&&c.rank==='K';highlight=canPlay;}else if(currentLeadSuit&&hasLead){canPlay=c.suit===currentLeadSuit;highlight=canPlay;}else highlight=isMyTurn;if(!canPlay)el.classList.add('disabled');else if(highlight)el.classList.add('highlight');el.onclick=e=>{if(!isProcessingTurn&&isMyTurn&&canPlay){e.currentTarget.classList.add('disabled');e.currentTarget.classList.remove('highlight');isProcessingTurn=true;showLoading(true);socket.emit('playCard',{roomID:myRoom,cardObject:c});}};hDiv.appendChild(el);});}
 function createCardUI(c){const d=document.createElement('div');d.className=`card ${['Hearts','Diamonds'].includes(c.suit)?'red':''}`;d.innerHTML=`<div style="font-size:10px">${c.rank}</div><div style="font-size:28px;text-align:center">${icons[c.suit]}</div><div style="font-size:10px;transform:rotate(180deg)">${c.rank}</div>`;return d;}
-function showDiscarded(list){const d=document.getElementById('discard-area');if(!list||list.length===0){d.innerHTML='';d.style.display='none';return;}d.style.display='flex';const isBlack=s=>['Spades','Clubs'].includes(s);d.innerHTML=`<div class="fate-label">⚰️ FATE (${list.length} Aces)</div>`;list.forEach(c=>{const div=document.createElement('div');div.className=`fate-card ${isBlack(c.suit)?'black':'red'}`;div.innerHTML=`<div style="font-size:12px">A</div><div style="font-size:22px">${icons[c.suit]}</div>`;d.appendChild(div);});}
+function showDiscarded(list){showFateInHeader(list);}
 updateStatsUI();checkAllTitles();
 window.addEventListener('beforeunload',e=>{if(myRoom&&document.getElementById('lobby').style.display==='none'){e.preventDefault();e.returnValue='';}});
 </script>

@@ -73,6 +73,9 @@
         /* Left Hexagon - Take Hand (clickable area) */
         .av-take-hand { position: absolute; left: 0px; top: 50%; transform: translateY(-50%); width: 36px; height: 55px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 0.2s; border-radius: 4px; }
         .av-take-hand.visible { opacity: 1; pointer-events: auto; }
+        .av-take-hand.visible.greyed { opacity: 0.5; cursor: not-allowed; }
+        .av-take-hand.visible.greyed::after { color: #6b7280; text-shadow: none; }
+        .av-take-hand.visible.greyed:hover { background: transparent; }
         .av-take-hand:hover { background: rgba(16,185,129,0.3); }
         .av-take-hand::after { content: 'TH'; font-size: 12px; font-weight: 900; color: #10b981; text-shadow: 0 0 8px #10b981, 0 1px 2px rgba(0,0,0,0.8); }
         
@@ -495,13 +498,20 @@ function render(players,turn,table=[]){
             y=bottomY;
         }
         
-        // Check if this player is next for swap (only if it's MY turn)
+        // Check if this player is next for swap
         let canSwap=false;
+        let canSwapGreyed=false;
         const isMyTurn=turn===myIdx;
-        if(isMyTurn&&players.length>1&&i!==myIdx&&p.hand.length>0){
+        if(players.length>1&&i!==myIdx&&p.hand.length>0){
             let nxt=(myIdx+1)%players.length,att=0;
             while(players[nxt].hand.length===0&&att<players.length){nxt=(nxt+1)%players.length;att++;}
-            if(i===nxt&&att<players.length)canSwap=true;
+            if(i===nxt&&att<players.length){
+                if(isMyTurn){
+                    canSwap=true;
+                }else{
+                    canSwapGreyed=true;
+                }
+            }
         }
         
         const playerLevel=p.level||1;
@@ -513,8 +523,9 @@ function render(players,turn,table=[]){
         div.style.left=`${x}px`;
         div.style.top=`${y}px`;
         div.style.transform='translateX(-50%)';
+        const thClass=canSwap?'visible':canSwapGreyed?'visible greyed':'';
         div.innerHTML=`<div class="av">
-<div class="av-take-hand ${canSwap?'visible':''}" onclick="event.stopPropagation();socket.emit('sendSwapRequest',{roomID:'${myRoom}',fromUserID:'${userID}'})" title="Take Hand"></div>
+<div class="av-take-hand ${thClass}" onclick="event.stopPropagation();socket.emit('sendSwapRequest',{roomID:'${myRoom}',fromUserID:'${userID}'})" title="Take Hand"></div>
 <div class="av-avatar"></div>
 <div class="av-info">
 <div class="av-level">LVL ${playerLevel}</div>

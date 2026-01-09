@@ -101,10 +101,14 @@ function startTurnTimer(roomID) {
  * Auto-play card when timer expires
  */
 function autoPlayCard(roomID) {
+    // Clear the timer first to stop any more timer events
+    clearTurnTimer(roomID);
+    
     const room = rooms[roomID];
     if (!room || room.resolving) return;
     
-    const player = room.players[room.turn];
+    const currentTurn = room.turn; // Capture current turn
+    const player = room.players[currentTurn];
     if (!player || player.hand.length === 0) return;
     
     let cardToPlay = null;
@@ -129,14 +133,16 @@ function autoPlayCard(roomID) {
     if (cardToPlay) {
         console.log(`Auto-play for ${player.name}: ${cardToPlay.rank} of ${cardToPlay.suit}`);
         
-        // Emit auto-play notification
+        // Emit auto-play notification first
         io.to(roomID).emit('autoPlayed', { 
             playerName: player.name, 
             card: cardToPlay 
         });
         
-        // Process the card play (simulate the playCard logic)
-        processCardPlay(roomID, room.turn, cardToPlay);
+        // Small delay then process the card play with captured turn index
+        setTimeout(() => {
+            processCardPlay(roomID, currentTurn, cardToPlay);
+        }, 100);
     }
 }
 

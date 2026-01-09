@@ -202,7 +202,7 @@ io.on('connection', (socket) => {
         };
         
         socket.join(roomID);
-        io.to(roomID).emit('updatePlayers', rooms[roomID].players);
+        io.to(roomID).emit('updatePlayers', rooms[roomID].players, { maxPlayers: rooms[roomID].maxPlayers });
         broadcastRooms();
         console.log(`Room ${roomID} created by ${playerName}`);
     });
@@ -250,7 +250,7 @@ io.on('connection', (socket) => {
             console.log(`${playerName} joined room ${roomID}`);
         }
         
-        io.to(roomID).emit('updatePlayers', room.players);
+        io.to(roomID).emit('updatePlayers', room.players, { maxPlayers: room.maxPlayers });
         broadcastRooms();
     });
 

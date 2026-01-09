@@ -259,7 +259,7 @@
     <div class="safe-wrap" id="table-wrap">
         <div id="p-layer"></div>
         <div id="t-layer"></div>
-        <button id="start-btn" class="btn" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:auto;padding:15px 30px;background:var(--primary-action);color:#000" onclick="start()">BEGIN DUEL</button>
+        <button id="start-btn" class="btn" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:auto;padding:15px 30px;font-size:14px" onclick="start()">BEGIN DUEL (0/0)</button>
     </div>
 </div>
 
@@ -332,7 +332,7 @@ if(!savedStats.version||savedStats.version<STATS_VERSION){
     localStorage.setItem('pStats',JSON.stringify(savedStats));
 }
 let stats={...DEFAULT_STATS,...savedStats};
-let myRoom='',myCurrentHand=[],pendingSwapRequest=null,swapTimeoutId=null,isProcessingTurn=false,isHost=false,isFirstMove=true,currentLeadSuit=null,currentFilter='all',rematchRequested=false;
+let myRoom='',myCurrentHand=[],pendingSwapRequest=null,swapTimeoutId=null,isProcessingTurn=false,isHost=false,isFirstMove=true,currentLeadSuit=null,currentFilter='all',rematchRequested=false,currentMaxPlayers=4;
 
 function getStatValue(t){switch(t){case'level':return getLevel();case'pangkahs':return stats.pangkahs||0;case'streak':return stats.bestStreak||0;case'wins':return stats.wins||0;case'games':return stats.games||0;case'xp':return stats.xp||0;case'handsAbsorbed':return stats.handsAbsorbed||0;case'nightGames':return stats.nightGames||0;case'uniquePlayers':return(stats.uniquePlayers||[]).length;case'topTwo':return stats.topTwo||0;case'secondPlace':return stats.secondPlace||0;case'thirdPlace':return stats.thirdPlace||0;case'cardsPlayed':return stats.cardsPlayed||0;default:return 0;}}
 function checkAllTitles(){TITLES.forEach(t=>{if(!stats.unlockedTitles.includes(t.id)&&getStatValue(t.req.t)>=t.req.v){stats.unlockedTitles.push(t.id);showAchievement(t);}});saveStats();}
@@ -399,8 +399,8 @@ function launchConfetti(){
     }
 }
 
-function enter(type){myRoom=document.getElementById('rid').value.trim();if(!myRoom)return showToast("Sect ID Required");showLoading(true);const data={roomID:myRoom,playerName:myName,userID,equippedTitle:getEquippedTitleData(),level:getLevel()};if(type==='create'){data.maxPlayers=document.getElementById('maxp').value;isHost=true;}socket.emit(type==='create'?'createRoom':'joinRoom',data);}
-function start(){showLoading(true);socket.emit('startGame',myRoom);}
+function enter(type){myRoom=document.getElementById('rid').value.trim();if(!myRoom)return showToast("Sect ID Required");showLoading(true);const data={roomID:myRoom,playerName:myName,userID,equippedTitle:getEquippedTitleData(),level:getLevel()};if(type==='create'){data.maxPlayers=document.getElementById('maxp').value;currentMaxPlayers=parseInt(data.maxPlayers);isHost=true;}socket.emit(type==='create'?'createRoom':'joinRoom',data);}
+function start(){const btn=document.getElementById('start-btn');if(btn.disabled)return;showLoading(true);socket.emit('startGame',myRoom);}
 function closeRoom(){if(myRoom&&confirm("Disband this sect?"))socket.emit('requestCloseRoom',{roomID:myRoom});}
 function sortHand(){const o={Spades:4,Hearts:3,Diamonds:2,Clubs:1};myCurrentHand.sort((a,b)=>(o[b.suit]-o[a.suit])||(b.val-a.val));renderHand();}
 function answerSwap(accept){if(swapTimeoutId)clearTimeout(swapTimeoutId);document.getElementById('swap-modal').style.display='none';if(accept&&pendingSwapRequest)socket.emit('acceptSwap',{roomID:myRoom,fromUserID:pendingSwapRequest,myUserID:userID});pendingSwapRequest=null;}
@@ -409,7 +409,19 @@ socket.on('connect',()=>{document.getElementById('connection-status').innerHTML=
 socket.on('disconnect',()=>{document.getElementById('connection-status').innerHTML='🔴 Disconnected';showToast("Connection lost...");});
 socket.on('reconnectSuccess',d=>{myRoom=d.roomID;isFirstMove=d.isFirstMove||false;currentLeadSuit=d.currentSuit;if(d.players[0]?.userID===userID){isHost=true;document.getElementById('close-room-btn').style.display='block';}showLoading(false);document.getElementById('lobby').style.display='none';document.getElementById('room-tag').innerText="SECT: "+myRoom;showToast("Reconnected!",true);update(d);});
 socket.on('roomList',list=>{const box=document.getElementById('room-box');box.innerHTML=list.length?"":'<div style="padding:15px;opacity:0.3">No active sects...</div>';list.forEach(r=>{const d=document.createElement('div');d.className=`room-item ${r.inGame?'in-game':''}`;d.innerHTML=`<span>#${r.id}</span><span>${r.count}/${r.max}${r.inGame?' 🎮':''}</span>`;d.onclick=()=>{if(!r.inGame)document.getElementById('rid').value=r.id;};box.appendChild(d);});});
-socket.on('updatePlayers',p=>{showLoading(false);document.getElementById('lobby').style.display='none';document.getElementById('room-tag').innerText="SECT: "+myRoom;isHost=p[0]?.userID===userID;document.getElementById('close-room-btn').style.display=isHost?'block':'none';document.getElementById('start-btn').style.display=isHost&&p.length>=4?'block':'none';p.forEach(pl=>{if(pl.userID!==userID&&!stats.uniquePlayers.includes(pl.userID))stats.uniquePlayers.push(pl.userID);});saveStats();render(p,-1);});
+socket.on('updatePlayers',(p,roomData)=>{showLoading(false);document.getElementById('lobby').style.display='none';document.getElementById('room-tag').innerText="SECT: "+myRoom;isHost=p[0]?.userID===userID;document.getElementById('close-room-btn').style.display=isHost?'block':'none';
+// Update start button with player count
+const startBtn=document.getElementById('start-btn');
+const maxP=roomData?.maxPlayers||currentMaxPlayers||p.length;
+currentMaxPlayers=maxP;
+const isFull=p.length>=maxP;
+startBtn.style.display=isHost?'block':'none';
+startBtn.innerText=`BEGIN DUEL (${p.length}/${maxP})`;
+startBtn.disabled=!isFull;
+startBtn.style.background=isFull?'var(--primary-action)':'rgba(255,255,255,0.2)';
+startBtn.style.color=isFull?'#000':'rgba(255,255,255,0.5)';
+startBtn.style.cursor=isFull?'pointer':'not-allowed';
+p.forEach(pl=>{if(pl.userID!==userID&&!stats.uniquePlayers.includes(pl.userID))stats.uniquePlayers.push(pl.userID);});saveStats();render(p,-1);});
 socket.on('gameInit',d=>{showLoading(false);document.getElementById('round-popup').style.display='none';document.getElementById('gameover-modal').style.display='none';document.getElementById('start-btn').style.display='none';isProcessingTurn=false;isFirstMove=d.isFirstMove!==undefined?d.isFirstMove:true;currentLeadSuit=null;rematchRequested=false;const h=new Date().getHours();if(h>=0&&h<6){stats.nightGames=(stats.nightGames||0)+1;saveStats();}update(d);});
 socket.on('clearTable',d=>{if(d.msg.toLowerCase()==='pangkah!'){flashScreen('pangkah');playSound('strike');if(d.winnerUserID===userID){stats.pangkahs=(stats.pangkahs||0)+1;addXP(3,"Pangkah!");}}else{flashScreen('clean');playSound('sweep');if(d.winnerUserID===userID)addXP(1,"Clean Round");}currentLeadSuit=null;const pop=document.getElementById('round-popup');document.getElementById('pop-title').className=d.msg==='Pangkah!'?'pangkah-text':'clean-text';document.getElementById('pop-title').innerText=d.msg.toUpperCase();document.getElementById('pop-desc').innerText=d.winner+" has the lead.";pop.style.display='block';setTimeout(()=>{pop.style.display='none';update(d);},2000);});
 socket.on('updateTable',d=>{playSound('place');if(d.currentSuit)currentLeadSuit=d.currentSuit;if(d.table?.length>0)isFirstMove=false;stats.cardsPlayed=(stats.cardsPlayed||0)+1;saveStats();update(d);});

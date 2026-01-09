@@ -11,7 +11,17 @@ app.use(express.static('public'));
 // Constants
 const ROUND_RESOLUTION_DELAY = 1500;
 const MIN_PLAYERS = 4;
-const MAX_PLAYERS = 6;
+const MAX_PLAYERS = 10;
+
+// Fate configuration: how many aces to discard per player count
+const FATE_CONFIG = {
+    4: 0,   // 52 cards / 4 = 13 each, 0 leftover
+    5: 2,   // 52 cards / 5 = 10 each, 2 leftover -> discard 2 random aces
+    6: 4,   // 52 cards / 6 = 8 each, 4 leftover -> discard all 4 aces
+    7: 3,   // 52 cards / 7 = 7 each, 3 leftover -> discard 3 random aces
+    8: 4,   // 52 cards / 8 = 6 each, 4 leftover -> discard all 4 aces
+    10: 2   // 52 cards / 10 = 5 each, 2 leftover -> discard 2 random aces
+};
 
 let rooms = {};
 
@@ -265,8 +275,15 @@ io.on('connection', (socket) => {
         const room = rooms[roomID];
         if (!room) return;
         
-        if (room.players.length < MIN_PLAYERS) {
+        const playerCount = room.players.length;
+        
+        if (playerCount < MIN_PLAYERS) {
             return socket.emit('errorMsg', `Need at least ${MIN_PLAYERS} players to start`);
+        }
+        
+        // Check if player count is valid (has a fate config)
+        if (FATE_CONFIG[playerCount] === undefined) {
+            return socket.emit('errorMsg', `Cannot start with ${playerCount} players. Valid: 4, 5, 6, 7, 8, or 10 players.`);
         }
         
         room.gameStarted = true;
@@ -286,9 +303,9 @@ io.on('connection', (socket) => {
         room.discarded = [];
         room.fateAces = []; // Separate array for initial discarded aces
 
-        // Cultivation Rule: Remove Aces for 5-6 players
-        if (room.players.length === 5 || room.players.length === 6) {
-            const discardCount = room.players.length === 5 ? 2 : 4;
+        // Fate Rule: Remove Aces based on player count
+        const discardCount = FATE_CONFIG[playerCount];
+        if (discardCount > 0) {
             let aceIndices = [];
             deck.forEach((card, idx) => { 
                 if (card.rank === 'A') aceIndices.push(idx); 
@@ -302,7 +319,7 @@ io.on('connection', (socket) => {
         }
 
         // Deal cards evenly
-        let cardsPerPlayer = Math.floor(deck.length / room.players.length);
+        let cardsPerPlayer = Math.floor(deck.length / playerCount);
         room.players.forEach(p => { 
             p.hand = deck.splice(0, cardsPerPlayer); 
         });
@@ -323,7 +340,7 @@ io.on('connection', (socket) => {
             gameNumber: room.gameNumber
         });
         
-        console.log(`Game #${room.gameNumber} started in room ${roomID}. ${room.players[room.turn].name} has K♠`);
+        console.log(`Game #${room.gameNumber} started in room ${roomID} with ${playerCount} players. ${room.players[room.turn].name} has K♠`);
     });
 
     /**

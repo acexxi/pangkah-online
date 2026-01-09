@@ -28,7 +28,7 @@
         .stat-label { font-size: 9px; opacity: 0.6; margin-top: 4px; text-transform: uppercase; }
         .bar-container { width: 100%; height: 10px; background: rgba(255,255,255,0.05); border-radius: 20px; margin: 10px 0; overflow: hidden; border: 1px solid var(--border); }
         .bar-fill { height: 100%; background: linear-gradient(90deg, var(--ui-blue), var(--primary-action)); width: 0%; transition: width 0.6s ease; }
-        .title-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0; }
+        .title-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; min-height: 240px; }
         .title-item { padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: rgba(0,0,0,0.3); cursor: pointer; transition: all 0.2s; text-align: left; position: relative; }
         .title-item:hover { transform: scale(1.02); }
         .title-item.locked { opacity: 0.4; cursor: not-allowed; }
@@ -204,9 +204,14 @@
 <div class="modal-overlay" id="titles-modal">
     <div class="titles-card">
         <h3 style="color:var(--purple);margin-top:0">🏆 ACHIEVEMENT TITLES</h3>
-        <p style="font-size:11px;opacity:0.6;margin-bottom:20px">Unlock titles and equip one to display!</p>
+        <p style="font-size:11px;opacity:0.6;margin-bottom:15px">Unlock titles and equip one to display!</p>
         <div class="filter-tabs" id="title-filters"></div>
         <div class="title-grid" id="title-grid"></div>
+        <div id="title-pagination" style="display:flex;justify-content:center;align-items:center;gap:15px;margin-top:15px">
+            <button class="btn" onclick="titleNav(-1)" style="padding:8px 15px;background:rgba(255,255,255,0.1);color:#fff">◀ PREV</button>
+            <span id="title-page-indicator" style="font-size:12px;color:rgba(255,255,255,0.7)">1 / 1</span>
+            <button class="btn" onclick="titleNav(1)" style="padding:8px 15px;background:rgba(255,255,255,0.1);color:#fff">NEXT ▶</button>
+        </div>
         <button class="btn btn-s" onclick="closeTitles()" style="margin-top:15px">BACK</button>
     </div>
 </div>
@@ -264,110 +269,23 @@
     </div>
 </div>
 
-<!-- How to Play Modal -->
+<!-- How to Play Modal - Paginated -->
 <div class="modal-overlay" id="howtoplay-modal" style="display:none">
     <div class="howtoplay-card">
-        <h3 style="color:var(--gold);margin-top:0;font-size:1.3rem">📖 HOW TO PLAY PANGKAH</h3>
-        
-        <div class="guide-section">
-            <div class="guide-title">🎯 GOAL OF THE GAME</div>
-            <p>Get rid of ALL your cards before anyone else!</p>
-            <p style="margin-top:8px;color:var(--danger)">⚠️ The <b>LAST player</b> holding cards <b>LOSES</b> the game!</p>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+            <h3 style="color:var(--gold);margin:0;font-size:1.2rem">📖 HOW TO PLAY</h3>
+            <span id="guide-page-indicator" style="font-size:11px;color:rgba(255,255,255,0.6)">1 / 5</span>
         </div>
         
-        <div class="guide-section">
-            <div class="guide-title">🃏 BASIC RULES</div>
-            <div class="guide-step"><span class="step-num">1</span> <div>The player holding <b>King of Spades (K♠)</b> always starts the game</div></div>
-            <div class="guide-step"><span class="step-num">2</span> <div>When someone plays a card, you <b>MUST play the same suit</b> if you have it<br><span style="font-size:10px;opacity:0.7">Example: If someone plays ♥, you must play a ♥ card</span></div></div>
-            <div class="guide-step"><span class="step-num">3</span> <div>The <b>HIGHEST card</b> of the lead suit wins that round<br><span style="font-size:10px;opacity:0.7">Card order: A(low) → 2 → 3 → ... → 10 → J → Q → K(high)</span></div></div>
-            <div class="guide-step"><span class="step-num">4</span> <div>The winner of each round plays first in the next round</div></div>
-        </div>
+        <div id="guide-content" style="min-height:280px"></div>
         
-        <div class="guide-section" style="border:1px solid var(--danger);background:rgba(244,63,94,0.1)">
-            <div class="guide-title" style="color:var(--danger)">⚡ PANGKAH - THE MOST IMPORTANT RULE!</div>
-            <p>If you <b>DON'T have the lead suit</b>, you can play ANY card from your hand.</p>
-            <p style="margin-top:8px">This is called <b style="color:var(--danger)">"PANGKAH"</b> (means "to cut/block")</p>
-            <div class="pangkah-box">
-                <div><b>What happens when PANGKAH occurs:</b></div>
-                <div style="margin-top:6px">1️⃣ The round <b>STOPS IMMEDIATELY</b> - no more players play</div>
-                <div>2️⃣ The player with the <b>HIGHEST lead suit card</b> must take ALL cards on table</div>
-                <div>3️⃣ That player now has MORE cards (bad for them!)</div>
-            </div>
-            <p style="margin-top:10px;font-size:11px;color:var(--primary-action)">💡 <b>Strategy Tip:</b> Use Pangkah wisely to dump cards onto opponents!</p>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:15px;gap:10px">
+            <button class="btn" id="guide-prev-btn" onclick="guideNav(-1)" style="flex:1;background:rgba(255,255,255,0.1);color:#fff;padding:10px">◀ PREV</button>
+            <button class="btn btn-gold" onclick="closeHowToPlay()" style="flex:1;padding:10px;font-size:11px">SKIP</button>
+            <button class="btn btn-p" id="guide-next-btn" onclick="guideNav(1)" style="flex:1;padding:10px">NEXT ▶</button>
         </div>
-        
-        <div class="guide-section">
-            <div class="guide-title">🔄 EXAMPLE ROUND</div>
-            <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px;font-size:11px">
-                <div style="margin-bottom:6px"><b>Player A</b> plays: <span style="color:var(--danger)">7♥</span> (leads with Hearts)</div>
-                <div style="margin-bottom:6px"><b>Player B</b> plays: <span style="color:var(--danger)">K♥</span> (follows suit - highest so far!)</div>
-                <div style="margin-bottom:6px"><b>Player C</b> plays: <span>5♠</span> (has no ♥, plays Spade = <b style="color:var(--danger)">PANGKAH!</b>)</div>
-                <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-                    ⚡ Round stops! <b>Player B</b> (K♥) takes all 3 cards
-                </div>
-            </div>
-        </div>
-        
-        <div class="guide-section">
-            <div class="guide-title">✨ CLEAN ROUND (No Pangkah)</div>
-            <p>If ALL players follow suit, the highest card wins and all cards are <b>discarded</b> (removed from game).</p>
-            <p style="margin-top:6px;font-size:11px;opacity:0.8">This is good! Cards leave the game instead of going to someone's hand.</p>
-        </div>
-        
-        <div class="guide-section">
-            <div class="guide-title">🤝 TAKE HAND (TH Button)</div>
-            <p>See the <span style="color:var(--primary-action);font-weight:800">TH</span> button on another player? Click it to <b>request their entire hand!</b></p>
-            <div style="font-size:11px;margin-top:8px;opacity:0.9">
-                <div>• Only works on <b>your turn</b></div>
-                <div>• Only targets the <b>next player</b> with cards</div>
-                <div>• They can <b>Accept</b> or <b>Decline</b> (15 sec to decide)</div>
-                <div>• If accepted, you absorb ALL their cards!</div>
-            </div>
-            <p style="margin-top:8px;font-size:11px;color:var(--gold)">💡 Useful when you're about to win and want to help a friend survive!</p>
-        </div>
-        
-        <div class="guide-section">
-            <div class="guide-title">⏱️ TURN TIMER (15 Seconds)</div>
-            <p>You have <b>15 seconds</b> to play a card on your turn.</p>
-            <div style="font-size:11px;margin-top:6px;opacity:0.9">
-                <div>• Timer shows next to "YOUR TURN" indicator</div>
-                <div>• Turns <span style="color:var(--danger)">RED</span> in last 5 seconds</div>
-                <div>• If time runs out, a card is <b>auto-played</b> for you</div>
-            </div>
-        </div>
-        
-        <div class="guide-section">
-            <div class="guide-title">⚰️ FATE RULE (Ace Removal)</div>
-            <p>Before dealing, some <b>Aces are removed</b> from the deck to make cards divide evenly.</p>
-            <div style="font-size:11px;margin-top:6px;opacity:0.9">
-                <div>• Removed aces shown in header: ⚰️ A♠ A♦ ...</div>
-                <div>• Different player counts = different aces removed</div>
-            </div>
-        </div>
-        
-        <div class="guide-section">
-            <div class="guide-title">🏆 WINNING & XP</div>
-            <div style="font-size:11px">
-                <div>🥇 <b>1st Place:</b> +15 XP + streak bonus</div>
-                <div>🥈 <b>2nd Place:</b> +8 XP</div>
-                <div>🥉 <b>3rd Place:</b> +5 XP</div>
-                <div>💀 <b>Last Place:</b> -2 XP</div>
-                <div style="margin-top:6px">⚡ <b>Bonus:</b> +3 XP per Pangkah dealt, +1 XP per clean win</div>
-            </div>
-        </div>
-        
-        <div style="background:linear-gradient(135deg,rgba(251,191,36,0.2),rgba(245,158,11,0.1));border:1px solid var(--gold);border-radius:12px;padding:12px;margin-top:5px">
-            <div style="font-weight:800;color:var(--gold);margin-bottom:6px">🎓 QUICK SUMMARY</div>
-            <div style="font-size:11px;line-height:1.6">
-                1. Empty your hand first to win<br>
-                2. Follow suit if you can<br>
-                3. No matching suit? PANGKAH! (opponent takes cards)<br>
-                4. Last player with cards loses
-            </div>
-        </div>
-        
-        <button class="btn btn-gold" onclick="closeHowToPlay()" style="margin-top:15px">I'M READY TO PLAY! ⚔️</button>
     </div>
+</div>
 </div>
 
 <div id="round-popup"><div id="pop-title"></div><div id="pop-desc"></div></div>
@@ -541,9 +459,138 @@ function showAchievement(t){const p=document.getElementById('achievement-popup')
 function equipTitle(id){if(stats.unlockedTitles.includes(id)){stats.equippedTitle=id;saveStats();updateStatsUI();renderTitleGrid();if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:getEquippedTitleData()});showToast('Equipped!',true);}}
 function unequipTitle(){stats.equippedTitle=null;saveStats();updateStatsUI();renderTitleGrid();if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:null});}
 function getEquippedTitleData(){if(!stats.equippedTitle)return null;const t=TITLES.find(x=>x.id===stats.equippedTitle);return t?{id:t.id,name:t.name,rarity:t.rarity,icon:t.icon}:null;}
-function renderTitleGrid(){const grid=document.getElementById('title-grid'),filters=document.getElementById('title-filters');filters.innerHTML=['all','legendary','epic','rare','common'].map(r=>`<div class="filter-tab ${currentFilter===r?'active':''}" onclick="currentFilter='${r}';renderTitleGrid()">${r==='all'?'ALL':r.toUpperCase()}</div>`).join('');const filtered=currentFilter==='all'?TITLES:TITLES.filter(t=>t.rarity===currentFilter);grid.innerHTML=filtered.map(t=>{const unlocked=stats.unlockedTitles.includes(t.id),equipped=stats.equippedTitle===t.id,prog=getStatValue(t.req.t),max=t.req.v,pct=Math.min(prog/max*100,100).toFixed(0);return`<div class="title-item ${unlocked?'':'locked'} ${equipped?'equipped':''}" onclick="${unlocked?(equipped?'unequipTitle()':`equipTitle('${t.id}')`):''}">${equipped?'<span style="position:absolute;top:8px;right:8px">✓</span>':''}<span class="title-rarity ${t.rarity}">${t.rarity.toUpperCase()}</span><div class="title-name">${t.icon} ${t.name}</div><div class="title-desc">${t.desc}</div>${!unlocked?`<div class="title-progress">${Math.min(prog,max)}/${max} (${pct}%)</div>`:''}</div>`;}).join('');}
-function openTitles(){document.getElementById('profile-modal').style.display='none';document.getElementById('titles-modal').style.display='flex';renderTitleGrid();}
+
+// Title Pagination
+let titlePage=0;
+const TITLES_PER_PAGE=6;
+function renderTitleGrid(){
+    const grid=document.getElementById('title-grid'),filters=document.getElementById('title-filters');
+    filters.innerHTML=['all','legendary','epic','rare','common'].map(r=>`<div class="filter-tab ${currentFilter===r?'active':''}" onclick="currentFilter='${r}';titlePage=0;renderTitleGrid()">${r==='all'?'ALL':r.toUpperCase()}</div>`).join('');
+    const filtered=currentFilter==='all'?TITLES:TITLES.filter(t=>t.rarity===currentFilter);
+    const totalPages=Math.ceil(filtered.length/TITLES_PER_PAGE);
+    const start=titlePage*TITLES_PER_PAGE;
+    const pageItems=filtered.slice(start,start+TITLES_PER_PAGE);
+    grid.innerHTML=pageItems.map(t=>{
+        const unlocked=stats.unlockedTitles.includes(t.id),equipped=stats.equippedTitle===t.id,prog=getStatValue(t.req.t),max=t.req.v,pct=Math.min(prog/max*100,100).toFixed(0);
+        return`<div class="title-item ${unlocked?'':'locked'} ${equipped?'equipped':''}" onclick="${unlocked?(equipped?'unequipTitle()':`equipTitle('${t.id}')`):''}">${equipped?'<span style="position:absolute;top:8px;right:8px">✓</span>':''}<span class="title-rarity ${t.rarity}">${t.rarity.toUpperCase()}</span><div class="title-name">${t.icon} ${t.name}</div><div class="title-desc">${t.desc}</div>${!unlocked?`<div class="title-progress">${Math.min(prog,max)}/${max} (${pct}%)</div>`:''}</div>`;
+    }).join('');
+    document.getElementById('title-page-indicator').innerText=`${titlePage+1} / ${totalPages}`;
+}
+function titleNav(dir){
+    const filtered=currentFilter==='all'?TITLES:TITLES.filter(t=>t.rarity===currentFilter);
+    const totalPages=Math.ceil(filtered.length/TITLES_PER_PAGE);
+    titlePage=Math.max(0,Math.min(totalPages-1,titlePage+dir));
+    renderTitleGrid();
+}
+function openTitles(){titlePage=0;document.getElementById('profile-modal').style.display='none';document.getElementById('titles-modal').style.display='flex';renderTitleGrid();}
 function closeTitles(){document.getElementById('titles-modal').style.display='none';document.getElementById('profile-modal').style.display='flex';}
+
+// Guide Pagination
+let guidePage=0;
+const GUIDE_PAGES=[
+    {title:'🎯 Goal & Basic Rules',content:`
+        <div class="guide-section">
+            <div class="guide-title">🎯 GOAL OF THE GAME</div>
+            <p>Get rid of ALL your cards before anyone else!</p>
+            <p style="margin-top:8px;color:var(--danger)">⚠️ The <b>LAST player</b> holding cards <b>LOSES</b> the game!</p>
+        </div>
+        <div class="guide-section">
+            <div class="guide-title">🃏 BASIC RULES</div>
+            <div class="guide-step"><span class="step-num">1</span> <div>Player with <b>King of Spades (K♠)</b> starts first</div></div>
+            <div class="guide-step"><span class="step-num">2</span> <div>You <b>MUST play the same suit</b> if you have it<br><span style="font-size:10px;opacity:0.7">Example: If someone plays ♥, you must play ♥</span></div></div>
+            <div class="guide-step"><span class="step-num">3</span> <div><b>HIGHEST card</b> of lead suit wins the round<br><span style="font-size:10px;opacity:0.7">A(low) → 2 → 3... → J → Q → K(high)</span></div></div>
+            <div class="guide-step"><span class="step-num">4</span> <div>Winner leads the next round</div></div>
+        </div>`},
+    {title:'⚡ Pangkah Mechanic',content:`
+        <div class="guide-section" style="border:1px solid var(--danger);background:rgba(244,63,94,0.1)">
+            <div class="guide-title" style="color:var(--danger)">⚡ PANGKAH - THE KEY MECHANIC!</div>
+            <p>If you <b>DON'T have the lead suit</b>, play ANY card.</p>
+            <p style="margin-top:8px">This is called <b style="color:var(--danger)">"PANGKAH"</b> (to cut/block)</p>
+            <div class="pangkah-box">
+                <div><b>When PANGKAH occurs:</b></div>
+                <div style="margin-top:6px">1️⃣ Round <b>STOPS IMMEDIATELY</b></div>
+                <div>2️⃣ <b>HIGHEST lead suit</b> holder takes ALL cards</div>
+                <div>3️⃣ That player now has MORE cards!</div>
+            </div>
+            <p style="margin-top:10px;font-size:11px;color:var(--primary-action)">💡 <b>Tip:</b> Use Pangkah to dump cards onto opponents!</p>
+        </div>
+        <div class="guide-section">
+            <div class="guide-title">✨ CLEAN ROUND</div>
+            <p>If ALL players follow suit, highest wins and cards are <b>discarded</b> (removed from game).</p>
+        </div>`},
+    {title:'🔄 Example Round',content:`
+        <div class="guide-section">
+            <div class="guide-title">🔄 EXAMPLE ROUND</div>
+            <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;font-size:12px">
+                <div style="margin-bottom:8px"><b>Player A</b> plays: <span style="color:var(--danger)">7♥</span> (leads Hearts)</div>
+                <div style="margin-bottom:8px"><b>Player B</b> plays: <span style="color:var(--danger)">K♥</span> (follows - highest!)</div>
+                <div style="margin-bottom:8px"><b>Player C</b> plays: <span>5♠</span> (no ♥ = <b style="color:var(--danger)">PANGKAH!</b>)</div>
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:13px">
+                    ⚡ Round stops! <b>Player B</b> takes all 3 cards
+                </div>
+            </div>
+        </div>
+        <div style="background:linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.1));border:1px solid var(--primary-action);border-radius:12px;padding:12px;margin-top:10px">
+            <div style="font-weight:800;color:var(--primary-action);margin-bottom:6px">💡 KEY INSIGHT</div>
+            <div style="font-size:11px">Player C had no Hearts, so played a Spade to "Pangkah" the round. Player B had the highest Heart (K♥), so B must take all cards!</div>
+        </div>`},
+    {title:'🤝 Take Hand & Timer',content:`
+        <div class="guide-section">
+            <div class="guide-title">🤝 TAKE HAND (TH Button)</div>
+            <p>Click <span style="color:var(--primary-action);font-weight:800">TH</span> on a player to request their hand!</p>
+            <div style="font-size:11px;margin-top:8px;opacity:0.9">
+                <div>• Only works on <b>your turn</b></div>
+                <div>• Only targets <b>next player</b> with cards</div>
+                <div>• They can <b>Accept</b> or <b>Decline</b> (15s)</div>
+                <div>• If accepted, you absorb ALL their cards!</div>
+            </div>
+            <p style="margin-top:8px;font-size:11px;color:var(--gold)">💡 Help a friend survive by taking their cards!</p>
+        </div>
+        <div class="guide-section">
+            <div class="guide-title">⏱️ TURN TIMER (15 Seconds)</div>
+            <p>You have <b>15 seconds</b> to play a card.</p>
+            <div style="font-size:11px;margin-top:6px;opacity:0.9">
+                <div>• Timer next to "YOUR TURN"</div>
+                <div>• <span style="color:var(--danger)">RED</span> in last 5 seconds</div>
+                <div>• Time out = <b>auto-play</b></div>
+            </div>
+        </div>`},
+    {title:'🏆 XP & Summary',content:`
+        <div class="guide-section">
+            <div class="guide-title">🏆 WINNING & XP</div>
+            <div style="font-size:12px">
+                <div>🥇 <b>1st Place:</b> +15 XP + streak bonus</div>
+                <div>🥈 <b>2nd Place:</b> +8 XP</div>
+                <div>🥉 <b>3rd Place:</b> +5 XP</div>
+                <div>💀 <b>Last Place:</b> -2 XP</div>
+                <div style="margin-top:8px">⚡ <b>Bonus:</b> +3 XP per Pangkah, +1 XP per clean</div>
+            </div>
+        </div>
+        <div style="background:linear-gradient(135deg,rgba(251,191,36,0.2),rgba(245,158,11,0.1));border:1px solid var(--gold);border-radius:12px;padding:15px;margin-top:10px">
+            <div style="font-weight:800;color:var(--gold);margin-bottom:8px;font-size:14px">🎓 QUICK SUMMARY</div>
+            <div style="font-size:12px;line-height:1.7">
+                1️⃣ Empty your hand first to win<br>
+                2️⃣ Follow suit if you can<br>
+                3️⃣ No suit? PANGKAH! (opponent takes cards)<br>
+                4️⃣ Last player with cards loses
+            </div>
+        </div>`}
+];
+function renderGuide(){
+    const page=GUIDE_PAGES[guidePage];
+    document.getElementById('guide-content').innerHTML=page.content;
+    document.getElementById('guide-page-indicator').innerText=`${guidePage+1} / ${GUIDE_PAGES.length}`;
+    document.getElementById('guide-prev-btn').style.visibility=guidePage===0?'hidden':'visible';
+    document.getElementById('guide-next-btn').innerText=guidePage===GUIDE_PAGES.length-1?'DONE ✓':'NEXT ▶';
+}
+function guideNav(dir){
+    if(dir===1&&guidePage===GUIDE_PAGES.length-1){closeHowToPlay();return;}
+    guidePage=Math.max(0,Math.min(GUIDE_PAGES.length-1,guidePage+dir));
+    renderGuide();
+}
+function openHowToPlay(){guidePage=0;document.getElementById('howtoplay-modal').style.display='flex';renderGuide();}
+function closeHowToPlay(){document.getElementById('howtoplay-modal').style.display='none';}
+
 function getLevel(){return Math.floor((stats.xp||0)/XP_PER_LEVEL)+1;}
 function getRankTitle(l){return l<=5?'APPRENTICE':l<=10?'WARRIOR':l<=15?'MASTER':l<=20?'GRANDMASTER':l<=30?'ELDER':l<=50?'SECT LEADER':'ANCIENT ANCESTOR';}
 function getBadgeImage(l){return l<=5?'/badge/apprentice-badge.png':l<=10?'/badge/warrior-badge.png':l<=15?'/badge/master-badge.png':l<=20?'/badge/grandmaster-badge.png':l<=30?'/badge/elder-badge.png':l<=50?'/badge/sectleader-badge.png':'/badge/ancientancestor-badge.png';}

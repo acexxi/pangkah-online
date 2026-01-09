@@ -451,6 +451,8 @@ socket.on('turnTimer',d=>{
 
 // Auto-play - includes full game state for proper render
 socket.on('autoPlayed',d=>{
+    console.log('autoPlayed received:', d);
+    console.log('autoPlayed table:', d.table);
     showToast(`⏱️ ${d.playerName} auto-played: ${d.card.rank}${icons[d.card.suit]}`,false);
     playSound('place');
     if(d.currentSuit)currentLeadSuit=d.currentSuit;
@@ -530,16 +532,19 @@ function render(players,turn,table=[]){
     
     // Render table cards
     const tLayer=document.getElementById('t-layer');
+    console.log('Rendering table, cards:', table.length, table);
     tLayer.innerHTML="";
     if(table.length>0){
         const rowDiv=document.createElement('div');
         rowDiv.className='table-cards-row';
         table.forEach((tc)=>{
+            console.log('Adding card to table:', tc.card);
             const el=createCardUI(tc.card);
             el.className=`card table-card ${['Hearts','Diamonds'].includes(tc.card.suit)?'red':''}`;
             rowDiv.appendChild(el);
         });
         tLayer.appendChild(rowDiv);
+        console.log('tLayer innerHTML after:', tLayer.innerHTML.substring(0, 100));
     }
 }
 

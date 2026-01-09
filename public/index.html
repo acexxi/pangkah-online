@@ -449,9 +449,14 @@ socket.on('turnTimer',d=>{
     }
 });
 
-// Auto-play notification
+// Auto-play - includes full game state for proper render
 socket.on('autoPlayed',d=>{
     showToast(`⏱️ ${d.playerName} auto-played: ${d.card.rank}${icons[d.card.suit]}`,false);
+    playSound('place');
+    if(d.currentSuit)currentLeadSuit=d.currentSuit;
+    if(d.table?.length>0)isFirstMove=false;
+    // Update with full state
+    update(d);
 });
 
 function update(d){isProcessingTurn=false;showLoading(false);const me=d.players.find(p=>p.userID===userID);if(me)myCurrentHand=me.hand;const active=d.players[d.turn];const isMyTurn=active?.userID===userID;setTurnIndicator(isMyTurn);const sInd=document.getElementById('suit-indicator');if(d.table?.length>0){sInd.style.display='flex';currentLeadSuit=d.table[0].card.suit;document.getElementById('suit-symbol').innerText=icons[currentLeadSuit];document.getElementById('suit-symbol').style.color=['Hearts','Diamonds'].includes(currentLeadSuit)?'var(--danger)':'white';}else{sInd.style.display='none';currentLeadSuit=null;}render(d.players,d.turn,d.table||[]);if(d.fateAces)showFateInHeader(d.fateAces);}

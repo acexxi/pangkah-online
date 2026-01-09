@@ -107,7 +107,7 @@ function autoPlayCard(roomID) {
     const room = rooms[roomID];
     if (!room || room.resolving) return;
     
-    const currentTurn = room.turn; // Capture current turn
+    const currentTurn = room.turn;
     const player = room.players[currentTurn];
     if (!player || player.hand.length === 0) return;
     
@@ -133,16 +133,64 @@ function autoPlayCard(roomID) {
     if (cardToPlay) {
         console.log(`Auto-play for ${player.name}: ${cardToPlay.rank} of ${cardToPlay.suit}`);
         
-        // Emit auto-play notification first
-        io.to(roomID).emit('autoPlayed', { 
+        // Process the card play directly (no delay)
+        const playedCard = player.hand.find(c => c.suit === cardToPlay.suit && c.rank === cardToPlay.rank);
+        if (!playedCard) return;
+        
+        const cardIndex = player.hand.indexOf(playedCard);
+        player.hand.splice(cardIndex, 1);
+        
+        if (room.isFirstMove) {
+            room.isFirstMove = false;
+        }
+        
+        room.table.push({ 
+            playerIdx: currentTurn, 
             playerName: player.name, 
-            card: cardToPlay 
+            card: playedCard 
         });
         
-        // Small delay then process the card play with captured turn index
-        setTimeout(() => {
-            processCardPlay(roomID, currentTurn, cardToPlay);
-        }, 100);
+        if (player.gameStats) {
+            player.gameStats.cardsPlayed++;
+        }
+        
+        if (room.table.length === 1) {
+            room.currentSuit = playedCard.suit;
+        }
+        
+        // Emit autoPlayed with FULL game state so client can render properly
+        io.to(roomID).emit('autoPlayed', { 
+            playerName: player.name, 
+            card: cardToPlay,
+            // Include full state for re-render
+            table: room.table,
+            turn: room.turn,
+            players: room.players,
+            currentSuit: room.currentSuit,
+            fateAces: room.fateAces
+        });
+        
+        // Determine if Pangkah occurred
+        let isPangkah = playedCard.suit !== room.currentSuit;
+        
+        if (player.gameStats && isPangkah) {
+            player.gameStats.pangkahsDealt++;
+        }
+        
+        // Count active players
+        let activePlayers = room.players.filter(p => 
+            p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p))
+        );
+        let roundComplete = room.table.length >= activePlayers.length;
+
+        if (isPangkah || roundComplete) {
+            room.resolving = true;
+            setTimeout(() => {
+                resolveRound(roomID, isPangkah);
+            }, ROUND_RESOLUTION_DELAY);
+        } else {
+            advanceToNextPlayer(roomID);
+        }
     }
 }
 

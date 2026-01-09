@@ -289,7 +289,9 @@ function advanceToNextPlayer(roomID) {
     io.to(roomID).emit('nextTurn', { 
         turn: room.turn, 
         players: room.players,
-        currentSuit: room.currentSuit
+        currentSuit: room.currentSuit,
+        table: room.table,
+        fateAces: room.fateAces
     });
     
     // Start timer for next player

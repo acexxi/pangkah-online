@@ -40,6 +40,8 @@
         .title-rarity.epic { background: var(--epic); color: #fff; }
         .title-rarity.rare { background: var(--rare); color: #fff; }
         .title-rarity.common { background: var(--common); color: #fff; }
+        .title-item.gm-title { border-color: #ff6b6b; background: linear-gradient(135deg, rgba(255,107,107,0.2), rgba(255,215,0,0.1)); }
+        .title-item.gm-title .title-rarity { background: linear-gradient(90deg, #ff6b6b, #ffd700); color: #000; }
         .title-progress { font-size: 8px; color: var(--ui-blue); margin-top: 4px; }
         .filter-tabs { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; }
         .filter-tab { padding: 6px 12px; border-radius: 20px; font-size: 10px; font-weight: 800; cursor: pointer; border: 1px solid var(--border); background: rgba(0,0,0,0.3); }
@@ -197,6 +199,7 @@
             <div class="stat-box"><div class="stat-value" id="prof-winrate">0%</div><div class="stat-label">Win Rate</div></div>
         </div>
         <button class="btn btn-gold" onclick="openTitles()" style="margin-bottom:10px">🏆 VIEW TITLES</button>
+        <button id="gm-logout-btn" class="btn" onclick="gmLogout()" style="margin-bottom:10px;background:linear-gradient(90deg,#ff6b6b,#ffd700);color:#000;display:none">⚜️ EXIT GM MODE</button>
         <button class="btn btn-p" onclick="closeProfile()">RETURN</button>
     </div>
 </div>
@@ -448,6 +451,13 @@ let userID=localStorage.getItem('pUserID')||'uid_'+Math.random().toString(36).su
 let myName=localStorage.getItem('pName')||'Disciple'+Math.floor(Math.random()*999);
 const DEFAULT_STATS={version:STATS_VERSION,xp:0,pangkahs:0,wins:0,losses:0,games:0,currentStreak:0,bestStreak:0,handsAbsorbed:0,cardsPlayed:0,secondPlace:0,thirdPlace:0,topTwo:0,nightGames:0,uniquePlayers:[],unlockedTitles:[],equippedTitle:null};
 
+// GM System
+let isGameMaster = localStorage.getItem('pGM') === 'true';
+const GM_TITLES = [
+    {id:'celestial_marshal',name:'Celestial Marshal',desc:'Game Master Exclusive',rarity:'legendary',icon:'⚜️',req:{t:'gm',v:1}},
+    {id:'shadow_magistrate',name:'Shadow Magistrate',desc:'Game Master Exclusive',rarity:'legendary',icon:'🐺',req:{t:'gm',v:1}}
+];
+
 // Load stats and check version
 let savedStats=JSON.parse(localStorage.getItem('pStats')||'{}');
 if(!savedStats.version||savedStats.version<STATS_VERSION){
@@ -463,7 +473,7 @@ function checkAllTitles(){TITLES.forEach(t=>{if(!stats.unlockedTitles.includes(t
 function showAchievement(t){const p=document.getElementById('achievement-popup');p.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:24px">${t.icon}</span><div><div style="font-size:10px;color:var(--gold);font-weight:800">TITLE UNLOCKED!</div><div style="font-size:16px;font-weight:800">${t.name}</div></div></div><div style="font-size:11px;opacity:0.7">${t.desc}</div><div class="title-rarity ${t.rarity}" style="margin-top:10px">${t.rarity.toUpperCase()}</div>`;p.style.display='block';setTimeout(()=>p.style.display='none',4000);}
 function equipTitle(id){if(stats.unlockedTitles.includes(id)){stats.equippedTitle=id;saveStats();updateStatsUI();renderTitleGrid();if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:getEquippedTitleData()});showToast('Equipped!',true);}}
 function unequipTitle(){stats.equippedTitle=null;saveStats();updateStatsUI();renderTitleGrid();if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:null});}
-function getEquippedTitleData(){if(!stats.equippedTitle)return null;const t=TITLES.find(x=>x.id===stats.equippedTitle);return t?{id:t.id,name:t.name,rarity:t.rarity,icon:t.icon}:null;}
+function getEquippedTitleData(){if(!stats.equippedTitle)return null;const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[])];const t=allTitles.find(x=>x.id===stats.equippedTitle);return t?{id:t.id,name:t.name,rarity:t.rarity,icon:t.icon}:null;}
 
 // Title Pagination
 let titlePage=0;
@@ -471,19 +481,22 @@ const TITLES_PER_PAGE=6;
 function renderTitleGrid(){
     const grid=document.getElementById('title-grid'),filters=document.getElementById('title-filters');
     filters.innerHTML=['all','legendary','epic','rare','common'].map(r=>`<div class="filter-tab ${currentFilter===r?'active':''}" onclick="currentFilter='${r}';titlePage=0;renderTitleGrid()">${r==='all'?'ALL':r.toUpperCase()}</div>`).join('');
-    const filtered=currentFilter==='all'?TITLES:TITLES.filter(t=>t.rarity===currentFilter);
-    const totalPages=Math.ceil(filtered.length/TITLES_PER_PAGE);
+    const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[])];
+    const filtered=currentFilter==='all'?allTitles:allTitles.filter(t=>t.rarity===currentFilter);
+    const totalPages=Math.ceil(filtered.length/TITLES_PER_PAGE)||1;
     const start=titlePage*TITLES_PER_PAGE;
     const pageItems=filtered.slice(start,start+TITLES_PER_PAGE);
     grid.innerHTML=pageItems.map(t=>{
-        const unlocked=stats.unlockedTitles.includes(t.id),equipped=stats.equippedTitle===t.id,prog=getStatValue(t.req.t),max=t.req.v,pct=Math.min(prog/max*100,100).toFixed(0);
-        return`<div class="title-item ${unlocked?'':'locked'} ${equipped?'equipped':''}" onclick="${unlocked?(equipped?'unequipTitle()':`equipTitle('${t.id}')`):''}">${equipped?'<span style="position:absolute;top:8px;right:8px">✓</span>':''}<span class="title-rarity ${t.rarity}">${t.rarity.toUpperCase()}</span><div class="title-name">${t.icon} ${t.name}</div><div class="title-desc">${t.desc}</div>${!unlocked?`<div class="title-progress">${Math.min(prog,max)}/${max} (${pct}%)</div>`:''}</div>`;
+        const isGMTitle=t.req.t==='gm';
+        const unlocked=stats.unlockedTitles.includes(t.id),equipped=stats.equippedTitle===t.id,prog=isGMTitle?1:getStatValue(t.req.t),max=t.req.v,pct=Math.min(prog/max*100,100).toFixed(0);
+        return`<div class="title-item ${unlocked?'':'locked'} ${equipped?'equipped':''} ${isGMTitle?'gm-title':''}" onclick="${unlocked?(equipped?'unequipTitle()':`equipTitle('${t.id}')`):''}">${equipped?'<span style="position:absolute;top:8px;right:8px">✓</span>':''}<span class="title-rarity ${t.rarity}">${isGMTitle?'GM':t.rarity.toUpperCase()}</span><div class="title-name">${t.icon} ${t.name}</div><div class="title-desc">${t.desc}</div>${!unlocked&&!isGMTitle?`<div class="title-progress">${Math.min(prog,max)}/${max} (${pct}%)</div>`:''}</div>`;
     }).join('');
     document.getElementById('title-page-indicator').innerText=`${titlePage+1} / ${totalPages}`;
 }
 function titleNav(dir){
-    const filtered=currentFilter==='all'?TITLES:TITLES.filter(t=>t.rarity===currentFilter);
-    const totalPages=Math.ceil(filtered.length/TITLES_PER_PAGE);
+    const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[])];
+    const filtered=currentFilter==='all'?allTitles:allTitles.filter(t=>t.rarity===currentFilter);
+    const totalPages=Math.ceil(filtered.length/TITLES_PER_PAGE)||1;
     titlePage=Math.max(0,Math.min(totalPages-1,titlePage+dir));
     renderTitleGrid();
 }
@@ -597,8 +610,49 @@ function openHowToPlay(){guidePage=0;document.getElementById('howtoplay-modal').
 function closeHowToPlay(){document.getElementById('howtoplay-modal').style.display='none';}
 
 function getLevel(){return Math.floor((stats.xp||0)/XP_PER_LEVEL)+1;}
-function getRankTitle(l){return l<=5?'APPRENTICE':l<=10?'WARRIOR':l<=15?'MASTER':l<=20?'GRANDMASTER':l<=30?'ELDER':l<=50?'SECT LEADER':'ANCIENT ANCESTOR';}
-function getBadgeImage(l){return l<=5?'/badge/apprentice-badge.png':l<=10?'/badge/warrior-badge.png':l<=15?'/badge/master-badge.png':l<=20?'/badge/grandmaster-badge.png':l<=30?'/badge/elder-badge.png':l<=50?'/badge/sectleader-badge.png':'/badge/ancientancestor-badge.png';}
+function getLevelDisplay(){return isGameMaster?'∞':getLevel();}
+function getRankTitle(l){return isGameMaster?'GAME MASTER':l<=5?'APPRENTICE':l<=10?'WARRIOR':l<=15?'MASTER':l<=20?'GRANDMASTER':l<=30?'ELDER':l<=50?'SECT LEADER':'ANCIENT ANCESTOR';}
+function getBadgeImage(l){return isGameMaster?'/badge/gm-badge.png':l<=5?'/badge/apprentice-badge.png':l<=10?'/badge/warrior-badge.png':l<=15?'/badge/master-badge.png':l<=20?'/badge/grandmaster-badge.png':l<=30?'/badge/elder-badge.png':l<=50?'/badge/sectleader-badge.png':'/badge/ancientancestor-badge.png';}
+
+// GM Functions
+async function gmLogin(){
+    const pwd=prompt('Enter Game Master Password:');
+    if(!pwd)return;
+    try{
+        const res=await fetch('/api/gm/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pwd})});
+        const data=await res.json();
+        if(data.success&&data.isGM){
+            isGameMaster=true;
+            localStorage.setItem('pGM','true');
+            // Add GM exclusive titles if not already unlocked
+            if(!stats.unlockedTitles.includes('celestial_marshal'))stats.unlockedTitles.push('celestial_marshal');
+            if(!stats.unlockedTitles.includes('shadow_magistrate'))stats.unlockedTitles.push('shadow_magistrate');
+            saveStats();
+            updateStatsUI();
+            showToast('⚜️ Game Master Mode Activated!',true);
+        }else{
+            showToast('Invalid password!',false);
+        }
+    }catch(e){showToast('Connection error',false);}
+}
+function gmLogout(){
+    isGameMaster=false;
+    localStorage.removeItem('pGM');
+    // Remove GM titles
+    stats.unlockedTitles=stats.unlockedTitles.filter(t=>t!=='celestial_marshal'&&t!=='shadow_magistrate');
+    if(stats.equippedTitle==='celestial_marshal'||stats.equippedTitle==='shadow_magistrate')stats.equippedTitle=null;
+    saveStats();
+    updateStatsUI();
+    showToast('Game Master Mode Deactivated',false);
+}
+// Secret key combo to open GM login: press G then M within 500ms
+let gmKeyBuffer=[];
+document.addEventListener('keydown',e=>{
+    gmKeyBuffer.push(e.key.toLowerCase());
+    setTimeout(()=>gmKeyBuffer.shift(),500);
+    if(gmKeyBuffer.join('').includes('gm')&&!isGameMaster){gmKeyBuffer=[];gmLogin();}
+});
+
 function saveStats(){
     localStorage.setItem('pStats',JSON.stringify(stats));
     // Sync to MongoDB (non-blocking)
@@ -614,7 +668,7 @@ async function syncStatsToServer(){
     } catch(e) { console.log('Sync failed:', e); }
 }
 function addXP(amt,reason,popup=true){const old=getLevel();stats.xp=Math.max(0,(stats.xp||0)+amt);saveStats();if(getLevel()>old)showToast(`⚡ LEVEL UP! Lv.${getLevel()}`,true);if(popup&&amt){const p=document.createElement('div');p.className='xp-popup';p.style.color=amt>0?'var(--primary-action)':'var(--danger)';p.innerText=`${amt>0?'+':''}${amt} XP`;document.body.appendChild(p);setTimeout(()=>p.remove(),1500);}updateStatsUI();checkAllTitles();}
-function updateStatsUI(){const lv=getLevel(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('level-title').innerText=`LEVEL ${lv} - ${rt}`;document.getElementById('lobby-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:10px">${eq.icon} ${eq.name}</span>`:'';document.getElementById('lobby-badge').src=getBadgeImage(lv);document.getElementById('prof-level').innerText=`LEVEL ${lv}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;}
+function updateStatsUI(){const lv=getLevel(),lvDisplay=getLevelDisplay(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('level-title').innerText=isGameMaster?'GAME MASTER':`LEVEL ${lvDisplay} - ${rt}`;document.getElementById('lobby-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:10px">${eq.icon} ${eq.name}</span>`:'';document.getElementById('lobby-badge').src=getBadgeImage(lv);document.getElementById('prof-level').innerText=isGameMaster?'∞':`LEVEL ${lvDisplay}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=isGameMaster?'∞ XP':`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=isGameMaster?'100%':(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;document.getElementById('gm-logout-btn').style.display=isGameMaster?'block':'none';}
 function editName(){const n=prompt("Enter Name:",myName);if(n?.trim()&&n.trim().length<=20){myName=n.trim();localStorage.setItem('pName',myName);updateStatsUI();}}
 function openProfile(){updateStatsUI();document.getElementById('profile-modal').style.display='flex';}
 function closeProfile(){document.getElementById('profile-modal').style.display='none';}

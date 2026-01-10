@@ -743,7 +743,7 @@ io.on('connection', (socket) => {
     /**
      * CREATE ROOM
      */
-    socket.on('createRoom', ({ roomID, playerName, maxPlayers, userID, equippedTitle, level }) => {
+    socket.on('createRoom', ({ roomID, playerName, maxPlayers, userID, equippedTitle, level, isGM }) => {
         if (!roomID || !playerName || !userID) {
             return socket.emit('errorMsg', 'Missing required fields');
         }
@@ -767,6 +767,7 @@ io.on('connection', (socket) => {
                 hand: [],
                 equippedTitle: equippedTitle || null,
                 level: level || 1,
+                isGM: isGM || false,
                 gameStats: null,
                 rematchReady: false
             }],
@@ -785,13 +786,13 @@ io.on('connection', (socket) => {
         socket.join(roomID);
         io.to(roomID).emit('updatePlayers', rooms[roomID].players, { maxPlayers: rooms[roomID].maxPlayers });
         broadcastRooms();
-        console.log(`Room ${roomID} created by ${playerName}`);
+        console.log(`Room ${roomID} created by ${playerName}${isGM?' (GM)':''}`);
     });
 
     /**
      * JOIN ROOM
      */
-    socket.on('joinRoom', ({ roomID, playerName, userID, equippedTitle, level }) => {
+    socket.on('joinRoom', ({ roomID, playerName, userID, equippedTitle, level, isGM }) => {
         if (!roomID || !playerName || !userID) {
             return socket.emit('errorMsg', 'Missing required fields');
         }
@@ -806,8 +807,9 @@ io.on('connection', (socket) => {
             existing.id = socket.id;
             existing.equippedTitle = equippedTitle || existing.equippedTitle;
             existing.level = level || existing.level || 1;
+            existing.isGM = isGM || existing.isGM || false;
             socket.join(roomID);
-            console.log(`${playerName} rejoined room ${roomID}`);
+            console.log(`${playerName} rejoined room ${roomID}${isGM?' (GM)':''}`);
         } else {
             if (room.players.length >= room.maxPlayers) {
                 return socket.emit('errorMsg', 'Room full!');
@@ -824,11 +826,12 @@ io.on('connection', (socket) => {
                 hand: [],
                 equippedTitle: equippedTitle || null,
                 level: level || 1,
+                isGM: isGM || false,
                 gameStats: null,
                 rematchReady: false
             });
             socket.join(roomID);
-            console.log(`${playerName} joined room ${roomID}`);
+            console.log(`${playerName} joined room ${roomID}${isGM?' (GM)':''}`);
         }
         
         io.to(roomID).emit('updatePlayers', room.players, { maxPlayers: room.maxPlayers });

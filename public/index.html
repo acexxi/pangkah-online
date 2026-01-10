@@ -468,6 +468,49 @@ if(!savedStats.version||savedStats.version<STATS_VERSION){
 let stats={...DEFAULT_STATS,...savedStats};
 let myRoom='',myCurrentHand=[],pendingSwapRequest=null,swapTimeoutId=null,isProcessingTurn=false,isHost=false,isFirstMove=true,currentLeadSuit=null,currentFilter='all',rematchRequested=false,currentMaxPlayers=4;
 
+// Auto-sync from MongoDB on page load
+async function syncFromServer(){
+    try{
+        const res=await fetch(`/api/stats/${userID}`);
+        if(res.ok){
+            const serverData=await res.json();
+            if(serverData&&serverData.userID){
+                // Merge server data with local (server takes priority)
+                stats={
+                    ...DEFAULT_STATS,
+                    version:STATS_VERSION,
+                    xp:serverData.xp||0,
+                    wins:serverData.wins||0,
+                    losses:serverData.losses||0,
+                    games:serverData.games||0,
+                    pangkahs:serverData.pangkahs||0,
+                    pangkahsReceived:serverData.pangkahsReceived||0,
+                    bestStreak:serverData.bestStreak||0,
+                    currentStreak:serverData.currentStreak||0,
+                    handsAbsorbed:serverData.handsAbsorbed||0,
+                    handsGiven:serverData.handsGiven||0,
+                    cleanWins:serverData.cleanWins||0,
+                    maxCardsHeld:serverData.maxCardsHeld||0,
+                    autoPlays:serverData.autoPlays||0,
+                    cardsPlayed:serverData.cardsPlayed||0,
+                    secondPlace:serverData.secondPlace||0,
+                    thirdPlace:serverData.thirdPlace||0,
+                    topTwo:serverData.topTwo||0,
+                    nightGames:serverData.nightGames||0,
+                    unlockedTitles:serverData.unlockedTitles||[],
+                    equippedTitle:serverData.equippedTitle||null,
+                    uniquePlayers:stats.uniquePlayers||[]
+                };
+                localStorage.setItem('pStats',JSON.stringify(stats));
+                console.log('✅ Stats synced from server');
+                updateStatsUI();
+            }
+        }
+    }catch(e){console.log('Server sync skipped:',e.message);}
+}
+// Call sync on page load (after DOM ready)
+document.addEventListener('DOMContentLoaded',()=>setTimeout(syncFromServer,500));
+
 function getStatValue(t){switch(t){case'level':return getLevel();case'pangkahs':return stats.pangkahs||0;case'streak':return stats.bestStreak||0;case'wins':return stats.wins||0;case'games':return stats.games||0;case'xp':return stats.xp||0;case'handsAbsorbed':return stats.handsAbsorbed||0;case'nightGames':return stats.nightGames||0;case'uniquePlayers':return(stats.uniquePlayers||[]).length;case'topTwo':return stats.topTwo||0;case'secondPlace':return stats.secondPlace||0;case'thirdPlace':return stats.thirdPlace||0;case'cardsPlayed':return stats.cardsPlayed||0;case'losses':return stats.losses||0;case'maxCardsHeld':return stats.maxCardsHeld||0;case'comebacks':return stats.comebacks||0;case'perfectWins':return stats.perfectWins||0;case'fastWins':return stats.fastWins||0;case'handsGiven':return stats.handsGiven||0;case'autoPlays':return stats.autoPlays||0;case'cleanWins':return stats.cleanWins||0;case'pangkahsReceived':return stats.pangkahsReceived||0;default:return 0;}}
 function checkAllTitles(){TITLES.forEach(t=>{if(!stats.unlockedTitles.includes(t.id)&&getStatValue(t.req.t)>=t.req.v){stats.unlockedTitles.push(t.id);showAchievement(t);}});saveStats();}
 function showAchievement(t){const p=document.getElementById('achievement-popup');p.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:24px">${t.icon}</span><div><div style="font-size:10px;color:var(--gold);font-weight:800">TITLE UNLOCKED!</div><div style="font-size:16px;font-weight:800">${t.name}</div></div></div><div style="font-size:11px;opacity:0.7">${t.desc}</div><div class="title-rarity ${t.rarity}" style="margin-top:10px">${t.rarity.toUpperCase()}</div>`;p.style.display='block';setTimeout(()=>p.style.display='none',4000);}

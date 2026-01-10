@@ -599,7 +599,20 @@ function closeHowToPlay(){document.getElementById('howtoplay-modal').style.displ
 function getLevel(){return Math.floor((stats.xp||0)/XP_PER_LEVEL)+1;}
 function getRankTitle(l){return l<=5?'APPRENTICE':l<=10?'WARRIOR':l<=15?'MASTER':l<=20?'GRANDMASTER':l<=30?'ELDER':l<=50?'SECT LEADER':'ANCIENT ANCESTOR';}
 function getBadgeImage(l){return l<=5?'/badge/apprentice-badge.png':l<=10?'/badge/warrior-badge.png':l<=15?'/badge/master-badge.png':l<=20?'/badge/grandmaster-badge.png':l<=30?'/badge/elder-badge.png':l<=50?'/badge/sectleader-badge.png':'/badge/ancientancestor-badge.png';}
-function saveStats(){localStorage.setItem('pStats',JSON.stringify(stats));}
+function saveStats(){
+    localStorage.setItem('pStats',JSON.stringify(stats));
+    // Sync to MongoDB (non-blocking)
+    syncStatsToServer();
+}
+async function syncStatsToServer(){
+    try {
+        await fetch('/api/stats/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userID, displayName: myName, stats })
+        });
+    } catch(e) { console.log('Sync failed:', e); }
+}
 function addXP(amt,reason,popup=true){const old=getLevel();stats.xp=Math.max(0,(stats.xp||0)+amt);saveStats();if(getLevel()>old)showToast(`⚡ LEVEL UP! Lv.${getLevel()}`,true);if(popup&&amt){const p=document.createElement('div');p.className='xp-popup';p.style.color=amt>0?'var(--primary-action)':'var(--danger)';p.innerText=`${amt>0?'+':''}${amt} XP`;document.body.appendChild(p);setTimeout(()=>p.remove(),1500);}updateStatsUI();checkAllTitles();}
 function updateStatsUI(){const lv=getLevel(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('level-title').innerText=`LEVEL ${lv} - ${rt}`;document.getElementById('lobby-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:10px">${eq.icon} ${eq.name}</span>`:'';document.getElementById('lobby-badge').src=getBadgeImage(lv);document.getElementById('prof-level').innerText=`LEVEL ${lv}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;}
 function editName(){const n=prompt("Enter Name:",myName);if(n?.trim()&&n.trim().length<=20){myName=n.trim();localStorage.setItem('pName',myName);updateStatsUI();}}

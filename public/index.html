@@ -11,20 +11,24 @@
         body { margin: 0; height: 100vh; overflow: hidden; background: var(--table-bg) center/cover no-repeat fixed; color: white; display: flex; flex-direction: column; }
         #lobby { position: fixed; inset: 0; z-index: 5000; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
         .panel { width: 90%; max-width: 400px; padding: 35px; border-radius: 24px; background: var(--glass-heavy); border: 1px solid var(--border-light); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
-        .murim-logo { width: 100%; max-width: 320px; height: auto; margin-bottom: 25px; filter: drop-shadow(0 0 8px var(--murim-glow)) drop-shadow(0 0 15px rgba(255,215,0,0.4)); animation: logoGlow 2s ease-in-out infinite alternate; }
+        .murim-logo { width: 100%; max-width: 320px; height: auto; margin-bottom: 25px; }
         
         /* New Lobby Header - Full Width Top */
         #lobby { display: flex; flex-direction: column; height: 100vh; }
         .lobby-header { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: var(--glass-heavy); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); z-index: 1000; }
         .lobby-header-left { display: flex; align-items: center; }
-        .header-logo { height: 28px; width: auto; filter: drop-shadow(0 0 5px var(--murim-glow)); }
+        .header-logo { height: 28px; width: auto; }
         .lobby-header-right { display: flex; align-items: center; gap: 12px; }
-        .header-player-info { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+        .header-player-box { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 14px; background: rgba(0,0,0,0.18); }
+
+        .header-player-info { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
         .header-badge { width: 32px; height: 32px; }
         .header-name { color: var(--ui-blue); font-weight: 800; font-size: 13px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .header-title { font-size: 10px; opacity: 0.8; }
         .header-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--glass-light); border: 1px solid var(--border); color: #fff; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
         .header-btn:hover { background: var(--ui-blue); border-color: var(--ui-blue); transform: scale(1.1); }
+        .header-btn.profile-btn { width: auto; padding: 0 12px; border-radius: 12px; font-size: 11px; font-weight: 900; letter-spacing: 0.6px; }
+
         .lobby-body { flex: 1; display: flex; align-items: center; justify-content: center; padding-top: 70px; }
         
         /* Leaderboard Modal */
@@ -278,12 +282,14 @@
             <img src="/PM-logo.png" alt="Pangkah Murim" class="header-logo">
         </div>
         <div class="lobby-header-right">
-            <img id="lobby-badge" src="/badge/apprentice-badge.png" alt="badge" class="header-badge">
-            <div class="header-player-info">
-                <span id="display-name" class="header-name"></span>
-                <span id="header-title" class="header-title"></span>
+            <div class="header-player-box">
+                <img id="lobby-badge" src="/badge/apprentice-badge.png" alt="badge" class="header-badge">
+                <div class="header-player-info">
+                    <span id="display-name" class="header-name"></span>
+                    <span id="header-title" class="header-title"></span>
+                </div>
             </div>
-            <button class="header-btn" onclick="openProfile()" title="Profile">👤</button>
+            <button class="header-btn profile-btn" onclick="openProfile()" title="Profile">PROFILE</button>
             <button class="header-btn" onclick="openLeaderboard()" title="Leaderboard">🏆</button>
         </div>
     </div>

@@ -444,7 +444,7 @@ const socket=io(),icons={Spades:'♠',Hearts:'♥',Diamonds:'♦',Clubs:'♣'},X
 
 // ============ VERSION RESET SYSTEM ============
 // Change this number to force all players to reset their stats
-const STATS_VERSION = 2;
+const STATS_VERSION = 1;
 // =============================================
 
 let userID=localStorage.getItem('pUserID')||'uid_'+Math.random().toString(36).substr(2,9);localStorage.setItem('pUserID',userID);
@@ -655,7 +655,7 @@ function closeHowToPlay(){document.getElementById('howtoplay-modal').style.displ
 function getLevel(){return Math.floor((stats.xp||0)/XP_PER_LEVEL)+1;}
 function getLevelDisplay(){return isGameMaster?'∞':getLevel();}
 function getRankTitle(l){return isGameMaster?'GAME MASTER':l<=5?'APPRENTICE':l<=10?'WARRIOR':l<=15?'MASTER':l<=20?'GRANDMASTER':l<=30?'ELDER':l<=50?'SECT LEADER':'ANCIENT ANCESTOR';}
-function getBadgeImage(l){return isGameMaster?'/badge/gm-badge.png':l<=5?'/badge/apprentice-badge.png':l<=10?'/badge/warrior-badge.png':l<=15?'/badge/master-badge.png':l<=20?'/badge/grandmaster-badge.png':l<=30?'/badge/elder-badge.png':l<=50?'/badge/sectleader-badge.png':'/badge/ancientancestor-badge.png';}
+function getBadgeImage(l,isGM=false){return isGM?'/badge/gm-badge.png':l<=5?'/badge/apprentice-badge.png':l<=10?'/badge/warrior-badge.png':l<=15?'/badge/master-badge.png':l<=20?'/badge/grandmaster-badge.png':l<=30?'/badge/elder-badge.png':l<=50?'/badge/sectleader-badge.png':'/badge/ancientancestor-badge.png';}
 
 // GM Functions
 async function gmLogin(){
@@ -711,7 +711,7 @@ async function syncStatsToServer(){
     } catch(e) { console.log('Sync failed:', e); }
 }
 function addXP(amt,reason,popup=true){const old=getLevel();stats.xp=Math.max(0,(stats.xp||0)+amt);saveStats();if(getLevel()>old)showToast(`⚡ LEVEL UP! Lv.${getLevel()}`,true);if(popup&&amt){const p=document.createElement('div');p.className='xp-popup';p.style.color=amt>0?'var(--primary-action)':'var(--danger)';p.innerText=`${amt>0?'+':''}${amt} XP`;document.body.appendChild(p);setTimeout(()=>p.remove(),1500);}updateStatsUI();checkAllTitles();}
-function updateStatsUI(){const lv=getLevel(),lvDisplay=getLevelDisplay(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('level-title').innerText=isGameMaster?'GAME MASTER':`LEVEL ${lvDisplay} - ${rt}`;document.getElementById('lobby-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:10px">${eq.icon} ${eq.name}</span>`:'';document.getElementById('lobby-badge').src=getBadgeImage(lv);document.getElementById('prof-level').innerText=isGameMaster?'∞':`LEVEL ${lvDisplay}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=isGameMaster?'∞ XP':`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=isGameMaster?'100%':(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;document.getElementById('gm-logout-btn').style.display=isGameMaster?'block':'none';}
+function updateStatsUI(){const lv=getLevel(),lvDisplay=getLevelDisplay(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('level-title').innerText=isGameMaster?'GAME MASTER':`LEVEL ${lvDisplay} - ${rt}`;document.getElementById('lobby-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:10px">${eq.icon} ${eq.name}</span>`:'';document.getElementById('lobby-badge').src=getBadgeImage(lv,isGameMaster);document.getElementById('prof-level').innerText=isGameMaster?'∞':`LEVEL ${lvDisplay}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=isGameMaster?'∞ XP':`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=isGameMaster?'100%':(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;document.getElementById('gm-logout-btn').style.display=isGameMaster?'block':'none';}
 function editName(){const n=prompt("Enter Name:",myName);if(n?.trim()&&n.trim().length<=20){myName=n.trim();localStorage.setItem('pName',myName);updateStatsUI();}}
 function openProfile(){updateStatsUI();document.getElementById('profile-modal').style.display='flex';}
 function closeProfile(){document.getElementById('profile-modal').style.display='none';}
@@ -765,7 +765,7 @@ function launchConfetti(){
     }
 }
 
-function enter(type){myRoom=document.getElementById('rid').value.trim();if(!myRoom)return showToast("Sect ID Required");showLoading(true);const data={roomID:myRoom,playerName:myName,userID,equippedTitle:getEquippedTitleData(),level:getLevel()};if(type==='create'){data.maxPlayers=document.getElementById('maxp').value;currentMaxPlayers=parseInt(data.maxPlayers);isHost=true;}socket.emit(type==='create'?'createRoom':'joinRoom',data);}
+function enter(type){myRoom=document.getElementById('rid').value.trim();if(!myRoom)return showToast("Sect ID Required");showLoading(true);const data={roomID:myRoom,playerName:myName,userID,equippedTitle:getEquippedTitleData(),level:getLevel(),isGM:isGameMaster};if(type==='create'){data.maxPlayers=document.getElementById('maxp').value;currentMaxPlayers=parseInt(data.maxPlayers);isHost=true;}socket.emit(type==='create'?'createRoom':'joinRoom',data);}
 function start(){const btn=document.getElementById('start-btn');if(btn.disabled)return;showLoading(true);socket.emit('startGame',myRoom);}
 function closeRoom(){if(myRoom&&confirm("Disband this sect?"))socket.emit('requestCloseRoom',{roomID:myRoom});}
 function sortHand(){const o={Spades:4,Hearts:3,Diamonds:2,Clubs:1};myCurrentHand.sort((a,b)=>(o[b.suit]-o[a.suit])||(b.val-a.val));renderHand();}
@@ -875,8 +875,10 @@ function render(players,turn,table=[]){
         }
         
         const playerLevel=p.level||1;
+        const playerIsGM=p.isGM||false;
         const titleText=p.equippedTitle?`${p.equippedTitle.name}`:'';
-        const badgeImg=getBadgeImage(playerLevel);
+        const badgeImg=getBadgeImage(playerLevel,playerIsGM);
+        const displayLevel=playerIsGM?'∞':playerLevel;
         
         const div=document.createElement('div');
         div.className=`player ${i===turn?'active':''} ${p.hand.length===0?'eliminated':''}`;
@@ -889,7 +891,7 @@ function render(players,turn,table=[]){
 <div class="av-take-hand ${thClass}" onclick="event.stopPropagation();socket.emit('sendSwapRequest',{roomID:'${myRoom}',fromUserID:'${userID}'})" title="Take Hand"></div>
 <div class="av-avatar"><img src="${badgeImg}" alt="badge" style="width:100%;height:100%;object-fit:contain"></div>
 <div class="av-info">
-<div class="av-level">LVL ${playerLevel}</div>
+<div class="av-level">LVL ${displayLevel}</div>
 <div class="av-name" style="color:${p.userID===userID?'var(--ui-blue)':'#fff'}">${p.name}</div>
 <div class="av-title">${titleText}</div>
 </div>

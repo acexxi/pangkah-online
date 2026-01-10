@@ -1,12 +1,29 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const mongoose = require('mongoose');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.static('public'));
+
+// ====================================
+// MONGODB CONNECTION
+// ====================================
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (MONGODB_URI) {
+    mongoose.connect(MONGODB_URI, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true
+    })
+    .then(() => console.log('✅ MongoDB connected'))
+    .catch(err => console.error('❌ MongoDB connection error:', err));
+} else {
+    console.log('⚠️  No MONGODB_URI found, running without database');
+}
 
 // Constants
 const ROUND_RESOLUTION_DELAY = 1500;
@@ -23,6 +40,242 @@ const FATE_CONFIG = {
     8: 4,   // 52 cards / 8 = 6 each, 4 leftover -> discard all 4 aces
     10: 2   // 52 cards / 10 = 5 each, 2 leftover -> discard 2 random aces
 };
+
+// ====================================
+// MONGODB SCHEMAS
+// ====================================
+
+// Player Stats Schema
+const PlayerStatsSchema = new mongoose.Schema({
+    userID: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
+    stats: {
+        version: { type: Number, default: 1 },
+        xp: { type: Number, default: 0 },
+        pangkahs: { type: Number, default: 0 },
+        wins: { type: Number, default: 0 },
+        losses: { type: Number, default: 0 },
+        games: { type: Number, default: 0 },
+        currentStreak: { type: Number, default: 0 },
+        bestStreak: { type: Number, default: 0 },
+        handsAbsorbed: { type: Number, default: 0 },
+        cardsPlayed: { type: Number, default: 0 },
+        secondPlace: { type: Number, default: 0 },
+        thirdPlace: { type: Number, default: 0 },
+        topTwo: { type: Number, default: 0 },
+        nightGames: { type: Number, default: 0 },
+        uniquePlayers: { type: [String], default: [] },
+        unlockedTitles: { type: [String], default: [] },
+        equippedTitle: { type: String, default: '' },
+        maxCardsHeld: { type: Number, default: 0 },
+        pangkahsReceived: { type: Number, default: 0 },
+        cleanWins: { type: Number, default: 0 },
+        handsGiven: { type: Number, default: 0 },
+        autoPlays: { type: Number, default: 0 }
+    },
+    isGM: { type: Boolean, default: false },
+    createdAt: { type: Date, default: Date.now },
+    lastPlayed: { type: Date, default: Date.now }
+});
+
+const PlayerStats = mongoose.model('PlayerStats', PlayerStatsSchema);
+
+// Game History Schema
+const GameHistorySchema = new mongoose.Schema({
+    roomID: { type: String, required: true },
+    players: [{
+        userID: String,
+        name: String,
+        finalPosition: Number,
+        cardsRemaining: Number
+    }],
+    winner: {
+        userID: String,
+        name: String
+    },
+    totalRounds: { type: Number, default: 0 },
+    startTime: { type: Date, required: true },
+    endTime: { type: Date, required: true },
+    duration: { type: Number } // in seconds
+});
+
+const GameHistory = mongoose.model('GameHistory', GameHistorySchema);
+
+// ====================================
+// MONGODB HELPER FUNCTIONS
+// ====================================
+
+/**
+ * Load player stats from database
+ */
+async function loadPlayerStats(userID) {
+    if (!MONGODB_URI) return null;
+    
+    try {
+        let player = await PlayerStats.findOne({ userID });
+        if (!player) {
+            // Create new player with default stats
+            player = new PlayerStats({
+                userID,
+                name: 'Player',
+                stats: {
+                    version: 1,
+                    xp: 0,
+                    pangkahs: 0,
+                    wins: 0,
+                    losses: 0,
+                    games: 0,
+                    currentStreak: 0,
+                    bestStreak: 0,
+                    handsAbsorbed: 0,
+                    cardsPlayed: 0,
+                    secondPlace: 0,
+                    thirdPlace: 0,
+                    topTwo: 0,
+                    nightGames: 0,
+                    uniquePlayers: [],
+                    unlockedTitles: [],
+                    equippedTitle: '',
+                    maxCardsHeld: 0,
+                    pangkahsReceived: 0,
+                    cleanWins: 0,
+                    handsGiven: 0,
+                    autoPlays: 0
+                }
+            });
+            await player.save();
+            console.log(`📊 New player created: ${userID}`);
+        }
+        return player.stats;
+    } catch (err) {
+        console.error('Error loading stats:', err);
+        return null;
+    }
+}
+
+/**
+ * Save player stats to database
+ */
+async function savePlayerStats(userID, name, stats) {
+    if (!MONGODB_URI) return;
+    
+    try {
+        await PlayerStats.findOneAndUpdate(
+            { userID },
+            { 
+                name,
+                stats,
+                lastPlayed: new Date()
+            },
+            { upsert: true, new: true }
+        );
+        console.log(`💾 Stats saved for ${name}`);
+    } catch (err) {
+        console.error('Error saving stats:', err);
+    }
+}
+
+/**
+ * Save game history to database
+ */
+async function saveGameHistory(room, winner, duration) {
+    if (!MONGODB_URI) return;
+    
+    try {
+        const gameHistory = new GameHistory({
+            roomID: room.roomID,
+            players: room.players.map((p, idx) => ({
+                userID: p.userID,
+                name: p.name,
+                finalPosition: idx + 1,
+                cardsRemaining: p.hand.length
+            })),
+            winner: {
+                userID: winner.userID,
+                name: winner.name
+            },
+            totalRounds: room.roundNumber || 0,
+            startTime: room.startTime || new Date(),
+            endTime: new Date(),
+            duration
+        });
+        await gameHistory.save();
+        console.log(`📜 Game history saved for room ${room.roomID}`);
+    } catch (err) {
+        console.error('Error saving game history:', err);
+    }
+}
+
+/**
+ * Check if user is Game Master
+ */
+async function checkGameMaster(userID) {
+    if (!MONGODB_URI) return false;
+    
+    try {
+        const player = await PlayerStats.findOne({ userID });
+        return player?.isGM || false;
+    } catch (err) {
+        console.error('Error checking GM status:', err);
+        return false;
+    }
+}
+
+/**
+ * Set Game Master status (requires correct password)
+ */
+async function setGameMaster(userID, password) {
+    const GM_PASSWORD = process.env.GM_PASSWORD || 'pangkah_gm_2024';
+    
+    if (password !== GM_PASSWORD) {
+        return { success: false, message: 'Invalid password' };
+    }
+    
+    try {
+        await PlayerStats.findOneAndUpdate(
+            { userID },
+            { isGM: true },
+            { upsert: true }
+        );
+        console.log(`👑 GM status granted to ${userID}`);
+        return { success: true, message: 'GM status granted' };
+    } catch (err) {
+        console.error('Error setting GM:', err);
+        return { success: false, message: 'Database error' };
+    }
+}
+
+/**
+ * Get leaderboard
+ */
+async function getLeaderboard(sortBy = 'xp', limit = 10) {
+    if (!MONGODB_URI) return [];
+    
+    try {
+        const sort = {};
+        sort[`stats.${sortBy}`] = -1;
+        
+        const players = await PlayerStats
+            .find({})
+            .sort(sort)
+            .limit(limit)
+            .select('userID name stats.xp stats.wins stats.games stats.pangkahs isGM');
+        
+        return players.map(p => ({
+            userID: p.userID,
+            name: p.name,
+            xp: p.stats.xp,
+            wins: p.stats.wins,
+            games: p.stats.games,
+            pangkahs: p.stats.pangkahs,
+            level: p.isGM ? '∞' : Math.floor(p.stats.xp / 100) + 1,
+            isGM: p.isGM
+        }));
+    } catch (err) {
+        console.error('Error getting leaderboard:', err);
+        return [];
+    }
+}
 
 let rooms = {};
 let turnTimers = {}; // Store turn timers per room
@@ -160,7 +413,8 @@ function autoPlayCard(roomID) {
         
         // Emit autoPlayed with FULL game state so client can render properly
         io.to(roomID).emit('autoPlayed', { 
-            playerName: player.name, 
+            playerName: player.name,
+            playerUserID: player.userID,
             card: cardToPlay,
             // Include full state for re-render
             table: room.table,
@@ -343,7 +597,7 @@ function resolveRound(roomID, isPangkah) {
     
     // Check for game over
     let survivors = room.players.filter(p => p.hand.length > 0);
-    
+
     // Track finish order
     room.players.forEach((p, idx) => {
         if (p.hand.length === 0 && !room.finishOrder.includes(p.userID)) {
@@ -380,6 +634,13 @@ function resolveRound(roomID, isPangkah) {
             gameNumber: room.gameNumber,
             performanceData
         });
+        
+        // Save game history to database
+        if (MONGODB_URI && room.startTime) {
+            const winner = room.players.find(p => p.userID === room.finishOrder[0]);
+            const duration = Math.floor((Date.now() - room.startTime.getTime()) / 1000);
+            await saveGameHistory(room, winner, duration);
+        }
         
         room.gameStarted = false;
         broadcastRooms();
@@ -445,14 +706,13 @@ function getNextActivePlayer(room, startIdx) {
  */
 function initPlayerGameStats(player) {
     player.gameStats = {
-        pangkahsDealt: 0,      // Times they pangkah'd someone
-        pangkahsReceived: 0,   // Times they got pangkah'd
-        cleanWins: 0,          // Clean rounds they won
-        cardsPlayed: 0,        // Total cards played
-        perfectRounds: 0,      // Rounds where they played optimally
-        comebacks: 0,          // Times they recovered from 15+ cards
-        hadMostCards: false,   // At some point had most cards
-        finishPosition: 0      // Final position (1st, 2nd, etc.)
+        cardsPlayed: 0,
+        pangkahsDealt: 0,
+        pangkahsReceived: 0,
+        cleanWins: 0,
+        finishPosition: null,
+        hadMostCards: false,
+        comebacks: 0
     };
 }
 
@@ -554,12 +814,13 @@ io.on('connection', (socket) => {
             fateAces: [],
             gameStarted: false,
             resolving: false,
-            gameNumber: 0,
-            finishOrder: []
+            finishOrder: [],
+            gameNumber: 0
         };
         
         socket.join(roomID);
-        io.to(roomID).emit('updatePlayers', rooms[roomID].players, { maxPlayers: rooms[roomID].maxPlayers });
+        socket.emit('roomCreated', { roomID });
+        io.to(roomID).emit('updatePlayers', { players: rooms[roomID].players });
         broadcastRooms();
         console.log(`Room ${roomID} created by ${playerName}`);
     });
@@ -577,58 +838,67 @@ io.on('connection', (socket) => {
             return socket.emit('errorMsg', 'Room not found!');
         }
         
-        let existing = room.players.find(p => p.userID === userID);
-        if (existing) {
-            existing.id = socket.id;
-            existing.equippedTitle = equippedTitle || existing.equippedTitle;
-            existing.level = level || existing.level || 1;
-            socket.join(roomID);
-            console.log(`${playerName} rejoined room ${roomID}`);
-        } else {
-            if (room.players.length >= room.maxPlayers) {
-                return socket.emit('errorMsg', 'Room full!');
-            }
-            
-            if (room.gameStarted) {
-                return socket.emit('errorMsg', 'Game already in progress!');
-            }
-            
-            room.players.push({ 
-                id: socket.id, 
-                name: playerName, 
-                userID: userID, 
-                hand: [],
-                equippedTitle: equippedTitle || null,
-                level: level || 1,
-                gameStats: null,
-                rematchReady: false
-            });
-            socket.join(roomID);
-            console.log(`${playerName} joined room ${roomID}`);
+        if (room.gameStarted) {
+            return socket.emit('errorMsg', 'Game already in progress!');
         }
         
-        io.to(roomID).emit('updatePlayers', room.players, { maxPlayers: room.maxPlayers });
+        if (room.players.length >= room.maxPlayers) {
+            return socket.emit('errorMsg', 'Room is full!');
+        }
+        
+        if (room.players.some(p => p.userID === userID)) {
+            return socket.emit('errorMsg', 'You are already in this room!');
+        }
+        
+        room.players.push({ 
+            id: socket.id, 
+            name: playerName, 
+            userID: userID, 
+            hand: [],
+            equippedTitle: equippedTitle || null,
+            level: level || 1,
+            gameStats: null,
+            rematchReady: false
+        });
+        
+        socket.join(roomID);
+        socket.emit('joinedRoom', { roomID });
+        io.to(roomID).emit('updatePlayers', { players: room.players });
+        io.to(roomID).emit('chatMsg', { msg: `${playerName} joined the room!` });
         broadcastRooms();
+        console.log(`${playerName} joined room ${roomID}`);
     });
 
     /**
-     * UPDATE EQUIPPED TITLE
+     * LEAVE ROOM
      */
-    socket.on('updateTitle', ({ roomID, userID, title }) => {
+    socket.on('leaveRoom', ({ roomID, userID }) => {
         const room = rooms[roomID];
         if (!room) return;
         
-        const player = room.players.find(p => p.userID === userID);
-        if (player) {
-            player.equippedTitle = title;
-            io.to(roomID).emit('updatePlayers', room.players);
+        const pIdx = room.players.findIndex(p => p.userID === userID);
+        if (pIdx === -1) return;
+        
+        const playerName = room.players[pIdx].name;
+        room.players.splice(pIdx, 1);
+        socket.leave(roomID);
+        
+        if (room.players.length === 0) {
+            delete rooms[roomID];
+            console.log(`Room ${roomID} deleted (empty)`);
+        } else {
+            io.to(roomID).emit('updatePlayers', { players: room.players });
+            io.to(roomID).emit('chatMsg', { msg: `${playerName} left the room.` });
         }
+        
+        broadcastRooms();
+        console.log(`${playerName} left room ${roomID}`);
     });
 
     /**
-     * START GAME - Core Logic
+     * START GAME - Internal function
      */
-    function startGameForRoom(roomID) {
+    async function startGameForRoom(roomID) {
         const room = rooms[roomID];
         if (!room) return false;
         
@@ -649,6 +919,7 @@ io.on('connection', (socket) => {
         room.currentSuit = null;
         room.gameNumber = (room.gameNumber || 0) + 1;
         room.finishOrder = [];
+        room.startTime = new Date(); // Track game start time for history
         
         // Reset rematch flags
         room.players.forEach(p => {
@@ -736,66 +1007,111 @@ io.on('connection', (socket) => {
         const player = room.players.find(p => p.userID === userID);
         if (player) {
             player.rematchReady = true;
+
+            io.to(roomID).emit('updatePlayers', { players: room.players });
             
             // Check if all players are ready
             const allReady = room.players.every(p => p.rematchReady);
-            
-            io.to(roomID).emit('rematchStatus', {
-                readyCount: room.players.filter(p => p.rematchReady).length,
-                totalCount: room.players.length,
-                allReady
-            });
-            
-            // Auto-start if all ready
             if (allReady) {
+                io.to(roomID).emit('chatMsg', { msg: 'All players ready! Starting new game...' });
                 setTimeout(() => {
                     startGameForRoom(roomID);
-                }, 1500);
+                }, 2000);
+            } else {
+                const readyCount = room.players.filter(p => p.rematchReady).length;
+                io.to(roomID).emit('chatMsg', { 
+                    msg: `${player.name} is ready for rematch! (${readyCount}/${room.players.length})` 
+                });
             }
         }
     });
 
     /**
-     * HAND SWAP - Send Request (only allowed on your turn)
+     * CHAT MESSAGE
      */
-    socket.on('sendSwapRequest', ({ roomID, fromUserID }) => {
-        const room = rooms[roomID];
-        if (!room) return;
-        
-        const myIdx = room.players.findIndex(p => p.userID === fromUserID);
-        if (myIdx === -1) {
-            return socket.emit('errorMsg', 'Player not found');
-        }
-        
-        // Check if it's the requester's turn
-        if (room.turn !== myIdx) {
-            return socket.emit('errorMsg', 'Wait for your turn!');
-        }
-        
-        let targetIdx = (myIdx + 1) % room.players.length;
-        let attempts = 0;
-        
-        while (room.players[targetIdx].hand.length === 0 && attempts < room.players.length) {
-            targetIdx = (targetIdx + 1) % room.players.length;
-            attempts++;
-        }
-        
-        if (attempts >= room.players.length) {
-            return socket.emit('errorMsg', 'No valid target for hand absorption');
-        }
-        
-        io.to(room.players[targetIdx].id).emit('receiveSwapRequest', { 
-            fromName: room.players[myIdx].name, 
-            fromUserID 
-        });
-        
-        console.log(`${room.players[myIdx].name} requests to absorb ${room.players[targetIdx].name}'s hand`);
+    socket.on('chatMsg', ({ roomID, playerName, msg }) => {
+        if (!roomID || !msg) return;
+        io.to(roomID).emit('chatMsg', { playerName, msg });
     });
 
     /**
-     * HAND SWAP - Accept Request
+     * SWAP REQUEST - Player requests to absorb another's hand
      */
-    socket.on('acceptSwap', ({ roomID, fromUserID, myUserID }) => {
+    socket.on('requestSwap', ({ roomID, fromUserID, toUserID }) => {
+        const room = rooms[roomID];
+        if (!room) return;
+        
+        const requester = room.players.find(p => p.userID === fromUserID);
+        const target = room.players.find(p => p.userID === toUserID);
+        
+        if (!requester || !target) {
+            return socket.emit('errorMsg', 'Invalid swap request');
+        }
+        
+        if (target.hand.length === 0) {
+            return socket.emit('errorMsg', `${target.name} has no cards to give!`);
+        }
+        
+        // Send request to target player
+        const targetSocket = io.sockets.sockets.get(target.id);
+        if (targetSocket) {
+            targetSocket.emit('receiveSwapRequest', {
+                fromUserID: requester.userID,
+                fromName: requester.name
+            });
+        }
+        
+        console.log(`${requester.name} requested hand swap from ${target.name}`);
+    });
+
+    /**
+     * SWAP ANSWER - Target accepts/declines
+     */
+    socket.on('answerSwap', ({ roomID, fromUserID, myUserID, accepted }) => {
+        const room = rooms[roomID];
+        if (!room) return;
+        
+        const requester = room.players.find(p => p.userID === fromUserID);
+        const accepter = room.players.find(p => p.userID === myUserID);
+        
+        if (!requester || !accepter) {
+            return socket.emit('errorMsg', 'Invalid swap participants');
+        }
+        
+        if (!accepted) {
+            io.to(roomID).emit('chatMsg', { 
+                msg: `${accepter.name} declined ${requester.name}'s hand absorption request.` 
+            });
+            return;
+        }
+        
+        // Check again if accepter still has cards
+        if (accepter.hand.length === 0) {
+            return socket.emit('errorMsg', 'You have no cards to give!');
+        }
+        
+        // Transfer all cards
+        requester.hand.push(...accepter.hand);
+        accepter.hand = [];
+        
+        io.to(roomID).emit('swapOccurred', { 
+            msg: `${requester.name} absorbed ${accepter.name}'s hand!`,
+            requesterUserID: requester.userID,
+            accepterUserID: accepter.userID,
+            requesterName: requester.name,
+            accepterName: accepter.name,
+            players: room.players,
+            turn: room.turn,
+            table: room.table
+        });
+        
+        console.log(`${requester.name} absorbed ${accepter.name}'s hand`);
+    });
+
+    /**
+     * SWAP DECLINE - Explicit decline
+     */
+    socket.on('declineSwap', ({ roomID, fromUserID, myUserID }) => {
         const room = rooms[roomID];
         if (!room) return;
         
@@ -877,10 +1193,63 @@ io.on('connection', (socket) => {
     });
 
     /**
+     * MONGODB: LOAD PLAYER STATS
+     */
+    socket.on('loadStats', async ({ userID }) => {
+        if (!userID) return;
+        const stats = await loadPlayerStats(userID);
+        if (stats) {
+            socket.emit('statsLoaded', stats);
+        }
+    });
+
+    /**
+     * MONGODB: SAVE PLAYER STATS
+     */
+    socket.on('saveStats', async ({ userID, name, stats }) => {
+        if (!userID || !stats) return;
+        await savePlayerStats(userID, name, stats);
+        socket.emit('statsSaved', { success: true });
+    });
+
+    /**
+     * MONGODB: GM LOGIN
+     */
+    socket.on('gmLogin', async ({ userID, password }) => {
+        const result = await setGameMaster(userID, password);
+        socket.emit('gmLoginResult', result);
+    });
+
+    /**
+     * MONGODB: CHECK GM STATUS
+     */
+    socket.on('checkGM', async ({ userID }) => {
+        const isGM = await checkGameMaster(userID);
+        socket.emit('gmStatus', { isGM });
+    });
+
+    /**
+     * MONGODB: GET LEADERBOARD
+     */
+    socket.on('getLeaderboard', async ({ sortBy = 'xp', limit = 10 }) => {
+        const leaderboard = await getLeaderboard(sortBy, limit);
+        socket.emit('leaderboardData', leaderboard);
+    });
+
+    /**
      * DISCONNECT HANDLER
      */
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
         console.log('Client disconnected:', socket.id);
+        
+        // Find and save stats for disconnecting player
+        for (let rid in rooms) {
+            const player = rooms[rid].players.find(p => p.id === socket.id);
+            if (player && player.userID && player.localStats) {
+                await savePlayerStats(player.userID, player.name, player.localStats);
+                console.log(`💾 Auto-saved stats for ${player.name} on disconnect`);
+            }
+        }
     });
 });
 

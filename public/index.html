@@ -29,6 +29,26 @@
         .header-btn:hover { background: var(--ui-blue); border-color: var(--ui-blue); transform: scale(1.1); }
         .header-btn.profile-btn { width: auto; padding: 0 12px; border-radius: 12px; font-size: 11px; font-weight: 900; letter-spacing: 0.6px; }
 
+        /* Mobile header menu */
+        .header-btn.hamburger-btn { display: none; width: 34px; height: 34px; border-radius: 12px; font-size: 18px; line-height: 1; }
+        .header-menu { position: fixed; top: 58px; right: 12px; z-index: 7000; display: none; flex-direction: column; min-width: 190px; border-radius: 16px; padding: 6px; background: var(--glass-heavy); border: 1px solid var(--border-light); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 12px 36px rgba(0,0,0,0.45); }
+        .header-menu.open { display: flex; }
+        .header-menu-title { padding: 10px 12px; font-size: 10px; opacity: 0.85; border-bottom: 1px solid var(--border); }
+        .header-menu-item { width: 100%; padding: 10px 12px; border-radius: 12px; background: transparent; border: 0; text-align: left; color: #fff; font-weight: 800; font-size: 12px; cursor: pointer; }
+        .header-menu-item:hover { background: rgba(255,255,255,0.08); }
+        .header-menu-card { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+        .header-menu-namecard { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 14px; background: rgba(0,0,0,0.18); }
+        .header-menu-namecard .header-player-info { align-items: flex-start; }
+        .header-menu-namecard .header-title { display: block; }
+
+        @media (max-width: 520px){
+            /* Collapse right-side header content into hamburger only */
+            .lobby-header-right .header-player-box { display: none !important; }
+            .lobby-header-right .profile-btn, .lobby-header-right .leaderboard-btn { display: none !important; }
+            .lobby-header-right .header-btn.hamburger-btn { display: flex; align-items: center; justify-content: center; }
+            .lobby-header { padding: 0 12px; }
+        }
+
         .lobby-body { flex: 1; display: flex; align-items: center; justify-content: center; padding-top: 70px; }
         
         /* Leaderboard Modal */
@@ -290,8 +310,24 @@
                 </div>
             </div>
             <button class="header-btn profile-btn" onclick="openProfile()" title="Profile">PROFILE</button>
-            <button class="header-btn" onclick="openLeaderboard()" title="Leaderboard">🏆</button>
+            <button class="header-btn leaderboard-btn" onclick="openLeaderboard()" title="Leaderboard">🏆</button>
+            <button class="header-btn hamburger-btn" id="hamburger-btn" onclick="toggleHeaderMenu()" aria-label="Menu" title="Menu">☰</button>
         </div>
+    </div>
+
+    <!-- Mobile Menu (hamburger) -->
+    <div class="header-menu" id="header-menu" aria-hidden="true">
+        <div class="header-menu-card">
+            <div class="header-menu-namecard">
+                <img id="menu-badge" src="/badge/apprentice-badge.png" alt="badge" class="header-badge">
+                <div class="header-player-info">
+                    <span id="menu-name" class="header-name"></span>
+                    <span id="menu-title" class="header-title"></span>
+                </div>
+            </div>
+        </div>
+        <button class="header-menu-item" onclick="openProfile(); closeHeaderMenu();">Profile</button>
+        <button class="header-menu-item" onclick="openLeaderboard(); closeHeaderMenu();">Leaderboard</button>
     </div>
     
     <!-- Body - Centered Panel -->
@@ -860,12 +896,36 @@ async function syncStatsToServer(){
     } catch(e) { console.log('Sync failed:', e); }
 }
 function addXP(amt,reason,popup=true){const old=getLevel();stats.xp=Math.max(0,(stats.xp||0)+amt);saveStats();if(getLevel()>old)showToast(`⚡ LEVEL UP! Lv.${getLevel()}`,true);if(popup&&amt){const p=document.createElement('div');p.className='xp-popup';p.style.color=amt>0?'var(--primary-action)':'var(--danger)';p.innerText=`${amt>0?'+':''}${amt} XP`;document.body.appendChild(p);setTimeout(()=>p.remove(),1500);}updateStatsUI();checkAllTitles();}
-function updateStatsUI(){const lv=getLevel(),lvDisplay=getLevelDisplay(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('lobby-badge').src=getBadgeImage(lv,isGameMaster);document.getElementById('header-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:9px;padding:1px 5px">${eq.icon} ${eq.name}</span>`:'';document.getElementById('prof-level').innerText=isGameMaster?'∞':`LEVEL ${lvDisplay}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=isGameMaster?'∞ XP':`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=isGameMaster?'100%':(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;document.getElementById('gm-logout-btn').style.display=isGameMaster?'block':'none';}
+function updateStatsUI(){const lv=getLevel(),lvDisplay=getLevelDisplay(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('lobby-badge').src=getBadgeImage(lv,isGameMaster);document.getElementById('header-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:9px;padding:1px 5px">${eq.icon} ${eq.name}</span>`:'';const mn=document.getElementById('menu-name');if(mn)mn.innerText=myName;const mb=document.getElementById('menu-badge');if(mb)mb.src=getBadgeImage(lv,isGameMaster);const mtitle=document.getElementById('menu-title');if(mtitle)mtitle.innerHTML=document.getElementById('header-title').innerHTML||'<span style="opacity:0.6">No title equipped</span>';document.getElementById('prof-level').innerText=isGameMaster?'∞':`LEVEL ${lvDisplay}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=isGameMaster?'∞ XP':`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=isGameMaster?'100%':(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;document.getElementById('gm-logout-btn').style.display=isGameMaster?'block':'none';}
 function editName(){const n=prompt("Enter Name:",myName);if(n?.trim()&&n.trim().length<=20){myName=n.trim();localStorage.setItem('pName',myName);updateStatsUI();}}
 function openProfile(){updateStatsUI();document.getElementById('profile-modal').style.display='flex';}
 function closeProfile(){document.getElementById('profile-modal').style.display='none';}
 function openHowToPlay(){document.getElementById('howtoplay-modal').style.display='flex';}
 function closeHowToPlay(){document.getElementById('howtoplay-modal').style.display='none';}
+
+// Mobile header hamburger menu
+function toggleHeaderMenu(){
+    const menu=document.getElementById('header-menu');
+    if(!menu)return;
+    const isOpen=menu.classList.toggle('open');
+    menu.setAttribute('aria-hidden',isOpen?'false':'true');
+}
+function closeHeaderMenu(){
+    const menu=document.getElementById('header-menu');
+    if(!menu)return;
+    menu.classList.remove('open');
+    menu.setAttribute('aria-hidden','true');
+}
+document.addEventListener('click',e=>{
+    const menu=document.getElementById('header-menu');
+    const btn=document.getElementById('hamburger-btn');
+    if(!menu||!btn)return;
+    if(!menu.classList.contains('open'))return;
+    const clickedInsideMenu=menu.contains(e.target);
+    const clickedBtn=btn.contains(e.target);
+    if(!clickedInsideMenu&&!clickedBtn)closeHeaderMenu();
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeHeaderMenu();});
 function showToast(msg,pos=false){const t=document.getElementById('toast');t.innerText=msg;t.style.background=pos?'var(--primary-action)':'var(--danger)';t.style.display='block';setTimeout(()=>t.style.display='none',3000);}
 function showLoading(s){document.getElementById('loading').style.display=s?'flex':'none';}
 function flashScreen(type){const f=document.createElement('div');f.className=type+'-flash';document.body.appendChild(f);setTimeout(()=>f.remove(),500);}

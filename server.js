@@ -146,6 +146,91 @@ app.get('/api/discord/:discordId', async (req, res) => {
     }
 });
 
+// GM Authentication
+const GM_PASSWORD = process.env.GM_PASSWORD || 'default_gm_password';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'default_admin_password';
+
+app.post('/api/gm/verify', (req, res) => {
+    const { password } = req.body;
+    if (password === GM_PASSWORD) {
+        res.json({ success: true, isGM: true });
+    } else {
+        res.status(401).json({ success: false, error: 'Invalid password' });
+    }
+});
+
+// Admin API Routes (protected by password)
+app.post('/api/admin/reset-player/:userID', async (req, res) => {
+    try {
+        const { password } = req.body;
+        if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
+        
+        const player = await Player.findOneAndUpdate(
+            { userID: req.params.userID },
+            { $set: {
+                xp: 0, wins: 0, losses: 0, games: 0, pangkahs: 0, pangkahsReceived: 0,
+                bestStreak: 0, currentStreak: 0, handsAbsorbed: 0, handsGiven: 0,
+                cleanWins: 0, maxCardsHeld: 0, autoPlays: 0, cardsPlayed: 0,
+                secondPlace: 0, thirdPlace: 0, topTwo: 0, nightGames: 0,
+                unlockedTitles: [], equippedTitle: null
+            }},
+            { new: true }
+        );
+        if (!player) return res.status(404).json({ error: 'Player not found' });
+        res.json({ success: true, player });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to reset player' });
+    }
+});
+
+app.post('/api/admin/update-player/:userID', async (req, res) => {
+    try {
+        const { password, updates } = req.body;
+        if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
+        
+        const player = await Player.findOneAndUpdate(
+            { userID: req.params.userID },
+            { $set: updates },
+            { new: true }
+        );
+        if (!player) return res.status(404).json({ error: 'Player not found' });
+        res.json({ success: true, player });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to update player' });
+    }
+});
+
+app.post('/api/admin/reset-all', async (req, res) => {
+    try {
+        const { password, confirm } = req.body;
+        if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
+        if (confirm !== 'RESET_ALL_PLAYERS') return res.status(400).json({ error: 'Confirmation required' });
+        
+        await Player.updateMany({}, { $set: {
+            xp: 0, wins: 0, losses: 0, games: 0, pangkahs: 0, pangkahsReceived: 0,
+            bestStreak: 0, currentStreak: 0, handsAbsorbed: 0, handsGiven: 0,
+            cleanWins: 0, maxCardsHeld: 0, autoPlays: 0, cardsPlayed: 0,
+            secondPlace: 0, thirdPlace: 0, topTwo: 0, nightGames: 0,
+            unlockedTitles: [], equippedTitle: null
+        }});
+        res.json({ success: true, message: 'All players reset' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to reset all players' });
+    }
+});
+
+app.get('/api/admin/players', async (req, res) => {
+    try {
+        const { password } = req.query;
+        if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
+        
+        const players = await Player.find().select('userID displayName xp wins games lastPlayedAt');
+        res.json(players);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to get players' });
+    }
+});
+
 // Constants
 const ROUND_RESOLUTION_DELAY = 1500;
 const MIN_PLAYERS = 4;

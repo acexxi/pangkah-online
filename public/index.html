@@ -12,6 +12,31 @@
         #lobby { position: fixed; inset: 0; z-index: 5000; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
         .panel { width: 90%; max-width: 400px; padding: 35px; border-radius: 24px; background: var(--glass-heavy); border: 1px solid var(--border-light); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
         .murim-logo { width: 100%; max-width: 320px; height: auto; margin-bottom: 25px; filter: drop-shadow(0 0 8px var(--murim-glow)) drop-shadow(0 0 15px rgba(255,215,0,0.4)); animation: logoGlow 2s ease-in-out infinite alternate; }
+        
+        /* New Lobby Header */
+        .lobby-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: var(--glass-heavy); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 20px; margin-bottom: 15px; border: 1px solid var(--border); }
+        .lobby-header-left { display: flex; align-items: center; }
+        .header-logo { height: 45px; width: auto; filter: drop-shadow(0 0 5px var(--murim-glow)); }
+        .lobby-header-right { display: flex; align-items: center; gap: 10px; }
+        .header-badge { width: 36px; height: 36px; }
+        .header-name { color: var(--ui-blue); font-weight: 800; font-size: 14px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .header-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--glass-light); border: 1px solid var(--border); color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .header-btn:hover { background: var(--ui-blue); border-color: var(--ui-blue); transform: scale(1.1); }
+        
+        /* Leaderboard Modal */
+        .leaderboard-card { background: var(--glass-heavy); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); border: 1px solid var(--border-light); padding: 25px; border-radius: 28px; width: 95%; max-width: 700px; max-height: 85vh; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+        .leaderboard-filters { margin-bottom: 15px; }
+        .leaderboard-filters select { width: auto; padding: 8px 15px; font-size: 12px; }
+        .leaderboard-table-wrapper { overflow-x: auto; max-height: 400px; overflow-y: auto; }
+        .leaderboard-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        .leaderboard-table th { background: rgba(0,0,0,0.4); color: var(--gold); padding: 10px 6px; text-align: center; position: sticky; top: 0; z-index: 1; }
+        .leaderboard-table td { padding: 8px 6px; border-bottom: 1px solid var(--border); text-align: center; }
+        .leaderboard-table tr:hover { background: rgba(255,255,255,0.05); }
+        .leaderboard-table tr:nth-child(1) td { background: rgba(251,191,36,0.15); }
+        .leaderboard-table tr:nth-child(2) td { background: rgba(192,192,192,0.1); }
+        .leaderboard-table tr:nth-child(3) td { background: rgba(205,127,50,0.1); }
+        .lb-rank { font-weight: 800; }
+        .lb-name { font-weight: 700; color: var(--ui-blue); text-align: left !important; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         @keyframes logoGlow { 0% { filter: drop-shadow(0 0 8px var(--murim-glow)) drop-shadow(0 0 15px rgba(255,215,0,0.4)); } 100% { filter: drop-shadow(0 0 12px var(--murim-glow)) drop-shadow(0 0 20px rgba(255,215,0,0.5)); } }
         .room-list { height: 120px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 16px; margin: 15px 0; border: 1px solid var(--border); }
         .room-item { padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; cursor: pointer; font-size: 0.85rem; transition: background 0.2s; }
@@ -243,22 +268,21 @@
 </div>
 
 <div id="lobby">
-    <div class="panel">
-        <img src="/PM-logo.png" alt="Pangkah Murim" class="murim-logo">
-        <div style="margin-bottom:20px;padding:15px;background:rgba(255,255,255,0.03);border-radius:20px;border:1px solid var(--border)">
-            <div style="display:flex;align-items:center;justify-content:center;gap:15px">
-                <img id="lobby-badge" src="/badge/apprentice-badge.png" alt="badge" style="width:80px;height:80px;flex-shrink:0">
-                <div style="text-align:left">
-                    <div style="display:flex;align-items:center;gap:8px">
-                        <span id="display-name" style="color:var(--ui-blue);font-size:1.1rem;font-weight:800"></span>
-                        <span onclick="editName()" style="color:var(--primary-action);cursor:pointer;font-size:0.7rem">[EDIT]</span>
-                    </div>
-                    <div id="lobby-title" style="margin:4px 0;min-height:18px"></div>
-                    <div id="level-title" style="color:var(--primary-action);font-size:12px">LEVEL 1 - APPRENTICE</div>
-                </div>
-            </div>
-            <button class="btn btn-s" onclick="openProfile()" style="margin-top:12px;width:100%">VIEW PROFILE</button>
+    <!-- New Header -->
+    <div class="lobby-header">
+        <div class="lobby-header-left">
+            <img src="/PM-logo.png" alt="Pangkah Murim" class="header-logo">
         </div>
+        <div class="lobby-header-right">
+            <img id="lobby-badge" src="/badge/apprentice-badge.png" alt="badge" class="header-badge">
+            <span id="display-name" class="header-name"></span>
+            <button class="header-btn" onclick="openProfile()" title="Profile">👤</button>
+            <button class="header-btn" onclick="openLeaderboard()" title="Leaderboard">🏆</button>
+        </div>
+    </div>
+    
+    <!-- Body Panel -->
+    <div class="panel" style="margin-top:20px">
         <div class="room-list" id="room-box"></div>
         <input id="rid" placeholder="Enter Sect ID" maxlength="20">
         <select id="maxp">
@@ -274,6 +298,49 @@
         <div onclick="openHowToPlay()" style="margin-top:20px;color:var(--ui-blue);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;opacity:0.8;transition:opacity 0.2s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
             <span style="font-size:16px">📖</span> How to Play Pangkah
         </div>
+    </div>
+</div>
+
+<!-- Leaderboard Modal -->
+<div class="modal-overlay" id="leaderboard-modal" style="display:none">
+    <div class="leaderboard-card">
+        <h3 style="color:var(--gold);margin-top:0">🏆 LEADERBOARD</h3>
+        <div class="leaderboard-filters">
+            <select id="lb-sort" onchange="loadLeaderboard()">
+                <option value="xp">Sort by XP</option>
+                <option value="wins">Sort by Wins</option>
+                <option value="winrate">Sort by Win Rate</option>
+                <option value="losses">Sort by Losses</option>
+                <option value="streak">Sort by Win Streak</option>
+                <option value="pangkahs">Sort by Pangkah Dealt</option>
+                <option value="pangkahsReceived">Sort by Pangkah Received</option>
+            </select>
+        </div>
+        <div class="leaderboard-table-wrapper">
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Player</th>
+                        <th>LVL</th>
+                        <th>Win</th>
+                        <th>W%</th>
+                        <th>Lose</th>
+                        <th>L%</th>
+                        <th>Streak</th>
+                        <th>PK</th>
+                        <th>GPK</th>
+                    </tr>
+                </thead>
+                <tbody id="lb-body"></tbody>
+            </table>
+        </div>
+        <div id="lb-pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:15px">
+            <button class="btn" onclick="lbNav(-1)" style="padding:8px 16px;background:rgba(255,255,255,0.1);color:#fff;font-size:11px">◀</button>
+            <span id="lb-page-indicator" style="font-size:12px;color:rgba(255,255,255,0.7)">1 / 1</span>
+            <button class="btn" onclick="lbNav(1)" style="padding:8px 16px;background:rgba(255,255,255,0.1);color:#fff;font-size:11px">▶</button>
+        </div>
+        <button class="btn btn-s" onclick="closeLeaderboard()" style="margin-top:15px">CLOSE</button>
     </div>
 </div>
 
@@ -696,6 +763,73 @@ document.addEventListener('keydown',e=>{
     if(gmKeyBuffer.join('').includes('gm')&&!isGameMaster){gmKeyBuffer=[];gmLogin();}
 });
 
+// Leaderboard System
+let lbData=[];
+let lbPage=0;
+const LB_PER_PAGE=10;
+
+async function loadLeaderboard(){
+    const sortBy=document.getElementById('lb-sort').value;
+    try{
+        const res=await fetch(`/api/leaderboard/${sortBy}?limit=100`);
+        if(res.ok){
+            lbData=await res.json();
+            lbPage=0;
+            renderLeaderboard();
+        }
+    }catch(e){console.log('Failed to load leaderboard');}
+}
+
+function renderLeaderboard(){
+    const tbody=document.getElementById('lb-body');
+    const totalPages=Math.ceil(lbData.length/LB_PER_PAGE)||1;
+    const start=lbPage*LB_PER_PAGE;
+    const pageData=lbData.slice(start,start+LB_PER_PAGE);
+    
+    tbody.innerHTML=pageData.map((p,i)=>{
+        const rank=start+i+1;
+        const level=Math.floor((p.xp||0)/100)+1;
+        const games=p.games||0;
+        const wins=p.wins||0;
+        const losses=p.losses||0;
+        const winRate=games>0?((wins/games)*100).toFixed(1):'0.0';
+        const loseRate=games>0?((losses/games)*100).toFixed(1):'0.0';
+        const streak=p.bestStreak||0;
+        const pangkahs=p.pangkahs||0;
+        const getPangkah=p.pangkahsReceived||0;
+        const medal=rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':rank;
+        return`<tr>
+            <td class="lb-rank">${medal}</td>
+            <td class="lb-name">${p.displayName||'Unknown'}</td>
+            <td>${level}</td>
+            <td>${wins}</td>
+            <td>${winRate}%</td>
+            <td>${losses}</td>
+            <td>${loseRate}%</td>
+            <td>${streak}</td>
+            <td>${pangkahs}</td>
+            <td>${getPangkah}</td>
+        </tr>`;
+    }).join('');
+    
+    document.getElementById('lb-page-indicator').innerText=`${lbPage+1} / ${totalPages}`;
+}
+
+function lbNav(dir){
+    const totalPages=Math.ceil(lbData.length/LB_PER_PAGE)||1;
+    lbPage=Math.max(0,Math.min(totalPages-1,lbPage+dir));
+    renderLeaderboard();
+}
+
+function openLeaderboard(){
+    document.getElementById('leaderboard-modal').style.display='flex';
+    loadLeaderboard();
+}
+
+function closeLeaderboard(){
+    document.getElementById('leaderboard-modal').style.display='none';
+}
+
 function saveStats(){
     localStorage.setItem('pStats',JSON.stringify(stats));
     // Sync to MongoDB (non-blocking)
@@ -711,7 +845,7 @@ async function syncStatsToServer(){
     } catch(e) { console.log('Sync failed:', e); }
 }
 function addXP(amt,reason,popup=true){const old=getLevel();stats.xp=Math.max(0,(stats.xp||0)+amt);saveStats();if(getLevel()>old)showToast(`⚡ LEVEL UP! Lv.${getLevel()}`,true);if(popup&&amt){const p=document.createElement('div');p.className='xp-popup';p.style.color=amt>0?'var(--primary-action)':'var(--danger)';p.innerText=`${amt>0?'+':''}${amt} XP`;document.body.appendChild(p);setTimeout(()=>p.remove(),1500);}updateStatsUI();checkAllTitles();}
-function updateStatsUI(){const lv=getLevel(),lvDisplay=getLevelDisplay(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('level-title').innerText=isGameMaster?'GAME MASTER':`LEVEL ${lvDisplay} - ${rt}`;document.getElementById('lobby-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:10px">${eq.icon} ${eq.name}</span>`:'';document.getElementById('lobby-badge').src=getBadgeImage(lv,isGameMaster);document.getElementById('prof-level').innerText=isGameMaster?'∞':`LEVEL ${lvDisplay}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=isGameMaster?'∞ XP':`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=isGameMaster?'100%':(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;document.getElementById('gm-logout-btn').style.display=isGameMaster?'block':'none';}
+function updateStatsUI(){const lv=getLevel(),lvDisplay=getLevelDisplay(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('lobby-badge').src=getBadgeImage(lv,isGameMaster);document.getElementById('prof-level').innerText=isGameMaster?'∞':`LEVEL ${lvDisplay}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=isGameMaster?'∞ XP':`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=isGameMaster?'100%':(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;document.getElementById('gm-logout-btn').style.display=isGameMaster?'block':'none';}
 function editName(){const n=prompt("Enter Name:",myName);if(n?.trim()&&n.trim().length<=20){myName=n.trim();localStorage.setItem('pName',myName);updateStatsUI();}}
 function openProfile(){updateStatsUI();document.getElementById('profile-modal').style.display='flex';}
 function closeProfile(){document.getElementById('profile-modal').style.display='none';}

@@ -81,6 +81,30 @@ app.post('/api/stats/save', async (req, res) => {
     }
 });
 
+
+app.post('/api/player/update-name', async (req, res) => {
+    try {
+        const { userID, displayName } = req.body;
+        if (!userID) return res.status(400).json({ error: 'userID required' });
+
+        const name = (displayName || '').trim();
+        if (!name) return res.status(400).json({ error: 'displayName required' });
+        if (name.length > 20) return res.status(400).json({ error: 'displayName too long' });
+
+        const player = await Player.findOneAndUpdate(
+            { userID },
+            { $set: { displayName: name, lastPlayedAt: new Date() } },
+            { upsert: true, new: true }
+        );
+
+        res.json({ success: true, player });
+    } catch (err) {
+        console.error('Update name error:', err);
+        res.status(500).json({ error: 'Failed to update name' });
+    }
+});
+
+
 app.get('/api/stats/:userID', async (req, res) => {
     try {
         const player = await Player.findOne({ userID: req.params.userID });
@@ -108,7 +132,7 @@ app.get('/api/leaderboard/:type', async (req, res) => {
         const players = await Player.find()
             .sort({ [sortField]: -1 })
             .limit(limit)
-            .select('displayName userID xp wins losses games pangkahs pangkahsReceived bestStreak equippedTitle');
+            .select('displayName userID xp wins losses games secondPlace thirdPlace pangkahs pangkahsReceived bestStreak equippedTitle');
         
         res.json(players);
     } catch (err) {
@@ -854,6 +878,18 @@ io.on('connection', (socket) => {
             io.to(roomID).emit('updatePlayers', room.players);
         }
     });
+
+    socket.on('updateName', ({ roomID, userID, playerName }) => {
+        const room = rooms[roomID];
+        if (!room) return;
+        const player = room.players.find(p => p.userID === userID);
+        if (!player) return;
+        const name = (playerName || '').trim();
+        if (!name) return;
+        player.name = name;
+        io.to(roomID).emit('updatePlayers', room.players, { maxPlayers: room.maxPlayers });
+    });
+
 
     /**
      * START GAME - Core Logic

@@ -98,14 +98,17 @@ app.get('/api/leaderboard/:type', async (req, res) => {
         
         let sortField = 'xp';
         if (type === 'wins') sortField = 'wins';
+        if (type === 'losses') sortField = 'losses';
         if (type === 'pangkahs') sortField = 'pangkahs';
+        if (type === 'pangkahsReceived') sortField = 'pangkahsReceived';
         if (type === 'games') sortField = 'games';
         if (type === 'streak') sortField = 'bestStreak';
+        if (type === 'winrate') sortField = 'wins'; // Will sort by wins, winrate calculated client-side
         
         const players = await Player.find()
             .sort({ [sortField]: -1 })
             .limit(limit)
-            .select('displayName userID xp wins games pangkahs bestStreak equippedTitle');
+            .select('displayName userID xp wins losses games pangkahs pangkahsReceived bestStreak equippedTitle');
         
         res.json(players);
     } catch (err) {

@@ -13,15 +13,19 @@
         .panel { width: 90%; max-width: 400px; padding: 35px; border-radius: 24px; background: var(--glass-heavy); border: 1px solid var(--border-light); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
         .murim-logo { width: 100%; max-width: 320px; height: auto; margin-bottom: 25px; filter: drop-shadow(0 0 8px var(--murim-glow)) drop-shadow(0 0 15px rgba(255,215,0,0.4)); animation: logoGlow 2s ease-in-out infinite alternate; }
         
-        /* New Lobby Header */
-        .lobby-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: var(--glass-heavy); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 20px; margin-bottom: 15px; border: 1px solid var(--border); }
+        /* New Lobby Header - Full Width Top */
+        #lobby { display: flex; flex-direction: column; height: 100vh; }
+        .lobby-header { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: var(--glass-heavy); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); z-index: 1000; }
         .lobby-header-left { display: flex; align-items: center; }
-        .header-logo { height: 45px; width: auto; filter: drop-shadow(0 0 5px var(--murim-glow)); }
-        .lobby-header-right { display: flex; align-items: center; gap: 10px; }
-        .header-badge { width: 36px; height: 36px; }
-        .header-name { color: var(--ui-blue); font-weight: 800; font-size: 14px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .header-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--glass-light); border: 1px solid var(--border); color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .header-logo { height: 28px; width: auto; filter: drop-shadow(0 0 5px var(--murim-glow)); }
+        .lobby-header-right { display: flex; align-items: center; gap: 12px; }
+        .header-player-info { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+        .header-badge { width: 32px; height: 32px; }
+        .header-name { color: var(--ui-blue); font-weight: 800; font-size: 13px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .header-title { font-size: 10px; opacity: 0.8; }
+        .header-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--glass-light); border: 1px solid var(--border); color: #fff; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
         .header-btn:hover { background: var(--ui-blue); border-color: var(--ui-blue); transform: scale(1.1); }
+        .lobby-body { flex: 1; display: flex; align-items: center; justify-content: center; padding-top: 70px; }
         
         /* Leaderboard Modal */
         .leaderboard-card { background: var(--glass-heavy); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); border: 1px solid var(--border-light); padding: 25px; border-radius: 28px; width: 95%; max-width: 700px; max-height: 85vh; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
@@ -268,35 +272,40 @@
 </div>
 
 <div id="lobby">
-    <!-- New Header -->
+    <!-- Header - Full Width Top -->
     <div class="lobby-header">
         <div class="lobby-header-left">
             <img src="/PM-logo.png" alt="Pangkah Murim" class="header-logo">
         </div>
         <div class="lobby-header-right">
             <img id="lobby-badge" src="/badge/apprentice-badge.png" alt="badge" class="header-badge">
-            <span id="display-name" class="header-name"></span>
+            <div class="header-player-info">
+                <span id="display-name" class="header-name"></span>
+                <span id="header-title" class="header-title"></span>
+            </div>
             <button class="header-btn" onclick="openProfile()" title="Profile">👤</button>
             <button class="header-btn" onclick="openLeaderboard()" title="Leaderboard">🏆</button>
         </div>
     </div>
     
-    <!-- Body Panel -->
-    <div class="panel" style="margin-top:20px">
-        <div class="room-list" id="room-box"></div>
-        <input id="rid" placeholder="Enter Sect ID" maxlength="20">
-        <select id="maxp">
-            <option value="4">4 Players</option>
-            <option value="5">5 Players</option>
-            <option value="6">6 Players</option>
-            <option value="7">7 Players</option>
-            <option value="8">8 Players</option>
-            <option value="10">10 Players</option>
-        </select>
-        <button class="btn btn-p" onclick="enter('create')">CREATE SECT</button>
-        <button class="btn btn-s" onclick="enter('join')" style="margin-top:8px">JOIN SECT</button>
-        <div onclick="openHowToPlay()" style="margin-top:20px;color:var(--ui-blue);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;opacity:0.8;transition:opacity 0.2s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
-            <span style="font-size:16px">📖</span> How to Play Pangkah
+    <!-- Body - Centered Panel -->
+    <div class="lobby-body">
+        <div class="panel">
+            <div class="room-list" id="room-box"></div>
+            <input id="rid" placeholder="Enter Sect ID" maxlength="20">
+            <select id="maxp">
+                <option value="4">4 Players</option>
+                <option value="5">5 Players</option>
+                <option value="6">6 Players</option>
+                <option value="7">7 Players</option>
+                <option value="8">8 Players</option>
+                <option value="10">10 Players</option>
+            </select>
+            <button class="btn btn-p" onclick="enter('create')">CREATE SECT</button>
+            <button class="btn btn-s" onclick="enter('join')" style="margin-top:8px">JOIN SECT</button>
+            <div onclick="openHowToPlay()" style="margin-top:20px;color:var(--ui-blue);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;opacity:0.8;transition:opacity 0.2s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
+                <span style="font-size:16px">📖</span> How to Play Pangkah
+            </div>
         </div>
     </div>
 </div>
@@ -845,7 +854,7 @@ async function syncStatsToServer(){
     } catch(e) { console.log('Sync failed:', e); }
 }
 function addXP(amt,reason,popup=true){const old=getLevel();stats.xp=Math.max(0,(stats.xp||0)+amt);saveStats();if(getLevel()>old)showToast(`⚡ LEVEL UP! Lv.${getLevel()}`,true);if(popup&&amt){const p=document.createElement('div');p.className='xp-popup';p.style.color=amt>0?'var(--primary-action)':'var(--danger)';p.innerText=`${amt>0?'+':''}${amt} XP`;document.body.appendChild(p);setTimeout(()=>p.remove(),1500);}updateStatsUI();checkAllTitles();}
-function updateStatsUI(){const lv=getLevel(),lvDisplay=getLevelDisplay(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('lobby-badge').src=getBadgeImage(lv,isGameMaster);document.getElementById('prof-level').innerText=isGameMaster?'∞':`LEVEL ${lvDisplay}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=isGameMaster?'∞ XP':`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=isGameMaster?'100%':(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;document.getElementById('gm-logout-btn').style.display=isGameMaster?'block':'none';}
+function updateStatsUI(){const lv=getLevel(),lvDisplay=getLevelDisplay(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('lobby-badge').src=getBadgeImage(lv,isGameMaster);document.getElementById('header-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:9px;padding:1px 5px">${eq.icon} ${eq.name}</span>`:'';document.getElementById('prof-level').innerText=isGameMaster?'∞':`LEVEL ${lvDisplay}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=isGameMaster?'∞ XP':`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=isGameMaster?'100%':(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;document.getElementById('gm-logout-btn').style.display=isGameMaster?'block':'none';}
 function editName(){const n=prompt("Enter Name:",myName);if(n?.trim()&&n.trim().length<=20){myName=n.trim();localStorage.setItem('pName',myName);updateStatsUI();}}
 function openProfile(){updateStatsUI();document.getElementById('profile-modal').style.display='flex';}
 function closeProfile(){document.getElementById('profile-modal').style.display='none';}

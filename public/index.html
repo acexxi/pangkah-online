@@ -269,7 +269,7 @@
             <div class="stat-box"><div class="stat-value" id="prof-streak">0</div><div class="stat-label">Best Streak</div></div>
             <div class="stat-box"><div class="stat-value" id="prof-winrate">0%</div><div class="stat-label">Win Rate</div></div>
         </div>
-        <button class="btn btn-gold" onclick="openTitles()" style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:6px"><img src="/icon/halloffame.svg" alt="" style="width:18px;height:18px"> VIEW TITLES</button>
+        <button class="btn btn-gold" onclick="openTitles()" style="margin-bottom:10px">VIEW TITLES</button>
         <button id="gm-logout-btn" class="btn" onclick="gmLogout()" style="margin-bottom:10px;background:linear-gradient(90deg,#ff6b6b,#ffd700);color:#000;display:none">⚜️ EXIT GM MODE</button>
         <button class="btn btn-p" onclick="closeProfile()">RETURN</button>
     </div>
@@ -277,7 +277,7 @@
 
 <div class="modal-overlay" id="titles-modal">
     <div class="titles-card">
-        <h3 style="color:var(--purple);margin-top:0;display:flex;align-items:center;justify-content:center;gap:8px"><img src="/icon/halloffame.svg" alt="" style="width:24px;height:24px"> ACHIEVEMENT TITLES</h3>
+        <h3 style="color:var(--purple);margin-top:0;display:flex;align-items:center;justify-content:center;gap:8px"><img src="/icon/halloffame.svg" alt="" style="width:24px;height:24px;filter:brightness(0) invert(1)"> ACHIEVEMENT TITLES</h3>
         <p style="font-size:11px;opacity:0.6;margin-bottom:15px">Unlock titles and equip one to display!</p>
         <div class="filter-tabs" id="title-filters"></div>
         <div class="title-grid" id="title-grid"></div>
@@ -357,7 +357,7 @@
             <button class="btn btn-p" onclick="enter('create')">CREATE SECT</button>
             <button class="btn btn-s" onclick="enter('join')" style="margin-top:8px">JOIN SECT</button>
             <div onclick="openHowToPlay()" style="margin-top:20px;color:var(--ui-blue);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;opacity:0.8;transition:opacity 0.2s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
-                <img src="/icon/howtoplay.svg" alt="" style="width:18px;height:18px"> How to Play Pangkah
+                <img src="/icon/howtoplay.svg" alt="" style="width:18px;height:18px;filter:brightness(0) invert(1)"> How to Play Pangkah
             </div>
         </div>
     </div>
@@ -366,7 +366,7 @@
 <!-- Leaderboard Modal -->
 <div class="modal-overlay" id="leaderboard-modal" style="display:none">
     <div class="leaderboard-card">
-        <h3 style="color:var(--gold);margin-top:0;display:flex;align-items:center;justify-content:center;gap:8px"><img src="/icon/halloffame.svg" alt="" style="width:24px;height:24px"> HALL OF FAME</h3>
+        <h3 style="color:var(--gold);margin-top:0;display:flex;align-items:center;justify-content:center;gap:8px"><img src="/icon/halloffame.svg" alt="" style="width:24px;height:24px;filter:brightness(0) invert(1)"> HALL OF FAME</h3>
         
         <!-- Hall of Fame Records -->
         <div class="hof-container" id="hof-container">
@@ -376,7 +376,10 @@
                 <span id="hof-page-indicator" style="font-size:12px;color:rgba(255,255,255,0.7);white-space:nowrap">1 / 1</span>
                 <button class="btn" onclick="hofNav(1)" style="width:44px;padding:8px 0;background:rgba(255,255,255,0.1);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center"><img src="/icon/chevron-right.svg" alt="Next" style="width:16px;height:16px;filter:brightness(0) invert(1)"></button>
             </div>
-            <button class="hof-btn" id="hof-toggle-btn" onclick="toggleFullTable()">📊 SHOW FULL TABLE</button>
+            <div style="display:flex;gap:10px">
+                <button class="btn btn-s" onclick="toggleFullTable()" style="flex:1">SHOW TABLE</button>
+                <button class="btn btn-s" onclick="closeLeaderboard()" style="flex:1">CLOSE</button>
+            </div>
         </div>
         
         <!-- Full Leaderboard Table (hidden by default) -->
@@ -418,10 +421,11 @@
                 <span id="lb-page-indicator" style="font-size:12px;color:rgba(255,255,255,0.7);white-space:nowrap;flex:0 0 auto;text-align:center">1 / 1</span>
                 <button class="btn" onclick="lbNav(1)" style="width:44px;padding:8px 0;background:rgba(255,255,255,0.1);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center"><img src="/icon/chevron-right.svg" alt="Next" style="width:16px;height:16px;filter:brightness(0) invert(1)"></button>
             </div>
-            <button class="hof-btn" onclick="toggleFullTable()" style="margin-top:15px">🏅 BACK TO HALL OF FAME</button>
+            <div style="display:flex;gap:10px;margin-top:15px">
+                <button class="btn btn-s" onclick="toggleFullTable()" style="flex:1">BACK TO HOF</button>
+                <button class="btn btn-s" onclick="closeLeaderboard()" style="flex:1">CLOSE</button>
+            </div>
         </div>
-        
-        <button class="btn btn-s" onclick="closeLeaderboard()" style="margin-top:15px">CLOSE</button>
     </div>
 </div>
 
@@ -429,7 +433,7 @@
 <div class="modal-overlay" id="howtoplay-modal" style="display:none">
     <div class="howtoplay-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
-            <h3 style="color:var(--gold);margin:0;font-size:1.2rem;display:flex;align-items:center;gap:8px"><img src="/icon/howtoplay.svg" alt="" style="width:22px;height:22px"> HOW TO PLAY</h3>
+            <h3 style="color:var(--gold);margin:0;font-size:1.2rem;display:flex;align-items:center;gap:8px"><img src="/icon/howtoplay.svg" alt="" style="width:22px;height:22px;filter:brightness(0) invert(1)"> HOW TO PLAY</h3>
             <span id="guide-page-indicator" style="font-size:11px;color:rgba(255,255,255,0.6)">1 / 5</span>
         </div>
         
@@ -818,7 +822,7 @@ function renderGuide(){
     document.getElementById('guide-content').innerHTML=page.content;
     document.getElementById('guide-page-indicator').innerText=`${guidePage+1} / ${GUIDE_PAGES.length}`;
     document.getElementById('guide-prev-btn').style.visibility=guidePage===0?'hidden':'visible';
-    document.getElementById('guide-next-btn').innerText=guidePage===GUIDE_PAGES.length-1?'DONE ✓':'NEXT ▶';
+    document.getElementById('guide-next-btn').innerHTML=guidePage===GUIDE_PAGES.length-1?'DONE ✓':'NEXT <img src="/icon/chevron-right.svg" alt="" style="width:14px;height:14px;filter:brightness(0) invert(1)">';
 }
 function guideNav(dir){
     if(dir===1&&guidePage===GUIDE_PAGES.length-1){closeHowToPlay();return;}

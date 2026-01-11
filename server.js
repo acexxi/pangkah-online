@@ -760,6 +760,298 @@ const BOT_NAMES = [
 const BOT_EMOTES = ['😂', '👍', '😡', '🔥', '💀', '👏', '🤡', '😎', '🥲', '💪'];
 
 /**
+ * ================================================================
+ * PANGKAH AI BRAIN MODULE
+ * ================================================================
+ * Smart AI that remembers, strategizes, and plays optimally
+ */
+const PangkahAI = {
+    
+    /**
+     * Initialize AI memory for a room (called once per game)
+     */
+    init(room) {
+        room.ai = {
+            // Permanent memory: which player lacks which suits
+            // Format: { playerIdx: Set(['Hearts', 'Clubs']) }
+            missingSuits: {},
+            
+            // Track all cards played this game
+            playedCards: [],
+            
+            // Track pangkah history for pattern recognition
+            pangkahLog: []
+        };
+        console.log('[AI Brain] Initialized for room');
+    },
+    
+    /**
+     * Record that a player doesn't have a suit (PERMANENT for this game)
+     */
+    recordMissingSuit(room, playerIdx, suit) {
+        if (!room.ai) this.init(room);
+        if (!room.ai.missingSuits[playerIdx]) {
+            room.ai.missingSuits[playerIdx] = new Set();
+        }
+        if (!room.ai.missingSuits[playerIdx].has(suit)) {
+            room.ai.missingSuits[playerIdx].add(suit);
+            const playerName = room.players[playerIdx]?.name || `Player ${playerIdx}`;
+            console.log(`[AI Brain] LEARNED: ${playerName} has NO ${suit}`);
+        }
+    },
+    
+    /**
+     * Record a pangkah event for learning
+     */
+    recordPangkah(room, pangkaherIdx, victimIdx, leadSuit) {
+        if (!room.ai) this.init(room);
+        room.ai.pangkahLog.push({
+            pangkaher: pangkaherIdx,
+            victim: victimIdx,
+            suit: leadSuit,
+            timestamp: Date.now()
+        });
+        // The pangkaher didn't have the lead suit - remember this!
+        this.recordMissingSuit(room, pangkaherIdx, leadSuit);
+    },
+    
+    /**
+     * Check if a specific player lacks a suit
+     */
+    playerLacksSuit(room, playerIdx, suit) {
+        if (!room.ai) return false;
+        return room.ai.missingSuits[playerIdx]?.has(suit) || false;
+    },
+    
+    /**
+     * Get all players (indices) who lack a specific suit
+     */
+    getPlayersLackingSuit(room, suit) {
+        if (!room.ai) return [];
+        const lacking = [];
+        for (const pIdx in room.ai.missingSuits) {
+            if (room.ai.missingSuits[pIdx].has(suit)) {
+                lacking.push(parseInt(pIdx));
+            }
+        }
+        return lacking;
+    },
+    
+    /**
+     * Check if any ACTIVE player after botIdx lacks the suit
+     * Returns the first one found (most dangerous)
+     */
+    findPlayerAfterMeLackingSuit(room, botIdx, suit) {
+        if (!room.ai) return null;
+        const playerCount = room.players.length;
+        
+        // Check players in turn order after bot
+        for (let offset = 1; offset < playerCount; offset++) {
+            const checkIdx = (botIdx + offset) % playerCount;
+            const player = room.players[checkIdx];
+            
+            // Skip eliminated players
+            if (!player || player.hand.length === 0) continue;
+            
+            // Found someone who lacks this suit!
+            if (this.playerLacksSuit(room, checkIdx, suit)) {
+                return {
+                    playerIdx: checkIdx,
+                    playerName: player.name,
+                    offset: offset // How many positions after bot
+                };
+            }
+        }
+        return null;
+    },
+    
+    /**
+     * STRATEGY: Find safe suits to lead (no one after me lacks them)
+     */
+    getSafeSuits(room, botIdx, availableSuits) {
+        const safeSuits = [];
+        for (const suit of availableSuits) {
+            const danger = this.findPlayerAfterMeLackingSuit(room, botIdx, suit);
+            if (!danger) {
+                safeSuits.push(suit);
+            }
+        }
+        return safeSuits;
+    },
+    
+    /**
+     * STRATEGY: Find bait opportunities
+     * If player at offset 2+ lacks a suit, I can bait the player at offset 1
+     */
+    findBaitOpportunity(room, botIdx, availableSuits) {
+        if (!room.ai) return null;
+        const playerCount = room.players.length;
+        
+        for (const suit of availableSuits) {
+            const lacking = this.findPlayerAfterMeLackingSuit(room, botIdx, suit);
+            
+            // If someone at offset 2+ lacks this suit, check if offset 1 can be baited
+            if (lacking && lacking.offset >= 2) {
+                const baitTargetIdx = (botIdx + 1) % playerCount;
+                const baitTarget = room.players[baitTargetIdx];
+                
+                // Bait target must be active and NOT lack this suit
+                if (baitTarget && baitTarget.hand.length > 0 && 
+                    !this.playerLacksSuit(room, baitTargetIdx, suit)) {
+                    return {
+                        suit: suit,
+                        baitTargetIdx: baitTargetIdx,
+                        baitTargetName: baitTarget.name,
+                        pangkaherIdx: lacking.playerIdx,
+                        pangkaherName: lacking.playerName
+                    };
+                }
+            }
+        }
+        return null;
+    },
+    
+    /**
+     * Get current highest card on table for a suit
+     */
+    getHighestOnTable(room, suit) {
+        if (!room.table || room.table.length === 0) return null;
+        let highest = null;
+        for (const entry of room.table) {
+            if (entry.card.suit === suit) {
+                if (!highest || entry.card.val > highest.val) {
+                    highest = entry.card;
+                }
+            }
+        }
+        return highest;
+    },
+    
+    /**
+     * ============================================
+     * MAIN DECISION ENGINE: Choose best card to play
+     * ============================================
+     */
+    chooseCard(room, botIdx) {
+        const player = room.players[botIdx];
+        const hand = player.hand;
+        
+        if (!room.ai) this.init(room);
+        
+        // Helper: Get cards by suit
+        const getCardsBySuit = (suit) => hand.filter(c => c.suit === suit);
+        
+        // Helper: Get all suits in hand
+        const getMySuits = () => [...new Set(hand.map(c => c.suit))];
+        
+        // Helper: Count cards per suit
+        const getSuitCounts = () => {
+            const counts = {};
+            hand.forEach(c => { counts[c.suit] = (counts[c.suit] || 0) + 1; });
+            return counts;
+        };
+        
+        // Helper: Get lowest card from array
+        const getLowest = (cards) => cards.reduce((min, c) => c.val < min.val ? c : min);
+        
+        // Helper: Get highest card from array
+        const getHighest = (cards) => cards.reduce((max, c) => c.val > max.val ? c : max);
+        
+        // ========== SCENARIO 1: First Move (Must play King of Spades) ==========
+        if (room.isFirstMove) {
+            return hand.find(c => c.suit === 'Spades' && c.rank === 'K');
+        }
+        
+        // ========== SCENARIO 2: Must Follow Suit ==========
+        if (room.currentSuit) {
+            const suitCards = getCardsBySuit(room.currentSuit);
+            
+            if (suitCards.length > 0) {
+                // I HAVE the lead suit - must follow
+                const highestOnTable = this.getHighestOnTable(room, room.currentSuit);
+                
+                if (highestOnTable) {
+                    // SMART PLAY: If high card already on table, dump my high cards below it
+                    const cardsBelow = suitCards.filter(c => c.val < highestOnTable.val);
+                    if (cardsBelow.length > 0) {
+                        // Play highest card that's still below table's highest (dump high cards safely)
+                        return getHighest(cardsBelow);
+                    }
+                }
+                
+                // Default: Play lowest to avoid winning
+                return getLowest(suitCards);
+                
+            } else {
+                // I DON'T HAVE lead suit - PANGKAH TIME!
+                // Strategy: Dump highest cards (high cards are dangerous to keep)
+                return getHighest(hand);
+            }
+        }
+        
+        // ========== SCENARIO 3: Leading a New Round ==========
+        const mySuits = getMySuits();
+        const suitCounts = getSuitCounts();
+        
+        // STRATEGY A: Find safe suits (no one after me lacks them)
+        const safeSuits = this.getSafeSuits(room, botIdx, mySuits);
+        
+        // STRATEGY B: Find bait opportunities
+        const bait = this.findBaitOpportunity(room, botIdx, mySuits);
+        
+        // DECISION PRIORITY:
+        
+        // 1. BAIT TRICK (70% chance if available)
+        if (bait && Math.random() < 0.7) {
+            const baitCards = getCardsBySuit(bait.suit);
+            console.log(`[AI Brain] ${player.name} BAITING ${bait.baitTargetName} with ${bait.suit} (${bait.pangkaherName} will pangkah)`);
+            // Play LOW card to bait
+            return getLowest(baitCards);
+        }
+        
+        // 2. SAFE SUIT - Clear rarest safe suit
+        if (safeSuits.length > 0) {
+            // Pick the rarest safe suit to clear it
+            let rarestSafe = safeSuits[0];
+            let minCount = suitCounts[rarestSafe];
+            for (const suit of safeSuits) {
+                if (suitCounts[suit] < minCount) {
+                    minCount = suitCounts[suit];
+                    rarestSafe = suit;
+                }
+            }
+            const safeCards = getCardsBySuit(rarestSafe);
+            console.log(`[AI Brain] ${player.name} playing SAFE suit ${rarestSafe}`);
+            return getLowest(safeCards);
+        }
+        
+        // 3. NO SAFE SUITS - Pick least dangerous option
+        // Try to find suit where the lacking player is furthest away
+        let bestSuit = mySuits[0];
+        let bestOffset = 0;
+        
+        for (const suit of mySuits) {
+            const danger = this.findPlayerAfterMeLackingSuit(room, botIdx, suit);
+            if (!danger) {
+                bestSuit = suit;
+                break;
+            }
+            if (danger.offset > bestOffset) {
+                bestOffset = danger.offset;
+                bestSuit = suit;
+            }
+        }
+        
+        // Play mid-value card (not lowest, not highest) to minimize damage
+        const cards = getCardsBySuit(bestSuit);
+        cards.sort((a, b) => a.val - b.val);
+        const midIndex = Math.floor(cards.length / 2);
+        console.log(`[AI Brain] ${player.name} NO SAFE OPTION - playing mid ${bestSuit}`);
+        return cards[midIndex] || cards[0];
+    }
+};
+
+/**
  * Get random bot name
  */
 function getRandomBotName(existingNames = []) {
@@ -788,7 +1080,7 @@ function createBot(existingNames = []) {
 }
 
 /**
- * Bot plays a card (AI logic with memory)
+ * Bot plays a card using AI Brain
  */
 function botPlayCard(roomID, isLeadingNewRound = false) {
     const room = rooms[roomID];
@@ -798,182 +1090,18 @@ function botPlayCard(roomID, isLeadingNewRound = false) {
     const player = room.players[botIdx];
     if (!player || !player.isBot || player.hand.length === 0) return;
     
-    // BUG FIX 2: If bot is leading a new round, wait longer (use 8 second delay)
-    // This prevents the glitch where card isn't visible
-    // Normal play: 1-2.5 seconds, Leading new round: 7-8 seconds
+    // Delay: Leading new round = 7-8s, Normal = 1-2.5s
     const delay = isLeadingNewRound ? (7000 + Math.random() * 1000) : (1000 + Math.random() * 1500);
     
     setTimeout(() => {
         if (!rooms[roomID] || rooms[roomID].resolving) return;
         if (rooms[roomID].turn !== botIdx) return;
         
-        let cardToPlay = null;
-        const hand = player.hand;
-        
-        // Initialize pangkah memory if not exists
-        // Tracks which suits each player DOESN'T have (from pangkah observations)
-        if (!room.pangkahMemory) {
-            room.pangkahMemory = {};
-        }
-        
-        // BUG FIX 3: Track suits that caused this bot to receive pangkah
-        // So bot doesn't keep playing the same suit
-        if (!room.botDangerousSuits) {
-            room.botDangerousSuits = {};
-        }
-        if (!room.botDangerousSuits[botIdx]) {
-            room.botDangerousSuits[botIdx] = [];
-        }
-        
-        // Helper: Count cards per suit in hand
-        const getSuitCounts = () => {
-            const counts = {};
-            hand.forEach(c => {
-                counts[c.suit] = (counts[c.suit] || 0) + 1;
-            });
-            return counts;
-        };
-        
-        // Helper: Get suits I have
-        const getMySuits = () => {
-            return [...new Set(hand.map(c => c.suit))];
-        };
-        
-        // Helper: Get suit with fewest cards (to clear it), avoiding dangerous suits
-        const getRarestSafeSuit = () => {
-            const counts = getSuitCounts();
-            const dangerousSuits = room.botDangerousSuits[botIdx] || [];
-            let rarest = null;
-            let minCount = Infinity;
-            
-            // First try to find a safe suit
-            for (const suit in counts) {
-                if (!dangerousSuits.includes(suit) && counts[suit] < minCount) {
-                    minCount = counts[suit];
-                    rarest = suit;
-                }
-            }
-            
-            // If all suits are dangerous, just pick the rarest anyway
-            if (!rarest) {
-                for (const suit in counts) {
-                    if (counts[suit] < minCount) {
-                        minCount = counts[suit];
-                        rarest = suit;
-                    }
-                }
-            }
-            
-            return rarest;
-        };
-        
-        // Helper: Check if any OTHER player doesn't have a suit (for bait)
-        const getPlayersWithoutSuit = (suit) => {
-            const playersWithout = [];
-            for (const pIdx in room.pangkahMemory) {
-                if (parseInt(pIdx) !== botIdx && room.pangkahMemory[pIdx]?.includes(suit)) {
-                    playersWithout.push(parseInt(pIdx));
-                }
-            }
-            return playersWithout;
-        };
-        
-        // Helper: Find a suit I can use to bait others (avoiding dangerous suits)
-        const findBaitSuit = () => {
-            const mySuits = getMySuits();
-            const dangerousSuits = room.botDangerousSuits[botIdx] || [];
-            
-            for (const suit of mySuits) {
-                // Skip suits that got me pangkah'd
-                if (dangerousSuits.includes(suit)) continue;
-                
-                const playersWithout = getPlayersWithoutSuit(suit);
-                if (playersWithout.length > 0) {
-                    return { suit, targets: playersWithout };
-                }
-            }
-            return null;
-        };
-        
-        // Helper: Check if a suit was used to pangkah me recently
-        const wasPangkahedWith = (suit) => {
-            return room.lastPangkahSuit === suit && room.lastPangkahVictim === botIdx;
-        };
-        
-        // First move - must play King of Spades
-        if (room.isFirstMove) {
-            cardToPlay = hand.find(c => c.suit === 'Spades' && c.rank === 'K');
-        }
-        // Has lead suit - must follow
-        else if (room.currentSuit) {
-            const suitCards = hand.filter(c => c.suit === room.currentSuit);
-            if (suitCards.length > 0) {
-                // STRATEGY: Play LOWEST card of lead suit to avoid winning
-                // 85% play lowest, 15% random
-                if (Math.random() < 0.85) {
-                    cardToPlay = suitCards.reduce((min, c) => c.val < min.val ? c : min);
-                } else {
-                    cardToPlay = suitCards[Math.floor(Math.random() * suitCards.length)];
-                }
-            } else {
-                // No lead suit - PANGKAH TIME!
-                // STRATEGY: Play HIGHEST card to dump high-value cards
-                // 90% play highest, 10% random
-                if (Math.random() < 0.9) {
-                    cardToPlay = hand.reduce((max, c) => c.val > max.val ? c : max);
-                } else {
-                    cardToPlay = hand[Math.floor(Math.random() * hand.length)];
-                }
-            }
-        }
-        
-        // Leading a new round (no current suit)
-        if (!cardToPlay) {
-            const suitCounts = getSuitCounts();
-            const mySuits = getMySuits();
-            const dangerousSuits = room.botDangerousSuits[botIdx] || [];
-            
-            // STRATEGY 1: BAIT TRICK (60% chance to try)
-            // If I know someone doesn't have a suit, lead LOW card of that suit
-            // to bait the player(s) in between to get pangkah'd
-            if (Math.random() < 0.6) {
-                const bait = findBaitSuit();
-                if (bait) {
-                    const baitCards = hand.filter(c => c.suit === bait.suit);
-                    // Play LOWEST card of bait suit
-                    cardToPlay = baitCards.reduce((min, c) => c.val < min.val ? c : min);
-                }
-            }
-            
-            // STRATEGY 2: AVOID DANGEROUS SUITS (Bug Fix 3)
-            // Don't lead with suits that caused me to receive pangkah
-            if (!cardToPlay) {
-                const safeSuits = mySuits.filter(s => !dangerousSuits.includes(s) && !wasPangkahedWith(s));
-                if (safeSuits.length > 0) {
-                    // Among safe suits, pick the rarest to clear it
-                    let rarestSafe = safeSuits[0];
-                    let minCount = suitCounts[rarestSafe] || Infinity;
-                    for (const suit of safeSuits) {
-                        if ((suitCounts[suit] || 0) < minCount) {
-                            minCount = suitCounts[suit];
-                            rarestSafe = suit;
-                        }
-                    }
-                    const safeCards = hand.filter(c => c.suit === rarestSafe);
-                    cardToPlay = safeCards.reduce((min, c) => c.val < min.val ? c : min);
-                }
-            }
-            
-            // STRATEGY 3: CLEAR RAREST SAFE SUIT (fallback)
-            if (!cardToPlay) {
-                const rarestSuit = getRarestSafeSuit();
-                const rarestCards = hand.filter(c => c.suit === rarestSuit);
-                cardToPlay = rarestCards.reduce((min, c) => c.val < min.val ? c : min);
-            }
-        }
+        // Use AI Brain to choose card
+        const cardToPlay = PangkahAI.chooseCard(room, botIdx);
         
         if (cardToPlay) {
-            // Sometimes send emote (20% chance, more if baiting)
+            // Sometimes send emote (20% chance)
             if (Math.random() < 0.2) {
                 const emote = BOT_EMOTES[Math.floor(Math.random() * BOT_EMOTES.length)];
                 io.to(roomID).emit('emote', { 
@@ -1222,19 +1350,11 @@ function processCardPlay(roomID, playerIdx, cardObject) {
     // Determine if Pangkah occurred
     let isPangkah = playedCard.suit !== room.currentSuit;
     
-    // Track pangkah stats and dealer
+    // Track pangkah stats and teach AI Brain
     if (isPangkah && player.gameStats) {
         player.gameStats.pangkahsDealt++;
-        room.pangkahDealer = player.userID; // Track who dealt the pangkah
+        room.pangkahDealer = player.userID;
         
-        // BOT MEMORY: Remember that this player doesn't have the lead suit
-        if (!room.pangkahMemory) room.pangkahMemory = {};
-        if (!room.pangkahMemory[playerIdx]) room.pangkahMemory[playerIdx] = [];
-        if (!room.pangkahMemory[playerIdx].includes(room.currentSuit)) {
-            room.pangkahMemory[playerIdx].push(room.currentSuit);
-        }
-        
-        // Track last pangkah for revenge avoidance
         // Find who will receive the pangkah (highest lead suit holder)
         let victimIdx = -1;
         let highVal = -1;
@@ -1244,8 +1364,9 @@ function processCardPlay(roomID, playerIdx, cardObject) {
                 victimIdx = t.playerIdx;
             }
         });
-        room.lastPangkahSuit = room.currentSuit;
-        room.lastPangkahVictim = victimIdx;
+        
+        // AI BRAIN: Record this pangkah event (permanent memory)
+        PangkahAI.recordPangkah(room, playerIdx, victimIdx, room.currentSuit);
     }
     
     // Count active players
@@ -1337,17 +1458,7 @@ function resolveRound(roomID, isPangkah) {
                 winner.gameStats.hadMostCards = true;
             }
         }
-        
-        // BUG FIX 3: If winner is a bot, remember this suit as dangerous
-        // So bot doesn't keep playing the same suit and receiving pangkah
-        if (winner.isBot) {
-            if (!room.botDangerousSuits) room.botDangerousSuits = {};
-            if (!room.botDangerousSuits[winnerIdx]) room.botDangerousSuits[winnerIdx] = [];
-            if (!room.botDangerousSuits[winnerIdx].includes(room.currentSuit)) {
-                room.botDangerousSuits[winnerIdx].push(room.currentSuit);
-                console.log(`Bot ${winner.name} learned: ${room.currentSuit} is dangerous (received pangkah)`);
-            }
-        }
+        // AI Brain already learned from pangkah in processCardPlay
     } else {
         room.discarded.push(...room.table.map(t => t.card));
         if (winner.gameStats) {
@@ -1711,11 +1822,8 @@ io.on('connection', (socket) => {
         room.gameNumber = (room.gameNumber || 0) + 1;
         room.finishOrder = [];
         
-        // Reset bot memory for new game
-        room.pangkahMemory = {};
-        room.lastPangkahSuit = null;
-        room.lastPangkahVictim = null;
-        room.botDangerousSuits = {}; // Reset dangerous suits memory
+        // Initialize AI Brain for new game (fresh memory)
+        PangkahAI.init(room);
         
         // Reset rematch flags
         room.players.forEach(p => {

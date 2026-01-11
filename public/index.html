@@ -160,6 +160,15 @@
         .clean-text { color: var(--accent-blue); font-size: 2rem; font-weight: 800; text-shadow: 0 0 20px var(--accent-blue); }
         #achievement-popup { position: fixed; top: 100px; right: 20px; background: var(--bg-primary); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px); padding: 20px; border-radius: 16px; border: 1px solid var(--accent-gold); z-index: 10002; display: none; min-width: 280px; animation: slideIn 0.4s ease; box-shadow: var(--shadow-lg); }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        /* GM Admin Styles */
+        .gm-stat-input { width: 100%; background: transparent; border: none; color: #fff; font-size: 16px; font-weight: 700; padding: 5px 0; outline: none; }
+        .gm-stat-input:focus { border-bottom: 2px solid var(--accent-gold); }
+        .toggle-switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: 0.3s; border-radius: 26px; }
+        .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: #fff; transition: 0.3s; border-radius: 50%; }
+        .toggle-switch input:checked + .toggle-slider { background-color: #22c55e; }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(24px); }
         .header { height: 60px; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); background: var(--bg-primary); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px); }
         #game-view { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
         .safe-wrap { position: relative; width: 100%; height: 100%; }
@@ -340,6 +349,7 @@
         </div>
         <button class="header-menu-item" onclick="openProfile(); closeHeaderMenu();"><img src="/icon/profile.svg" alt="" style="width:16px;height:16px;filter:brightness(0) invert(1);vertical-align:middle;margin-right:8px">Profile</button>
         <button class="header-menu-item" onclick="openLeaderboard(); closeHeaderMenu();"><img src="/icon/leaderboard.svg" alt="" style="width:16px;height:16px;vertical-align:middle;margin-right:8px">Leaderboard</button>
+        <button class="header-menu-item gm-only" id="gm-admin-btn" onclick="openGMAdmin(); closeHeaderMenu();" style="display:none;color:var(--accent-red)"><img src="/icon/profile.svg" alt="" style="width:16px;height:16px;filter:invert(27%) sepia(94%) saturate(5826%) hue-rotate(354deg) brightness(91%) contrast(130%);vertical-align:middle;margin-right:8px">GM Admin Panel</button>
     </div>
     
     <!-- Body - Centered Panel -->
@@ -432,6 +442,77 @@
                 <button class="btn btn-s" onclick="closeLeaderboard()" style="flex:1">CLOSE</button>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- GM Admin Panel Modal -->
+<div class="modal-overlay" id="gm-admin-modal" style="display:none">
+    <div class="leaderboard-card" style="max-width:500px">
+        <h3 style="color:var(--accent-red);margin-top:0;display:flex;align-items:center;justify-content:center;gap:8px">⚙️ GM ADMIN PANEL</h3>
+        
+        <div style="margin-bottom:15px">
+            <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:5px">SEARCH PLAYER</label>
+            <div style="display:flex;gap:8px">
+                <input id="gm-search-input" type="text" placeholder="Enter player name or userID" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border-light);background:rgba(0,0,0,0.3);color:#fff;font-size:12px">
+                <button class="btn btn-p" onclick="gmSearchPlayer()" style="width:auto;padding:10px 15px;font-size:11px">SEARCH</button>
+            </div>
+        </div>
+        
+        <div id="gm-player-result" style="display:none;background:rgba(0,0,0,0.3);border-radius:12px;padding:15px;margin-bottom:15px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+                <div>
+                    <div id="gm-player-name" style="font-weight:800;font-size:16px;color:#fff"></div>
+                    <div id="gm-player-id" style="font-size:10px;color:var(--text-tertiary)"></div>
+                </div>
+                <div id="gm-player-status" style="padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700"></div>
+            </div>
+            
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px">
+                <div style="background:rgba(255,255,255,0.05);padding:10px;border-radius:8px">
+                    <div style="font-size:10px;color:var(--text-tertiary)">XP</div>
+                    <input id="gm-stat-xp" type="number" class="gm-stat-input" value="0">
+                </div>
+                <div style="background:rgba(255,255,255,0.05);padding:10px;border-radius:8px">
+                    <div style="font-size:10px;color:var(--text-tertiary)">WINS</div>
+                    <input id="gm-stat-wins" type="number" class="gm-stat-input" value="0">
+                </div>
+                <div style="background:rgba(255,255,255,0.05);padding:10px;border-radius:8px">
+                    <div style="font-size:10px;color:var(--text-tertiary)">LOSSES</div>
+                    <input id="gm-stat-losses" type="number" class="gm-stat-input" value="0">
+                </div>
+                <div style="background:rgba(255,255,255,0.05);padding:10px;border-radius:8px">
+                    <div style="font-size:10px;color:var(--text-tertiary)">GAMES</div>
+                    <input id="gm-stat-games" type="number" class="gm-stat-input" value="0">
+                </div>
+                <div style="background:rgba(255,255,255,0.05);padding:10px;border-radius:8px">
+                    <div style="font-size:10px;color:var(--text-tertiary)">PANGKAHS</div>
+                    <input id="gm-stat-pangkahs" type="number" class="gm-stat-input" value="0">
+                </div>
+                <div style="background:rgba(255,255,255,0.05);padding:10px;border-radius:8px">
+                    <div style="font-size:10px;color:var(--text-tertiary)">BEST STREAK</div>
+                    <input id="gm-stat-bestStreak" type="number" class="gm-stat-input" value="0">
+                </div>
+            </div>
+            
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;background:rgba(255,255,255,0.05);padding:10px;border-radius:8px">
+                <label style="font-size:11px;color:var(--text-secondary);flex:1">BETA TESTER STATUS</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="gm-beta-toggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            
+            <div style="display:flex;gap:10px">
+                <button class="btn btn-p" onclick="gmSavePlayer()" style="flex:1;font-size:11px">💾 SAVE CHANGES</button>
+                <button class="btn" onclick="gmResetPlayer()" style="flex:1;font-size:11px;background:var(--accent-red);color:#fff">🗑️ RESET ALL STATS</button>
+            </div>
+        </div>
+        
+        <div id="gm-no-result" style="display:none;text-align:center;padding:20px;color:var(--text-tertiary)">
+            No player found. Try a different search.
+        </div>
+        
+        <button class="btn btn-s" onclick="closeGMAdmin()" style="width:100%;margin-top:10px">CLOSE</button>
     </div>
 </div>
 
@@ -682,7 +763,13 @@ async function syncFromServer(){
     }catch(e){console.log('Server sync skipped:',e.message);}
 }
 // Call sync on page load (after DOM ready)
-document.addEventListener('DOMContentLoaded',()=>setTimeout(syncFromServer,500));
+document.addEventListener('DOMContentLoaded',()=>{
+    setTimeout(syncFromServer,500);
+    // Show GM Admin button if already logged in as GM
+    if(isGameMaster){
+        document.getElementById('gm-admin-btn').style.display='block';
+    }
+});
 
 function getStatValue(t){switch(t){case'level':return getLevel();case'pangkahs':return stats.pangkahs||0;case'streak':return stats.bestStreak||0;case'wins':return stats.wins||0;case'games':return stats.games||0;case'xp':return stats.xp||0;case'handsAbsorbed':return stats.handsAbsorbed||0;case'nightGames':return stats.nightGames||0;case'uniquePlayers':return(stats.uniquePlayers||[]).length;case'topTwo':return stats.topTwo||0;case'secondPlace':return stats.secondPlace||0;case'thirdPlace':return stats.thirdPlace||0;case'cardsPlayed':return stats.cardsPlayed||0;case'losses':return stats.losses||0;case'maxCardsHeld':return stats.maxCardsHeld||0;case'comebacks':return stats.comebacks||0;case'perfectWins':return stats.perfectWins||0;case'fastWins':return stats.fastWins||0;case'handsGiven':return stats.handsGiven||0;case'autoPlays':return stats.autoPlays||0;case'cleanWins':return stats.cleanWins||0;case'pangkahsReceived':return stats.pangkahsReceived||0;default:return 0;}}
 function checkAllTitles(){TITLES.forEach(t=>{if(!stats.unlockedTitles.includes(t.id)&&getStatValue(t.req.t)>=t.req.v){stats.unlockedTitles.push(t.id);showAchievement(t);}});saveStats();}
@@ -858,6 +945,8 @@ async function gmLogin(){
             if(!stats.unlockedTitles.includes('shadow_magistrate'))stats.unlockedTitles.push('shadow_magistrate');
             saveStats();
             updateStatsUI();
+            // Show GM Admin button
+            document.getElementById('gm-admin-btn').style.display='block';
             showToast('⚜️ Game Master Mode Activated!',true);
         }else{
             showToast('Invalid password!',false);
@@ -867,6 +956,8 @@ async function gmLogin(){
 function gmLogout(){
     isGameMaster=false;
     localStorage.removeItem('pGM');
+    // Hide GM Admin button
+    document.getElementById('gm-admin-btn').style.display='none';
     // Remove GM titles
     stats.unlockedTitles=stats.unlockedTitles.filter(t=>t!=='celestial_marshal'&&t!=='shadow_magistrate');
     if(stats.equippedTitle==='celestial_marshal'||stats.equippedTitle==='shadow_magistrate')stats.equippedTitle=null;
@@ -1021,6 +1112,136 @@ function openLeaderboard(){
 function closeLeaderboard(){
     document.getElementById('leaderboard-modal').style.display='none';
 }
+
+// ============ GM ADMIN PANEL ============
+let gmCurrentPlayer = null;
+
+function openGMAdmin(){
+    if(!isGameMaster){showToast('Access denied');return;}
+    document.getElementById('gm-admin-modal').style.display='flex';
+    document.getElementById('gm-player-result').style.display='none';
+    document.getElementById('gm-no-result').style.display='none';
+    document.getElementById('gm-search-input').value='';
+}
+
+function closeGMAdmin(){
+    document.getElementById('gm-admin-modal').style.display='none';
+    gmCurrentPlayer=null;
+}
+
+async function gmSearchPlayer(){
+    const query=document.getElementById('gm-search-input').value.trim();
+    if(!query){showToast('Enter a search term');return;}
+    
+    try{
+        const res=await fetch(`/api/gm/search-player?q=${encodeURIComponent(query)}`);
+        const data=await res.json();
+        
+        if(data.player){
+            gmCurrentPlayer=data.player;
+            document.getElementById('gm-player-result').style.display='block';
+            document.getElementById('gm-no-result').style.display='none';
+            
+            document.getElementById('gm-player-name').innerText=data.player.displayName||'Unknown';
+            document.getElementById('gm-player-id').innerText=data.player.userID;
+            
+            const statusEl=document.getElementById('gm-player-status');
+            if(data.player.isBetaTester){
+                statusEl.innerText='BETA TESTER';
+                statusEl.style.background='#22c55e';
+                statusEl.style.color='#000';
+            }else{
+                statusEl.innerText='NORMAL';
+                statusEl.style.background='rgba(255,255,255,0.1)';
+                statusEl.style.color='#fff';
+            }
+            
+            document.getElementById('gm-stat-xp').value=data.player.xp||0;
+            document.getElementById('gm-stat-wins').value=data.player.wins||0;
+            document.getElementById('gm-stat-losses').value=data.player.losses||0;
+            document.getElementById('gm-stat-games').value=data.player.games||0;
+            document.getElementById('gm-stat-pangkahs').value=data.player.pangkahs||0;
+            document.getElementById('gm-stat-bestStreak').value=data.player.bestStreak||0;
+            document.getElementById('gm-beta-toggle').checked=data.player.isBetaTester||false;
+        }else{
+            document.getElementById('gm-player-result').style.display='none';
+            document.getElementById('gm-no-result').style.display='block';
+            gmCurrentPlayer=null;
+        }
+    }catch(e){
+        console.error('GM search error:',e);
+        showToast('Search failed');
+    }
+}
+
+async function gmSavePlayer(){
+    if(!gmCurrentPlayer){showToast('No player selected');return;}
+    
+    const updates={
+        xp:parseInt(document.getElementById('gm-stat-xp').value)||0,
+        wins:parseInt(document.getElementById('gm-stat-wins').value)||0,
+        losses:parseInt(document.getElementById('gm-stat-losses').value)||0,
+        games:parseInt(document.getElementById('gm-stat-games').value)||0,
+        pangkahs:parseInt(document.getElementById('gm-stat-pangkahs').value)||0,
+        bestStreak:parseInt(document.getElementById('gm-stat-bestStreak').value)||0,
+        isBetaTester:document.getElementById('gm-beta-toggle').checked
+    };
+    
+    try{
+        const res=await fetch('/api/gm/update-player',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({targetUserID:gmCurrentPlayer.userID,updates})
+        });
+        const data=await res.json();
+        if(data.success){
+            showToast('Player updated!',true);
+            // Update status display
+            const statusEl=document.getElementById('gm-player-status');
+            if(updates.isBetaTester){
+                statusEl.innerText='BETA TESTER';
+                statusEl.style.background='#22c55e';
+                statusEl.style.color='#000';
+            }else{
+                statusEl.innerText='NORMAL';
+                statusEl.style.background='rgba(255,255,255,0.1)';
+                statusEl.style.color='#fff';
+            }
+        }else{
+            showToast(data.error||'Update failed');
+        }
+    }catch(e){
+        console.error('GM save error:',e);
+        showToast('Save failed');
+    }
+}
+
+async function gmResetPlayer(){
+    if(!gmCurrentPlayer){showToast('No player selected');return;}
+    
+    if(!confirm(`Are you sure you want to RESET ALL STATS for ${gmCurrentPlayer.displayName}?\n\nThis cannot be undone!`)){
+        return;
+    }
+    
+    try{
+        const res=await fetch('/api/gm/reset-player',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({targetUserID:gmCurrentPlayer.userID})
+        });
+        const data=await res.json();
+        if(data.success){
+            showToast('Player stats reset!',true);
+            gmSearchPlayer(); // Refresh the display
+        }else{
+            showToast(data.error||'Reset failed');
+        }
+    }catch(e){
+        console.error('GM reset error:',e);
+        showToast('Reset failed');
+    }
+}
+// ============ END GM ADMIN PANEL ============
 
 function saveStats(){
     localStorage.setItem('pStats',JSON.stringify(stats));

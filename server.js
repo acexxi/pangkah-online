@@ -1519,7 +1519,7 @@ io.on('connection', (socket) => {
     /**
      * CREATE ROOM
      */
-    socket.on('createRoom', ({ roomID, playerName, maxPlayers, userID, equippedTitle, level, isGM, botCount }) => {
+    socket.on('createRoom', ({ roomID, playerName, maxPlayers, userID, equippedTitle, level, isGM, isBetaTester, botCount }) => {
         if (!roomID || !playerName || !userID) {
             return socket.emit('errorMsg', 'Missing required fields');
         }
@@ -1548,6 +1548,7 @@ io.on('connection', (socket) => {
                 equippedTitle: equippedTitle || null,
                 level: level || 1,
                 isGM: isGM || false,
+                isBetaTester: isBetaTester || false,
                 isBot: false,
                 gameStats: null,
                 rematchReady: false
@@ -1582,7 +1583,7 @@ io.on('connection', (socket) => {
     /**
      * JOIN ROOM
      */
-    socket.on('joinRoom', ({ roomID, playerName, userID, equippedTitle, level, isGM }) => {
+    socket.on('joinRoom', ({ roomID, playerName, userID, equippedTitle, level, isGM, isBetaTester }) => {
         if (!roomID || !playerName || !userID) {
             return socket.emit('errorMsg', 'Missing required fields');
         }
@@ -1598,6 +1599,7 @@ io.on('connection', (socket) => {
             existing.equippedTitle = equippedTitle || existing.equippedTitle;
             existing.level = level || existing.level || 1;
             existing.isGM = isGM || existing.isGM || false;
+            existing.isBetaTester = isBetaTester || existing.isBetaTester || false;
             socket.join(roomID);
             console.log(`${playerName} rejoined room ${roomID}${isGM?' (GM)':''}`);
         } else {
@@ -1617,6 +1619,8 @@ io.on('connection', (socket) => {
                 equippedTitle: equippedTitle || null,
                 level: level || 1,
                 isGM: isGM || false,
+                isBetaTester: isBetaTester || false,
+                isBot: false,
                 gameStats: null,
                 rematchReady: false
             });

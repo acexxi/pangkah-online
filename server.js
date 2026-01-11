@@ -788,13 +788,14 @@ function createBot(existingNames = []) {
 }
 
 /**
- * Bot plays a card (AI logic)
+ * Bot plays a card (AI logic with memory)
  */
 function botPlayCard(roomID) {
     const room = rooms[roomID];
     if (!room || room.resolving) return;
     
-    const player = room.players[room.turn];
+    const botIdx = room.turn;
+    const player = room.players[botIdx];
     if (!player || !player.isBot || player.hand.length === 0) return;
     
     // Random delay to feel more human (1-2.5 seconds)
@@ -802,18 +803,29 @@ function botPlayCard(roomID) {
     
     setTimeout(() => {
         if (!rooms[roomID] || rooms[roomID].resolving) return;
-        if (rooms[roomID].turn !== room.players.indexOf(player)) return;
+        if (rooms[roomID].turn !== botIdx) return;
         
         let cardToPlay = null;
         const hand = player.hand;
         
-        // Helper: Count cards per suit
+        // Initialize pangkah memory if not exists
+        // Tracks which suits each player DOESN'T have (from pangkah observations)
+        if (!room.pangkahMemory) {
+            room.pangkahMemory = {};
+        }
+        
+        // Helper: Count cards per suit in hand
         const getSuitCounts = () => {
             const counts = {};
             hand.forEach(c => {
                 counts[c.suit] = (counts[c.suit] || 0) + 1;
             });
             return counts;
+        };
+        
+        // Helper: Get suits I have
+        const getMySuits = () => {
+            return [...new Set(hand.map(c => c.suit))];
         };
         
         // Helper: Get suit with fewest cards (to clear it)
@@ -830,6 +842,36 @@ function botPlayCard(roomID) {
             return rarest;
         };
         
+        // Helper: Check if any OTHER player doesn't have a suit (for bait)
+        const getPlayersWithoutSuit = (suit) => {
+            const playersWithout = [];
+            for (const pIdx in room.pangkahMemory) {
+                if (parseInt(pIdx) !== botIdx && room.pangkahMemory[pIdx]?.includes(suit)) {
+                    playersWithout.push(parseInt(pIdx));
+                }
+            }
+            return playersWithout;
+        };
+        
+        // Helper: Find a suit I can use to bait others
+        const findBaitSuit = () => {
+            const mySuits = getMySuits();
+            for (const suit of mySuits) {
+                const playersWithout = getPlayersWithoutSuit(suit);
+                // Check if there's a player BETWEEN me and the one without the suit
+                // who might get baited
+                if (playersWithout.length > 0) {
+                    return { suit, targets: playersWithout };
+                }
+            }
+            return null;
+        };
+        
+        // Helper: Check if a suit was used to pangkah me recently
+        const wasPangkahedWith = (suit) => {
+            return room.lastPangkahSuit === suit && room.lastPangkahVictim === botIdx;
+        };
+        
         // First move - must play King of Spades
         if (room.isFirstMove) {
             cardToPlay = hand.find(c => c.suit === 'Spades' && c.rank === 'K');
@@ -839,9 +881,8 @@ function botPlayCard(roomID) {
             const suitCards = hand.filter(c => c.suit === room.currentSuit);
             if (suitCards.length > 0) {
                 // STRATEGY: Play LOWEST card of lead suit to avoid winning
-                // Winning = you lead next round = others can pangkah YOU
-                // 80% play lowest, 20% random
-                if (Math.random() < 0.8) {
+                // 85% play lowest, 15% random
+                if (Math.random() < 0.85) {
                     cardToPlay = suitCards.reduce((min, c) => c.val < min.val ? c : min);
                 } else {
                     cardToPlay = suitCards[Math.floor(Math.random() * suitCards.length)];
@@ -849,9 +890,8 @@ function botPlayCard(roomID) {
             } else {
                 // No lead suit - PANGKAH TIME!
                 // STRATEGY: Play HIGHEST card to dump high-value cards
-                // High cards are bad because they win rounds
-                // 85% play highest, 15% random
-                if (Math.random() < 0.85) {
+                // 90% play highest, 10% random
+                if (Math.random() < 0.9) {
                     cardToPlay = hand.reduce((max, c) => c.val > max.val ? c : max);
                 } else {
                     cardToPlay = hand[Math.floor(Math.random() * hand.length)];
@@ -861,28 +901,56 @@ function botPlayCard(roomID) {
         
         // Leading a new round (no current suit)
         if (!cardToPlay) {
-            // STRATEGY: Clear suits with fewest cards to create pangkah opportunities
-            // If I have only 1 Heart, play it! Then next time Hearts lead, I can pangkah!
-            // 70% play from rarest suit (lowest card), 30% random
-            if (Math.random() < 0.7) {
+            const suitCounts = getSuitCounts();
+            const mySuits = getMySuits();
+            
+            // STRATEGY 1: BAIT TRICK (60% chance to try)
+            // If I know someone doesn't have a suit, lead LOW card of that suit
+            // to bait the player(s) in between to get pangkah'd
+            if (Math.random() < 0.6) {
+                const bait = findBaitSuit();
+                if (bait) {
+                    const baitCards = hand.filter(c => c.suit === bait.suit);
+                    // Play LOWEST card of bait suit
+                    cardToPlay = baitCards.reduce((min, c) => c.val < min.val ? c : min);
+                }
+            }
+            
+            // STRATEGY 2: AVOID REVENGE
+            // Don't lead with a suit that was just used to pangkah me
+            if (!cardToPlay) {
+                const safeSuits = mySuits.filter(s => !wasPangkahedWith(s));
+                if (safeSuits.length > 0) {
+                    // Among safe suits, pick the rarest to clear it
+                    let rarestSafe = safeSuits[0];
+                    let minCount = suitCounts[rarestSafe] || Infinity;
+                    for (const suit of safeSuits) {
+                        if ((suitCounts[suit] || 0) < minCount) {
+                            minCount = suitCounts[suit];
+                            rarestSafe = suit;
+                        }
+                    }
+                    const safeCards = hand.filter(c => c.suit === rarestSafe);
+                    cardToPlay = safeCards.reduce((min, c) => c.val < min.val ? c : min);
+                }
+            }
+            
+            // STRATEGY 3: CLEAR RAREST SUIT (fallback)
+            if (!cardToPlay) {
                 const rarestSuit = getRarestSuit();
                 const rarestCards = hand.filter(c => c.suit === rarestSuit);
-                // Play lowest of rarest suit to not win
                 cardToPlay = rarestCards.reduce((min, c) => c.val < min.val ? c : min);
-            } else {
-                // Random card
-                cardToPlay = hand[Math.floor(Math.random() * hand.length)];
             }
         }
         
         if (cardToPlay) {
-            // Sometimes send emote (20% chance)
+            // Sometimes send emote (20% chance, more if baiting)
             if (Math.random() < 0.2) {
                 const emote = BOT_EMOTES[Math.floor(Math.random() * BOT_EMOTES.length)];
                 io.to(roomID).emit('emote', { 
                     from: player.name, 
                     emote: emote,
-                    playerIdx: room.players.indexOf(player)
+                    playerIdx: botIdx
                 });
             }
             
@@ -1129,6 +1197,26 @@ function processCardPlay(roomID, playerIdx, cardObject) {
     if (isPangkah && player.gameStats) {
         player.gameStats.pangkahsDealt++;
         room.pangkahDealer = player.userID; // Track who dealt the pangkah
+        
+        // BOT MEMORY: Remember that this player doesn't have the lead suit
+        if (!room.pangkahMemory) room.pangkahMemory = {};
+        if (!room.pangkahMemory[playerIdx]) room.pangkahMemory[playerIdx] = [];
+        if (!room.pangkahMemory[playerIdx].includes(room.currentSuit)) {
+            room.pangkahMemory[playerIdx].push(room.currentSuit);
+        }
+        
+        // Track last pangkah for revenge avoidance
+        // Find who will receive the pangkah (highest lead suit holder)
+        let victimIdx = -1;
+        let highVal = -1;
+        room.table.forEach(t => {
+            if (t.card.suit === room.currentSuit && t.card.val > highVal) {
+                highVal = t.card.val;
+                victimIdx = t.playerIdx;
+            }
+        });
+        room.lastPangkahSuit = room.currentSuit;
+        room.lastPangkahVictim = victimIdx;
     }
     
     // Count active players
@@ -1578,6 +1666,11 @@ io.on('connection', (socket) => {
         room.currentSuit = null;
         room.gameNumber = (room.gameNumber || 0) + 1;
         room.finishOrder = [];
+        
+        // Reset bot memory for new game
+        room.pangkahMemory = {};
+        room.lastPangkahSuit = null;
+        room.lastPangkahVictim = null;
         
         // Reset rematch flags
         room.players.forEach(p => {

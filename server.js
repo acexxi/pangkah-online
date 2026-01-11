@@ -748,6 +748,162 @@ const FATE_CONFIG = {
 let rooms = {};
 let turnTimers = {}; // Store turn timers per room
 
+// Bot Configuration
+const BOT_NAMES = [
+    'Keanu Reeves', 'Shrek', 'Gandalf', 'Yoda', 'SpongeBob', 
+    'Dobby', 'Groot', 'Pikachu', 'Batman', 'Gollum',
+    'Thanos', 'Dumbledore', 'Sherlock', 'Mario', 'Sonic',
+    'Elsa', 'Buzz Lightyear', 'Dora', 'Mr Bean', 'John Wick',
+    'Naruto', 'Goku', 'Luffy', 'Saitama', 'Levi Ackerman'
+];
+
+const BOT_EMOTES = ['😂', '👍', '😡', '🔥', '💀', '👏', '🤡', '😎', '🥲', '💪'];
+
+/**
+ * Get random bot name
+ */
+function getRandomBotName(existingNames = []) {
+    const available = BOT_NAMES.filter(n => !existingNames.includes(`[BOT] ${n}`));
+    if (available.length === 0) return `[BOT] Bot${Math.floor(Math.random() * 1000)}`;
+    return `[BOT] ${available[Math.floor(Math.random() * available.length)]}`;
+}
+
+/**
+ * Create bot player object
+ */
+function createBot(existingNames = []) {
+    const botName = getRandomBotName(existingNames);
+    return {
+        id: `bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: botName,
+        userID: `bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        hand: [],
+        equippedTitle: null,
+        level: Math.floor(Math.random() * 10) + 1,
+        isGM: false,
+        isBot: true,
+        gameStats: null,
+        rematchReady: false
+    };
+}
+
+/**
+ * Bot plays a card (AI logic)
+ */
+function botPlayCard(roomID) {
+    const room = rooms[roomID];
+    if (!room || room.resolving) return;
+    
+    const player = room.players[room.turn];
+    if (!player || !player.isBot || player.hand.length === 0) return;
+    
+    // Random delay to feel more human (1-2.5 seconds)
+    const delay = 1000 + Math.random() * 1500;
+    
+    setTimeout(() => {
+        if (!rooms[roomID] || rooms[roomID].resolving) return;
+        if (rooms[roomID].turn !== room.players.indexOf(player)) return;
+        
+        let cardToPlay = null;
+        const hand = player.hand;
+        
+        // Helper: Count cards per suit
+        const getSuitCounts = () => {
+            const counts = {};
+            hand.forEach(c => {
+                counts[c.suit] = (counts[c.suit] || 0) + 1;
+            });
+            return counts;
+        };
+        
+        // Helper: Get suit with fewest cards (to clear it)
+        const getRarestSuit = () => {
+            const counts = getSuitCounts();
+            let rarest = null;
+            let minCount = Infinity;
+            for (const suit in counts) {
+                if (counts[suit] < minCount) {
+                    minCount = counts[suit];
+                    rarest = suit;
+                }
+            }
+            return rarest;
+        };
+        
+        // First move - must play King of Spades
+        if (room.isFirstMove) {
+            cardToPlay = hand.find(c => c.suit === 'Spades' && c.rank === 'K');
+        }
+        // Has lead suit - must follow
+        else if (room.currentSuit) {
+            const suitCards = hand.filter(c => c.suit === room.currentSuit);
+            if (suitCards.length > 0) {
+                // STRATEGY: Play LOWEST card of lead suit to avoid winning
+                // Winning = you lead next round = others can pangkah YOU
+                // 80% play lowest, 20% random
+                if (Math.random() < 0.8) {
+                    cardToPlay = suitCards.reduce((min, c) => c.val < min.val ? c : min);
+                } else {
+                    cardToPlay = suitCards[Math.floor(Math.random() * suitCards.length)];
+                }
+            } else {
+                // No lead suit - PANGKAH TIME!
+                // STRATEGY: Play HIGHEST card to dump high-value cards
+                // High cards are bad because they win rounds
+                // 85% play highest, 15% random
+                if (Math.random() < 0.85) {
+                    cardToPlay = hand.reduce((max, c) => c.val > max.val ? c : max);
+                } else {
+                    cardToPlay = hand[Math.floor(Math.random() * hand.length)];
+                }
+            }
+        }
+        
+        // Leading a new round (no current suit)
+        if (!cardToPlay) {
+            // STRATEGY: Clear suits with fewest cards to create pangkah opportunities
+            // If I have only 1 Heart, play it! Then next time Hearts lead, I can pangkah!
+            // 70% play from rarest suit (lowest card), 30% random
+            if (Math.random() < 0.7) {
+                const rarestSuit = getRarestSuit();
+                const rarestCards = hand.filter(c => c.suit === rarestSuit);
+                // Play lowest of rarest suit to not win
+                cardToPlay = rarestCards.reduce((min, c) => c.val < min.val ? c : min);
+            } else {
+                // Random card
+                cardToPlay = hand[Math.floor(Math.random() * hand.length)];
+            }
+        }
+        
+        if (cardToPlay) {
+            // Sometimes send emote (20% chance)
+            if (Math.random() < 0.2) {
+                const emote = BOT_EMOTES[Math.floor(Math.random() * BOT_EMOTES.length)];
+                io.to(roomID).emit('emote', { 
+                    from: player.name, 
+                    emote: emote,
+                    playerIdx: room.players.indexOf(player)
+                });
+            }
+            
+            processCardPlay(roomID, room.turn, cardToPlay);
+        }
+    }, delay);
+}
+
+/**
+ * Check if current player is bot and trigger bot play
+ */
+function checkBotTurn(roomID) {
+    const room = rooms[roomID];
+    if (!room || !room.gameStarted || room.resolving) return;
+    
+    const currentPlayer = room.players[room.turn];
+    if (currentPlayer && currentPlayer.isBot && currentPlayer.hand.length > 0) {
+        botPlayCard(roomID);
+    }
+}
+
 /**
  * Fisher-Yates shuffle - unbiased randomization
  */
@@ -1018,8 +1174,14 @@ function advanceToNextPlayer(roomID) {
         fateAces: room.fateAces
     });
     
-    // Start timer for next player
-    startTurnTimer(roomID);
+    // Check if next player is a bot
+    const nextPlayer = room.players[room.turn];
+    if (nextPlayer && nextPlayer.isBot) {
+        checkBotTurn(roomID);
+    } else {
+        // Start timer for human player
+        startTurnTimer(roomID);
+    }
 }
 
 /**
@@ -1108,6 +1270,24 @@ function resolveRound(roomID, isPangkah) {
         });
         
         room.gameStarted = false;
+        
+        // Auto-ready bots for rematch
+        room.players.forEach(p => {
+            if (p.isBot) {
+                p.rematchReady = true;
+            }
+        });
+        
+        // Emit rematch status with bots already ready
+        const botReadyCount = room.players.filter(p => p.isBot).length;
+        if (botReadyCount > 0) {
+            io.to(roomID).emit('rematchStatus', {
+                readyCount: botReadyCount,
+                totalCount: room.players.length,
+                allReady: false
+            });
+        }
+        
         broadcastRooms();
         
         console.log(`Game #${room.gameNumber} ended in room ${roomID}. Loser: ${survivors[0]?.name || 'None'}`);
@@ -1128,9 +1308,14 @@ function resolveRound(roomID, isPangkah) {
             fateAces: room.fateAces
         });
         
-        // Start timer for winner (next round leader)
+        // Check if next player (winner) is a bot
+        const nextPlayer = room.players[room.turn];
         setTimeout(() => {
-            startTurnTimer(roomID);
+            if (nextPlayer && nextPlayer.isBot) {
+                checkBotTurn(roomID);
+            } else {
+                startTurnTimer(roomID);
+            }
         }, 500);
     }
 }
@@ -1246,7 +1431,7 @@ io.on('connection', (socket) => {
     /**
      * CREATE ROOM
      */
-    socket.on('createRoom', ({ roomID, playerName, maxPlayers, userID, equippedTitle, level, isGM }) => {
+    socket.on('createRoom', ({ roomID, playerName, maxPlayers, userID, equippedTitle, level, isGM, botCount }) => {
         if (!roomID || !playerName || !userID) {
             return socket.emit('errorMsg', 'Missing required fields');
         }
@@ -1260,6 +1445,10 @@ io.on('connection', (socket) => {
             return socket.emit('errorMsg', `Max players must be ${MIN_PLAYERS}-${MAX_PLAYERS}`);
         }
         
+        // Validate bot count (0, 1, or 2)
+        const numBots = Math.min(Math.max(parseInt(botCount) || 0, 0), 2);
+        
+        // Create room with host player
         rooms[roomID] = {
             id: roomID, 
             maxPlayers: max,
@@ -1271,6 +1460,7 @@ io.on('connection', (socket) => {
                 equippedTitle: equippedTitle || null,
                 level: level || 1,
                 isGM: isGM || false,
+                isBot: false,
                 gameStats: null,
                 rematchReady: false
             }],
@@ -1283,13 +1473,22 @@ io.on('connection', (socket) => {
             gameStarted: false,
             resolving: false,
             gameNumber: 0,
-            finishOrder: []
+            finishOrder: [],
+            botCount: numBots
         };
         
+        // Add bots
+        const existingNames = [playerName];
+        for (let i = 0; i < numBots; i++) {
+            const bot = createBot(existingNames);
+            existingNames.push(bot.name);
+            rooms[roomID].players.push(bot);
+        }
+        
         socket.join(roomID);
-        io.to(roomID).emit('updatePlayers', rooms[roomID].players, { maxPlayers: rooms[roomID].maxPlayers });
+        io.to(roomID).emit('updatePlayers', rooms[roomID].players, { maxPlayers: rooms[roomID].maxPlayers, botCount: numBots });
         broadcastRooms();
-        console.log(`Room ${roomID} created by ${playerName}${isGM?' (GM)':''}`);
+        console.log(`Room ${roomID} created by ${playerName}${isGM?' (GM)':''} with ${numBots} bot(s)`);
     });
 
     /**
@@ -1427,9 +1626,14 @@ io.on('connection', (socket) => {
             gameNumber: room.gameNumber
         });
         
-        // Start turn timer for first player
+        // Check if first player is a bot
+        const firstPlayer = room.players[room.turn];
         setTimeout(() => {
-            startTurnTimer(roomID);
+            if (firstPlayer && firstPlayer.isBot) {
+                checkBotTurn(roomID);
+            } else {
+                startTurnTimer(roomID);
+            }
         }, 1000);
         
         console.log(`Game #${room.gameNumber} started in room ${roomID} with ${playerCount} players. ${room.players[room.turn].name} has K♠`);

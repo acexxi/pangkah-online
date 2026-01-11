@@ -1387,6 +1387,16 @@ io.on('connection', (socket) => {
         requester.hand.push(...accepter.hand);
         accepter.hand = [];
         
+        // IMPORTANT: Track finish order when player gives away their hand!
+        // The accepter just emptied their hand, so they should be added to finishOrder
+        if (room.finishOrder && !room.finishOrder.includes(accepter.userID)) {
+            room.finishOrder.push(accepter.userID);
+            if (accepter.gameStats) {
+                accepter.gameStats.finishPosition = room.finishOrder.length;
+            }
+            console.log(`${accepter.name} finished in position ${room.finishOrder.length} (gave hand away)`);
+        }
+        
         io.to(roomID).emit('swapOccurred', { 
             msg: `${requester.name} absorbed ${accepter.name}'s hand!`,
             requesterUserID: requester.userID,
@@ -1395,8 +1405,42 @@ io.on('connection', (socket) => {
             accepterName: accepter.name,
             players: room.players,
             turn: room.turn,
-            table: room.table
+            table: room.table,
+            finishOrder: room.finishOrder // Send updated finish order
         });
+        
+        // Check if game should end (only 1 player left with cards)
+        let survivors = room.players.filter(p => p.hand.length > 0);
+        if (survivors.length <= 1 && room.gameStarted) {
+            // Game over - the last survivor is the LOSER
+            clearTurnTimer(roomID);
+            
+            if (survivors[0]) {
+                room.finishOrder.push(survivors[0].userID);
+                survivors[0].gameStats.finishPosition = room.players.length;
+            }
+            
+            const performanceData = room.players.map(p => ({
+                userID: p.userID,
+                name: p.name,
+                position: p.gameStats ? p.gameStats.finishPosition : 0,
+                stats: p.gameStats,
+                equippedTitle: p.equippedTitle
+            }));
+            
+            io.to(roomID).emit('gameOver', { 
+                loser: survivors[0]?.name || 'None',
+                loserUserID: survivors[0]?.userID || null,
+                finishOrder: room.finishOrder,
+                gameNumber: room.gameNumber,
+                performanceData
+            });
+            
+            room.gameStarted = false;
+            broadcastRooms();
+            
+            console.log(`Game #${room.gameNumber} ended in room ${roomID} (via hand swap). Loser: ${survivors[0]?.name || 'None'}`);
+        }
         
         console.log(`${requester.name} absorbed ${accepter.name}'s hand`);
     });

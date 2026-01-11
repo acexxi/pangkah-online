@@ -771,10 +771,10 @@ async function syncFromServer(){
                 stats = newStats;
                 
                 // Update display name if server has it
-                if(serverData.displayName && serverData.displayName !== displayName){
-                    displayName = serverData.displayName;
-                    localStorage.setItem('pName', displayName);
-                    console.log('📝 Display name updated from server:', displayName);
+                if(serverData.displayName && serverData.displayName !== myName){
+                    myName = serverData.displayName;
+                    localStorage.setItem('pName', myName);
+                    console.log('📝 Display name updated from server:', myName);
                 }
                 localStorage.setItem('pStats',JSON.stringify(stats));
                 console.log('✅ Stats synced & saved to localStorage - XP:', stats.xp, 'Wins:', stats.wins, 'Games:', stats.games);

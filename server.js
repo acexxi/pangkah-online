@@ -50,6 +50,9 @@ const playerSchema = new mongoose.Schema({
     unlockedTitles: { type: [String], default: [] },
     equippedTitle: { type: String, default: null },
     
+    // Special Status
+    isBetaTester: { type: Boolean, default: false },
+    
     // Timestamps
     createdAt: { type: Date, default: Date.now },
     lastPlayedAt: { type: Date, default: Date.now }

@@ -595,7 +595,7 @@ const socket=io(),icons={Spades:'♠',Hearts:'♥',Diamonds:'♦',Clubs:'♣'},X
 
 // ============ VERSION RESET SYSTEM ============
 // Change this number to force all players to reset their stats
-const STATS_VERSION = 3;
+const STATS_VERSION = 4;
 // =============================================
 
 let userID=localStorage.getItem('pUserID')||'uid_'+Math.random().toString(36).substr(2,9);localStorage.setItem('pUserID',userID);

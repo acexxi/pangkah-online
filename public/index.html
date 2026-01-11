@@ -166,6 +166,7 @@
         #t-layer { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; pointer-events: none; }
         .player { position: absolute; text-align: center; z-index: 100; transition: all 0.3s ease; }
         .av { position: relative; width: 205px; height: 70px; background: url('/avatar-frame.png') center/contain no-repeat; display: flex; align-items: center; }
+        .av.beta-frame { background-image: url('/beta-frame.png'); }
         .av-take-hand { position: absolute; left: 0px; top: 50%; transform: translateY(-50%); width: 36px; height: 55px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 0.2s; border-radius: 4px; }
         .av-take-hand.visible { opacity: 1; pointer-events: auto; }
         .av-take-hand.visible.greyed { opacity: 0.5; cursor: not-allowed; }
@@ -1143,7 +1144,7 @@ function launchConfetti(){
     }
 }
 
-function enter(type){myRoom=document.getElementById('rid').value.trim();if(!myRoom)return showToast("Sect ID Required");showLoading(true);const data={roomID:myRoom,playerName:myName,userID,equippedTitle:getEquippedTitleData(),level:getLevel(),isGM:isGameMaster};if(type==='create'){data.maxPlayers=document.getElementById('maxp').value;data.botCount=document.getElementById('botcount').value;currentMaxPlayers=parseInt(data.maxPlayers);isHost=true;}socket.emit(type==='create'?'createRoom':'joinRoom',data);}
+function enter(type){myRoom=document.getElementById('rid').value.trim();if(!myRoom)return showToast("Sect ID Required");showLoading(true);const data={roomID:myRoom,playerName:myName,userID,equippedTitle:getEquippedTitleData(),level:getLevel(),isGM:isGameMaster,isBetaTester:isBetaTester};if(type==='create'){data.maxPlayers=document.getElementById('maxp').value;data.botCount=document.getElementById('botcount').value;currentMaxPlayers=parseInt(data.maxPlayers);isHost=true;}socket.emit(type==='create'?'createRoom':'joinRoom',data);}
 function start(){const btn=document.getElementById('start-btn');if(btn.disabled)return;showLoading(true);socket.emit('startGame',myRoom);}
 function closeRoom(){if(myRoom&&confirm("Disband this sect?"))socket.emit('requestCloseRoom',{roomID:myRoom});}
 function sortHand(){const o={Spades:4,Hearts:3,Diamonds:2,Clubs:1};myCurrentHand.sort((a,b)=>(o[b.suit]-o[a.suit])||(b.val-a.val));renderHand();}
@@ -1259,10 +1260,12 @@ function render(players,turn,table=[]){
         
         const playerLevel=p.level||1;
         const playerIsGM=p.isGM||false;
+        const playerIsBeta=p.isBetaTester||false;
         const titleText=isBot?'🤖 Bot':p.equippedTitle?`${p.equippedTitle.name}`:'';
         const badgeImg=getBadgeImage(playerLevel,playerIsGM);
         const displayLevel=isBot?'BOT':playerIsGM?'∞':playerLevel;
         const nameColor=p.userID===userID?'var(--ui-blue)':isBot?'var(--accent-purple)':'#fff';
+        const frameClass=playerIsBeta?'av beta-frame':'av';
         
         const div=document.createElement('div');
         div.className=`player ${i===turn?'active':''} ${p.hand.length===0?'eliminated':''}`;
@@ -1271,7 +1274,7 @@ function render(players,turn,table=[]){
         div.style.top=`${y}px`;
         div.style.transform='translateX(-50%)';
         const thClass=canSwap?'visible':canSwapGreyed?'visible greyed':'';
-        div.innerHTML=`<div class="av">
+        div.innerHTML=`<div class="${frameClass}">
 <div class="av-take-hand ${thClass}" onclick="event.stopPropagation();socket.emit('sendSwapRequest',{roomID:'${myRoom}',fromUserID:'${userID}'})" title="Take Hand"></div>
 <div class="av-avatar"><img src="${badgeImg}" alt="badge" style="width:100%;height:100%;object-fit:contain"></div>
 <div class="av-info">

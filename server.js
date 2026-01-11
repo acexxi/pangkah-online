@@ -804,6 +804,46 @@ app.post('/api/gm/reset-player', async (req, res) => {
     }
 });
 
+// GM Admin Panel - Get Active Rooms
+app.get('/api/gm/rooms', (req, res) => {
+    try {
+        const roomList = Object.values(rooms).map(room => ({
+            id: room.id,
+            playerCount: room.players.filter(p => !p.isBot).length,
+            maxPlayers: room.maxPlayers,
+            inGame: room.inGame || false,
+            botCount: room.players.filter(p => p.isBot).length
+        }));
+        res.json({ rooms: roomList });
+    } catch (err) {
+        console.error('GM rooms error:', err);
+        res.status(500).json({ error: 'Failed to get rooms' });
+    }
+});
+
+// GM Admin Panel - Force Close Room
+app.post('/api/gm/force-close-room', (req, res) => {
+    try {
+        const { roomID } = req.body;
+        if (!roomID) return res.status(400).json({ error: 'roomID required' });
+        
+        const room = rooms[roomID];
+        if (!room) return res.status(404).json({ error: 'Room not found' });
+        
+        // Notify all players in the room
+        io.to(roomID).emit('roomClosed');
+        
+        // Delete the room
+        delete rooms[roomID];
+        
+        console.log(`[GM] Force closed room ${roomID}`);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('GM force close error:', err);
+        res.status(500).json({ error: 'Failed to close room' });
+    }
+});
+
 // Admin API Routes (protected by password)
 app.post('/api/admin/reset-player/:userID', async (req, res) => {
     try {

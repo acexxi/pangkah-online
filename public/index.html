@@ -354,6 +354,11 @@
                 <option value="8">8 Players</option>
                 <option value="10">10 Players</option>
             </select>
+            <select id="botcount">
+                <option value="0">No Bots</option>
+                <option value="1">1 Bot</option>
+                <option value="2">2 Bots</option>
+            </select>
             <button class="btn btn-p" onclick="enter('create')">CREATE SECT</button>
             <button class="btn btn-s" onclick="enter('join')" style="margin-top:8px">JOIN SECT</button>
             <div onclick="openHowToPlay()" style="margin-top:20px;color:var(--ui-blue);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;opacity:0.8;transition:opacity 0.2s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
@@ -1134,7 +1139,7 @@ function launchConfetti(){
     }
 }
 
-function enter(type){myRoom=document.getElementById('rid').value.trim();if(!myRoom)return showToast("Sect ID Required");showLoading(true);const data={roomID:myRoom,playerName:myName,userID,equippedTitle:getEquippedTitleData(),level:getLevel(),isGM:isGameMaster};if(type==='create'){data.maxPlayers=document.getElementById('maxp').value;currentMaxPlayers=parseInt(data.maxPlayers);isHost=true;}socket.emit(type==='create'?'createRoom':'joinRoom',data);}
+function enter(type){myRoom=document.getElementById('rid').value.trim();if(!myRoom)return showToast("Sect ID Required");showLoading(true);const data={roomID:myRoom,playerName:myName,userID,equippedTitle:getEquippedTitleData(),level:getLevel(),isGM:isGameMaster};if(type==='create'){data.maxPlayers=document.getElementById('maxp').value;data.botCount=document.getElementById('botcount').value;currentMaxPlayers=parseInt(data.maxPlayers);isHost=true;}socket.emit(type==='create'?'createRoom':'joinRoom',data);}
 function start(){const btn=document.getElementById('start-btn');if(btn.disabled)return;showLoading(true);socket.emit('startGame',myRoom);}
 function closeRoom(){if(myRoom&&confirm("Disband this sect?"))socket.emit('requestCloseRoom',{roomID:myRoom});}
 function sortHand(){const o={Spades:4,Hearts:3,Diamonds:2,Clubs:1};myCurrentHand.sort((a,b)=>(o[b.suit]-o[a.suit])||(b.val-a.val));renderHand();}
@@ -1235,7 +1240,8 @@ function render(players,turn,table=[]){
         let canSwap=false;
         let canSwapGreyed=false;
         const isMyTurn=turn===myIdx;
-        if(players.length>1&&i!==myIdx&&p.hand.length>0){
+        const isBot=p.isBot||false;
+        if(players.length>1&&i!==myIdx&&p.hand.length>0&&!isBot){
             let nxt=(myIdx+1)%players.length,att=0;
             while(players[nxt].hand.length===0&&att<players.length){nxt=(nxt+1)%players.length;att++;}
             if(i===nxt&&att<players.length){
@@ -1249,9 +1255,10 @@ function render(players,turn,table=[]){
         
         const playerLevel=p.level||1;
         const playerIsGM=p.isGM||false;
-        const titleText=p.equippedTitle?`${p.equippedTitle.name}`:'';
+        const titleText=isBot?'🤖 Bot':p.equippedTitle?`${p.equippedTitle.name}`:'';
         const badgeImg=getBadgeImage(playerLevel,playerIsGM);
-        const displayLevel=playerIsGM?'∞':playerLevel;
+        const displayLevel=isBot?'BOT':playerIsGM?'∞':playerLevel;
+        const nameColor=p.userID===userID?'var(--ui-blue)':isBot?'var(--accent-purple)':'#fff';
         
         const div=document.createElement('div');
         div.className=`player ${i===turn?'active':''} ${p.hand.length===0?'eliminated':''}`;
@@ -1264,8 +1271,8 @@ function render(players,turn,table=[]){
 <div class="av-take-hand ${thClass}" onclick="event.stopPropagation();socket.emit('sendSwapRequest',{roomID:'${myRoom}',fromUserID:'${userID}'})" title="Take Hand"></div>
 <div class="av-avatar"><img src="${badgeImg}" alt="badge" style="width:100%;height:100%;object-fit:contain"></div>
 <div class="av-info">
-<div class="av-level">LVL ${displayLevel}</div>
-<div class="av-name" style="color:${p.userID===userID?'var(--ui-blue)':'#fff'}">${p.name}</div>
+<div class="av-level" ${isBot?'style="color:var(--accent-purple)"':''}>LVL ${displayLevel}</div>
+<div class="av-name" style="color:${nameColor}">${p.name}</div>
 <div class="av-title">${titleText}</div>
 </div>
 <div class="av-cards">${p.hand.length}</div>

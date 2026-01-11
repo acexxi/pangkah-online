@@ -316,7 +316,7 @@
         <div class="finish-list" id="finish-list"></div>
         <div class="bonus-list" id="bonus-list"></div>
         <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border-subtle)">
-            <button class="btn btn-gold" onclick="location.reload()">🏠 BACK TO LOBBY</button>
+            <button class="btn btn-gold" onclick="backToLobby()">🏠 BACK TO LOBBY</button>
         </div>
     </div>
 </div>
@@ -1401,6 +1401,22 @@ function launchConfetti(){
 function enter(type){myRoom=document.getElementById('rid').value.trim();if(!myRoom)return showToast("Sect ID Required");showLoading(true);const data={roomID:myRoom,playerName:myName,userID,equippedTitle:getEquippedTitleData(),level:getLevel(),isGM:isGameMaster,isBetaTester:isBetaTester};if(type==='create'){data.maxPlayers=document.getElementById('maxp').value;data.botCount=document.getElementById('botcount').value;currentMaxPlayers=parseInt(data.maxPlayers);isHost=true;}socket.emit(type==='create'?'createRoom':'joinRoom',data);}
 function start(){const btn=document.getElementById('start-btn');if(btn.disabled)return;showLoading(true);socket.emit('startGame',myRoom);}
 function closeRoom(){if(myRoom&&confirm("Disband this sect?"))socket.emit('requestCloseRoom',{roomID:myRoom});}
+function backToLobby(){
+    // Clear room data and disconnect
+    if(myRoom){
+        socket.emit('leaveRoom',{roomID:myRoom,userID});
+    }
+    // Clear local state
+    myRoom='';
+    myCurrentHand=[];
+    isHost=false;
+    isFirstMove=true;
+    currentLeadSuit=null;
+    // Clear session storage to force fresh start
+    sessionStorage.removeItem('pRoom');
+    // Reload page to go back to lobby
+    location.reload();
+}
 function sortHand(){const o={Spades:4,Hearts:3,Diamonds:2,Clubs:1};myCurrentHand.sort((a,b)=>(o[b.suit]-o[a.suit])||(b.val-a.val));renderHand();}
 function answerSwap(accept){if(swapTimeoutId)clearTimeout(swapTimeoutId);document.getElementById('swap-modal').style.display='none';if(accept&&pendingSwapRequest)socket.emit('acceptSwap',{roomID:myRoom,fromUserID:pendingSwapRequest,myUserID:userID});pendingSwapRequest=null;}
 

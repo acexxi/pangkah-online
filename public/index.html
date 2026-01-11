@@ -52,32 +52,34 @@
         .lobby-body { flex: 1; display: flex; align-items: center; justify-content: center; padding-top: 70px; }
         
         /* Leaderboard Modal */
-        .leaderboard-card { background: var(--glass-heavy); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); border: 1px solid var(--border-light); padding: 25px; border-radius: 28px; width: 95%; max-width: 700px; max-height: 85vh; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+        .leaderboard-card { background: var(--glass-heavy); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); border: 1px solid var(--border-light); padding: 25px; border-radius: 28px; width: 95%; max-width: 800px; max-height: 85vh; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.3); overflow-y: auto; }
         .leaderboard-filters { margin-bottom: 15px; }
         .leaderboard-filters select { width: auto; padding: 8px 15px; font-size: 12px; }
-        .leaderboard-table-wrapper { overflow-x: auto; max-height: 400px; overflow-y: auto; }
-        .leaderboard-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-        .leaderboard-table th { background: rgba(0,0,0,0.4); color: var(--gold); padding: 10px 6px; text-align: center; position: sticky; top: 0; z-index: 1; }
-        .leaderboard-table td { padding: 8px 6px; border-bottom: 1px solid var(--border); text-align: center; }
+        .leaderboard-table-wrapper { overflow-x: auto; max-height: 350px; overflow-y: auto; }
+        .leaderboard-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        .leaderboard-table th { background: rgba(0,0,0,0.4); color: var(--gold); padding: 8px 4px; text-align: center; position: sticky; top: 0; z-index: 1; font-size: 9px; white-space: nowrap; }
+        .leaderboard-table td { padding: 6px 4px; border-bottom: 1px solid var(--border); text-align: center; }
         .leaderboard-table tr:hover { background: rgba(255,255,255,0.05); }
         .leaderboard-table tr:nth-child(1) td { background: rgba(251,191,36,0.15); }
         .leaderboard-table tr:nth-child(2) td { background: rgba(192,192,192,0.1); }
         .leaderboard-table tr:nth-child(3) td { background: rgba(205,127,50,0.1); }
         .lb-rank { font-weight: 800; }
-        .lb-name { font-weight: 700; color: var(--ui-blue); text-align: left !important; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lb-name { font-weight: 700; color: var(--ui-blue); text-align: left !important; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        
         /* Hall of Fame */
-        .hof-content{display:flex;flex-direction:column;gap:10px;}
-        .hof-item{background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:16px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;}
-        .hof-icon{font-size:22px;line-height:1;margin-top:1px;}
-        .hof-text{flex:1;}
-        .hof-title{font-weight:900;color:var(--gold);font-size:11px;letter-spacing:0.8px;text-transform:uppercase;}
-        .hof-desc{font-size:12px;color:rgba(255,255,255,0.92);line-height:1.4;margin-top:4px;}
-        .hof-meta{font-size:10px;opacity:0.75;margin-top:6px;}
-        @media (max-width:480px){
-            .lb-name{max-width:130px;}
-            .hof-desc{font-size:11px;}
-        }
-
+        .hof-container { margin-bottom: 20px; }
+        .hof-title { color: var(--gold); font-size: 18px; font-weight: 800; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .hof-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 15px; }
+        .hof-card { background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 16px; padding: 12px; text-align: left; transition: all 0.2s; }
+        .hof-card:hover { background: rgba(255,255,255,0.05); border-color: var(--gold); transform: translateY(-2px); }
+        .hof-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .hof-icon { font-size: 24px; }
+        .hof-card-title { font-size: 11px; font-weight: 800; color: var(--gold); }
+        .hof-player { font-size: 13px; font-weight: 800; color: var(--ui-blue); }
+        .hof-value { font-size: 11px; color: var(--primary-action); font-weight: 700; }
+        .hof-desc { font-size: 10px; color: rgba(255,255,255,0.7); line-height: 1.4; margin-top: 6px; }
+        .hof-btn { background: var(--glass-light); border: 1px solid var(--border); color: #fff; padding: 10px 20px; border-radius: 12px; font-weight: 800; font-size: 11px; cursor: pointer; transition: all 0.2s; }
+        .hof-btn:hover { background: var(--ui-blue); border-color: var(--ui-blue); }
         @keyframes logoGlow { 0% { filter: drop-shadow(0 0 8px var(--murim-glow)) drop-shadow(0 0 15px rgba(255,215,0,0.4)); } 100% { filter: drop-shadow(0 0 12px var(--murim-glow)) drop-shadow(0 0 20px rgba(255,215,0,0.5)); } }
         .room-list { height: 120px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 16px; margin: 15px 0; border: 1px solid var(--border); }
         .room-item { padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; cursor: pointer; font-size: 0.85rem; transition: background 0.2s; }
@@ -86,9 +88,6 @@
         .modal-overlay { position: fixed; inset: 0; z-index: 6000; background: rgba(0,0,0,0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: none; align-items: center; justify-content: center; overflow-y: auto; padding: 20px; }
         #profile-modal .profile-card, #titles-modal .titles-card, .gameover-card { width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; padding: 30px 20px; background: var(--glass-heavy); border-radius: 24px; text-align: center; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
         #profile-modal .profile-card { border: 1px solid var(--ui-blue); }
-        .name-edit-row{display:flex;gap:8px;align-items:center;margin:10px 0 18px;}
-        .name-edit-row input{flex:1;margin:0;padding:10px 12px;font-size:12px;border-radius:12px;}
-
         #titles-modal .titles-card { border: 1px solid var(--purple); }
         .gameover-card { border: 1px solid var(--danger); }
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
@@ -254,11 +253,10 @@
 <div class="modal-overlay" id="profile-modal">
     <div class="profile-card">
         <h3 style="color:var(--ui-blue);margin-top:0">CULTIVATION PROFILE</h3>
-        <div class="name-edit-row">
-            <input id="profile-name-input" maxlength="20" placeholder="Your name" />
-            <button class="btn btn-s" onclick="saveProfileName()" style="width:auto;padding:10px 14px;font-size:11px;border-radius:12px">SAVE</button>
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:15px">
+            <span id="prof-name" style="font-size:18px;font-weight:800;color:#fff"></span>
+            <button onclick="editNamePrompt()" style="background:var(--glass-light);border:1px solid var(--border);color:#fff;padding:4px 10px;border-radius:8px;font-size:10px;cursor:pointer;font-weight:700">✏️ EDIT</button>
         </div>
-
         <div id="prof-equipped-title" style="margin-bottom:15px"></div>
         <div id="prof-level" style="font-size:28px;font-weight:800">LEVEL 1</div>
         <div id="prof-rank-title" style="color:var(--primary-action);margin-bottom:15px">APPRENTICE</div>
@@ -376,28 +374,25 @@
 <!-- Leaderboard Modal -->
 <div class="modal-overlay" id="leaderboard-modal" style="display:none">
     <div class="leaderboard-card">
-        <h3 id="lb-title" style="color:var(--gold);margin-top:0">🏆 HALL OF FAME</h3>
-
-        <!-- Hall of Fame View -->
-        <div id="hof-view">
-            <div id="hof-content" class="hof-content" style="margin-top:10px;text-align:left;opacity:0.9">
-                Loading records...
-            </div>
-            <button class="btn btn-gold" onclick="showFullTableView()" style="margin-top:14px">SHOW FULL TABLE</button>
+        <h3 style="color:var(--gold);margin-top:0">🏆 HALL OF FAME</h3>
+        
+        <!-- Hall of Fame Records -->
+        <div class="hof-container" id="hof-container">
+            <div class="hof-grid" id="hof-grid"></div>
+            <button class="hof-btn" id="hof-toggle-btn" onclick="toggleFullTable()">📊 SHOW FULL TABLE</button>
         </div>
-
-        <!-- Full Table View -->
-        <div id="lb-table-view" style="display:none">
+        
+        <!-- Full Leaderboard Table (hidden by default) -->
+        <div id="full-table-section" style="display:none">
             <div class="leaderboard-filters">
                 <select id="lb-sort" onchange="loadLeaderboard()">
                     <option value="xp">Sort by XP</option>
-                    <option value="games">Sort by Games</option>
-                    <option value="wins">Sort by 1st Place</option>
+                    <option value="wins">Sort by Wins</option>
                     <option value="winrate">Sort by Win Rate</option>
-                    <option value="losses">Sort by Last Place</option>
+                    <option value="losses">Sort by Losses</option>
                     <option value="streak">Sort by Win Streak</option>
                     <option value="pangkahs">Sort by Pangkah Dealt</option>
-                    <option value="pangkahsReceived">Sort by Pangkah Received</option>
+                    <option value="pangkahsReceived">Sort by Got Pangkah</option>
                 </select>
             </div>
             <div class="leaderboard-table-wrapper">
@@ -413,7 +408,7 @@
                             <th>L%</th>
                             <th>2nd</th>
                             <th>3rd</th>
-                            <th>4th-10th</th>
+                            <th>4-10th</th>
                             <th>PK</th>
                             <th>GPK</th>
                         </tr>
@@ -422,13 +417,13 @@
                 </table>
             </div>
             <div id="lb-pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:15px">
-                <button class="btn" onclick="lbNav(-1)" style="width:44px;height:44px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.1);color:#fff;font-size:11px">◀</button>
-                <span id="lb-page-indicator" style="font-size:12px;color:#fff;white-space:nowrap;flex:0 0 auto;text-align:center">1 / 1</span>
-                <button class="btn" onclick="lbNav(1)" style="width:44px;height:44px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.1);color:#fff;font-size:11px">▶</button>
+                <button class="btn" onclick="lbNav(-1)" style="width:44px;padding:8px 0;background:rgba(255,255,255,0.1);color:#fff;font-size:11px">◀</button>
+                <span id="lb-page-indicator" style="font-size:12px;color:rgba(255,255,255,0.7);white-space:nowrap;flex:0 0 auto;text-align:center">1 / 1</span>
+                <button class="btn" onclick="lbNav(1)" style="width:44px;padding:8px 0;background:rgba(255,255,255,0.1);color:#fff;font-size:11px">▶</button>
             </div>
-            <button class="btn btn-s" onclick="showHallOfFameView()" style="margin-top:12px">⬅ BACK TO HALL OF FAME</button>
+            <button class="hof-btn" onclick="toggleFullTable()" style="margin-top:15px">🏅 BACK TO HALL OF FAME</button>
         </div>
-
+        
         <button class="btn btn-s" onclick="closeLeaderboard()" style="margin-top:15px">CLOSE</button>
     </div>
 </div>
@@ -600,12 +595,12 @@ const socket=io(),icons={Spades:'♠',Hearts:'♥',Diamonds:'♦',Clubs:'♣'},X
 
 // ============ VERSION RESET SYSTEM ============
 // Change this number to force all players to reset their stats
-const STATS_VERSION = 1;
+const STATS_VERSION = 3;
 // =============================================
 
 let userID=localStorage.getItem('pUserID')||'uid_'+Math.random().toString(36).substr(2,9);localStorage.setItem('pUserID',userID);
 let myName=localStorage.getItem('pName')||'Disciple'+Math.floor(Math.random()*999);
-const DEFAULT_STATS={version:STATS_VERSION,xp:0,pangkahs:0,wins:0,losses:0,games:0,currentStreak:0,bestStreak:0,handsAbsorbed:0,cardsPlayed:0,secondPlace:0,thirdPlace:0,topTwo:0,nightGames:0,uniquePlayers:[],unlockedTitles:[],equippedTitle:null};
+const DEFAULT_STATS={version:STATS_VERSION,xp:0,pangkahs:0,wins:0,losses:0,games:0,currentStreak:0,bestStreak:0,handsAbsorbed:0,cardsPlayed:0,secondPlace:0,thirdPlace:0,fourthToTenth:0,topTwo:0,nightGames:0,uniquePlayers:[],unlockedTitles:[],equippedTitle:null};
 
 // GM System
 let isGameMaster = localStorage.getItem('pGM') === 'true';
@@ -651,6 +646,7 @@ async function syncFromServer(){
                     cardsPlayed:serverData.cardsPlayed||0,
                     secondPlace:serverData.secondPlace||0,
                     thirdPlace:serverData.thirdPlace||0,
+                    fourthToTenth:serverData.fourthToTenth||0,
                     topTwo:serverData.topTwo||0,
                     nightGames:serverData.nightGames||0,
                     unlockedTitles:serverData.unlockedTitles||[],
@@ -856,209 +852,112 @@ document.addEventListener('keydown',e=>{
 let lbData=[];
 let lbPage=0;
 const LB_PER_PAGE=10;
+let showingFullTable=false;
+let hofData=[];
 
-async function loadLeaderboard(){
-    const sortByEl=document.getElementById('lb-sort');
-    const sortBy=sortByEl?sortByEl.value:'xp';
+async function loadHallOfFame(){
     try{
-        const res=await fetch(`/api/leaderboard/${sortBy}?limit=200`);
+        const res=await fetch('/api/hall-of-fame');
         if(res.ok){
-            lbData=await res.json();
-
-            // Client-side sorts (server sorts by raw fields)
-            if(sortBy==='winrate'){
-                lbData.sort((a,b)=>getWinRate(b)-getWinRate(a));
-            }
-            lbPage=0;
-
+            hofData=await res.json();
             renderHallOfFame();
-            if(isTableViewOpen()) renderLeaderboardTable();
         }
-    }catch(e){
-        console.log('Failed to load leaderboard', e);
-    }
-}
-
-function isTableViewOpen(){
-    const v=document.getElementById('lb-table-view');
-    return !!(v && v.style.display!=='none');
-}
-
-function showHallOfFameView(){
-    const hof=document.getElementById('hof-view');
-    const table=document.getElementById('lb-table-view');
-    if(hof) hof.style.display='block';
-    if(table) table.style.display='none';
-    const t=document.getElementById('lb-title');
-    if(t) t.innerText='🏆 HALL OF FAME';
-    renderHallOfFame();
-}
-
-function showFullTableView(){
-    const hof=document.getElementById('hof-view');
-    const table=document.getElementById('lb-table-view');
-    if(hof) hof.style.display='none';
-    if(table) table.style.display='block';
-    const t=document.getElementById('lb-title');
-    if(t) t.innerText='🏆 LEADERBOARD';
-    renderLeaderboardTable();
-}
-
-function getLevelFromXPValue(xp){
-    return Math.floor((xp||0)/100)+1;
-}
-function getWinRate(p){
-    const g=p?.games||0;
-    return g?((p.wins||0)/g*100):0;
-}
-function getLoseRate(p){
-    const g=p?.games||0;
-    return g?((p.losses||0)/g*100):0;
+    }catch(e){console.log('Failed to load hall of fame');}
 }
 
 function renderHallOfFame(){
-    const wrap=document.getElementById('hof-content');
-    if(!wrap) return;
-
-    if(!lbData || lbData.length===0){
-        wrap.innerHTML='<div style="text-align:center;opacity:0.8">No records yet. Go create chaos first.</div>';
+    const grid=document.getElementById('hof-grid');
+    if(!hofData.records||hofData.records.length===0){
+        grid.innerHTML='<div style="padding:20px;opacity:0.5;grid-column:1/-1">No records yet. Play some games!</div>';
         return;
     }
-
-    const eligible=lbData.filter(p=>(p.games||0)>=3);
-    const list=eligible.length>=3?eligible:lbData;
-
-    const bestWin=[...list].sort((a,b)=>getWinRate(b)-getWinRate(a))[0];
-    const worstLose=[...list].sort((a,b)=>getLoseRate(b)-getLoseRate(a))[0];
-    const bestStreak=[...lbData].sort((a,b)=>(b.bestStreak||0)-(a.bestStreak||0))[0];
-    const pangkahDealer=[...lbData].sort((a,b)=>(b.pangkahs||0)-(a.pangkahs||0))[0];
-    const pangkahBag=[...lbData].sort((a,b)=>(b.pangkahsReceived||0)-(a.pangkahsReceived||0))[0];
-    const grinder=[...lbData].sort((a,b)=>(b.games||0)-(a.games||0))[0];
-    const silverMagnet=[...lbData].sort((a,b)=>(b.secondPlace||0)-(a.secondPlace||0))[0];
-    const bronzeCollector=[...lbData].sort((a,b)=>(b.thirdPlace||0)-(a.thirdPlace||0))[0];
-
-    const fmt=n=>Number.isFinite(n)?n.toFixed(1):'0.0';
-    const nm=p=>p?.displayName||'Unknown';
-
-    const items=[
-        {
-            icon:'👑',
-            title:'Winrate Emperor',
-            desc:`${nm(bestWin)} is in their prime: ${fmt(getWinRate(bestWin))}% winrate. Other sects? Just free XP.`,
-            meta:`Games: ${bestWin.games||0} • 1st: ${bestWin.wins||0} • PK: ${bestWin.pangkahs||0}`
-        },
-        {
-            icon:'🤡',
-            title:'Luckless Disciple',
-            desc:`${nm(worstLose)} needs the gods to patch their RNG: ${fmt(getLoseRate(worstLose))}% loserate. Pray harder, brother.`,
-            meta:`Games: ${worstLose.games||0} • Last: ${worstLose.losses||0} • GPK: ${worstLose.pangkahsReceived||0}`
-        },
-        {
-            icon:'🔥',
-            title:'Streak Demon',
-            desc:`${nm(bestStreak)} once went Super Saiyan: ${bestStreak.bestStreak||0} wins in a row. Blink and your hand is gone.`,
-            meta:`XP: ${bestStreak.xp||0} • Games: ${bestStreak.games||0}`
-        },
-        {
-            icon:'💥',
-            title:'Pangkah Dealer',
-            desc:`${nm(pangkahDealer)} hands out pangkahs like flyers: ${pangkahDealer.pangkahs||0} dealt. Violence is their love language.`,
-            meta:`Got pangkah: ${pangkahDealer.pangkahsReceived||0} • Games: ${pangkahDealer.games||0}`
-        },
-        {
-            icon:'🥊',
-            title:'Punching Bag of the Sect',
-            desc:`${nm(pangkahBag)} has eaten ${pangkahBag.pangkahsReceived||0} pangkahs. At this point, it’s cardio.`,
-            meta:`Pangkah dealt: ${pangkahBag.pangkahs||0} • Games: ${pangkahBag.games||0}`
-        },
-        {
-            icon:'💀',
-            title:'No-Life Grinder',
-            desc:`${nm(grinder)} has ${grinder.games||0} games played. Touch grass? Never heard of her.`,
-            meta:`XP: ${grinder.xp||0} • Best streak: ${grinder.bestStreak||0}`
-        },
-        {
-            icon:'🥈',
-            title:'Silver Magnet',
-            desc:`${nm(silverMagnet)} collects 2nd place like rent: ${silverMagnet.secondPlace||0} times. Always close, never crowned.`,
-            meta:`1st: ${silverMagnet.wins||0} • 3rd: ${silverMagnet.thirdPlace||0} • Games: ${silverMagnet.games||0}`
-        },
-        {
-            icon:'🥉',
-            title:'Bronze Collector',
-            desc:`${nm(bronzeCollector)} is a certified podium enjoyer: ${bronzeCollector.thirdPlace||0} third-places. Consistently… not first.`,
-            meta:`1st: ${bronzeCollector.wins||0} • 2nd: ${bronzeCollector.secondPlace||0} • Games: ${bronzeCollector.games||0}`
-        }
-    ];
-
-    wrap.innerHTML=items.map(it=>`
-        <div class="hof-item">
-            <div class="hof-icon">${it.icon}</div>
-            <div class="hof-text">
-                <div class="hof-title">${it.title}</div>
-                <div class="hof-desc">${it.desc}</div>
-                <div class="hof-meta">${it.meta||''}</div>
+    grid.innerHTML=hofData.records.map(r=>`
+        <div class="hof-card">
+            <div class="hof-card-header">
+                <span class="hof-icon">${r.icon}</span>
+                <div>
+                    <div class="hof-card-title">${r.title}</div>
+                    <div class="hof-player">${r.player}</div>
+                </div>
             </div>
+            <div class="hof-value">${r.value}</div>
+            <div class="hof-desc">${r.description}</div>
         </div>
     `).join('');
 }
 
-function renderLeaderboardTable(){
-    const tbody=document.getElementById('lb-body');
-    if(!tbody) return;
+function toggleFullTable(){
+    showingFullTable=!showingFullTable;
+    document.getElementById('hof-container').style.display=showingFullTable?'none':'block';
+    document.getElementById('full-table-section').style.display=showingFullTable?'block':'none';
+    if(showingFullTable&&lbData.length===0){
+        loadLeaderboard();
+    }
+}
 
+async function loadLeaderboard(){
+    const sortBy=document.getElementById('lb-sort').value;
+    try{
+        const res=await fetch(`/api/leaderboard/${sortBy}?limit=100`);
+        if(res.ok){
+            lbData=await res.json();
+            lbPage=0;
+            renderLeaderboard();
+        }
+    }catch(e){console.log('Failed to load leaderboard');}
+}
+
+function renderLeaderboard(){
+    const tbody=document.getElementById('lb-body');
     const totalPages=Math.ceil(lbData.length/LB_PER_PAGE)||1;
     const start=lbPage*LB_PER_PAGE;
     const pageData=lbData.slice(start,start+LB_PER_PAGE);
-
+    
     tbody.innerHTML=pageData.map((p,i)=>{
         const rank=start+i+1;
-        const medal=rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':rank;
-
-        const lv=getLevelFromXPValue(p.xp||0);
+        const level=Math.floor((p.xp||0)/100)+1;
         const games=p.games||0;
-
         const wins=p.wins||0;
         const losses=p.losses||0;
-        const second=p.secondPlace||0;
-        const third=p.thirdPlace||0;
-        const other=Math.max(0, games - wins - losses - second - third);
-
+        const secondPlace=p.secondPlace||0;
+        const thirdPlace=p.thirdPlace||0;
+        const fourthToTenth=p.fourthToTenth||0;
         const winRate=games>0?((wins/games)*100).toFixed(1):'0.0';
         const loseRate=games>0?((losses/games)*100).toFixed(1):'0.0';
-
         const pangkahs=p.pangkahs||0;
         const getPangkah=p.pangkahsReceived||0;
-
+        const medal=rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':rank;
         return`<tr>
             <td class="lb-rank">${medal}</td>
-            <td class="lb-name">${p.displayName||'Unknown'} <span style="opacity:0.65;font-size:10px">(Lv.${lv})</span></td>
+            <td class="lb-name">${p.displayName||'Unknown'} <span style="opacity:0.6;font-size:9px">(${level})</span></td>
             <td>${games}</td>
             <td>${wins}</td>
             <td>${winRate}%</td>
             <td>${losses}</td>
             <td>${loseRate}%</td>
-            <td>${second}</td>
-            <td>${third}</td>
-            <td>${other}</td>
+            <td>${secondPlace}</td>
+            <td>${thirdPlace}</td>
+            <td>${fourthToTenth}</td>
             <td>${pangkahs}</td>
             <td>${getPangkah}</td>
         </tr>`;
     }).join('');
-
+    
     document.getElementById('lb-page-indicator').innerText=`${lbPage+1} / ${totalPages}`;
 }
 
 function lbNav(dir){
     const totalPages=Math.ceil(lbData.length/LB_PER_PAGE)||1;
     lbPage=Math.max(0,Math.min(totalPages-1,lbPage+dir));
-    renderLeaderboardTable();
+    renderLeaderboard();
 }
 
 function openLeaderboard(){
     document.getElementById('leaderboard-modal').style.display='flex';
-    showHallOfFameView();
-    loadLeaderboard();
+    showingFullTable=false;
+    document.getElementById('hof-container').style.display='block';
+    document.getElementById('full-table-section').style.display='none';
+    loadHallOfFame();
 }
 
 function closeLeaderboard(){
@@ -1080,35 +979,38 @@ async function syncStatsToServer(){
     } catch(e) { console.log('Sync failed:', e); }
 }
 function addXP(amt,reason,popup=true){const old=getLevel();stats.xp=Math.max(0,(stats.xp||0)+amt);saveStats();if(getLevel()>old)showToast(`⚡ LEVEL UP! Lv.${getLevel()}`,true);if(popup&&amt){const p=document.createElement('div');p.className='xp-popup';p.style.color=amt>0?'var(--primary-action)':'var(--danger)';p.innerText=`${amt>0?'+':''}${amt} XP`;document.body.appendChild(p);setTimeout(()=>p.remove(),1500);}updateStatsUI();checkAllTitles();}
-function updateStatsUI(){const lv=getLevel(),lvDisplay=getLevelDisplay(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('lobby-badge').src=getBadgeImage(lv,isGameMaster);document.getElementById('header-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:9px;padding:1px 5px">${eq.icon} ${eq.name}</span>`:'';const mn=document.getElementById('menu-name');if(mn)mn.innerText=myName;const mb=document.getElementById('menu-badge');if(mb)mb.src=getBadgeImage(lv,isGameMaster);const mtitle=document.getElementById('menu-title');if(mtitle)mtitle.innerHTML=document.getElementById('header-title').innerHTML||'<span style="opacity:0.6">No title equipped</span>';document.getElementById('prof-level').innerText=isGameMaster?'∞':`LEVEL ${lvDisplay}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=isGameMaster?'∞ XP':`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=isGameMaster?'100%':(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;document.getElementById('gm-logout-btn').style.display=isGameMaster?'block':'none';}
-function editName(){const n=prompt("Enter Name:",myName);if(n?.trim()&&n.trim().length<=20){myName=n.trim();localStorage.setItem('pName',myName);updateStatsUI();const inp=document.getElementById('profile-name-input');if(inp)inp.value=myName;}}
-
-async function saveProfileName(){
-    const input=document.getElementById('profile-name-input');
-    if(!input) return;
-    const n=(input.value||'').trim();
-    if(!n) return showToast('Name required');
-    if(n.length>20) return showToast('Max 20 chars');
-    myName=n;
-    localStorage.setItem('pName',myName);
-    updateStatsUI();
-
-    // If you're already inside a sect, update your visible name for everyone
-    try{ if(myRoom) socket.emit('updateName',{roomID:myRoom,userID,playerName:myName}); }catch(e){}
-
-    // Persist for leaderboard/profile
+function updateStatsUI(){const lv=getLevel(),lvDisplay=getLevelDisplay(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('lobby-badge').src=getBadgeImage(lv,isGameMaster);document.getElementById('header-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:9px;padding:1px 5px">${eq.icon} ${eq.name}</span>`:'';const mn=document.getElementById('menu-name');if(mn)mn.innerText=myName;const mb=document.getElementById('menu-badge');if(mb)mb.src=getBadgeImage(lv,isGameMaster);const mtitle=document.getElementById('menu-title');if(mtitle)mtitle.innerHTML=document.getElementById('header-title').innerHTML||'<span style="opacity:0.6">No title equipped</span>';document.getElementById('prof-name').innerText=myName;document.getElementById('prof-level').innerText=isGameMaster?'∞':`LEVEL ${lvDisplay}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=isGameMaster?'∞ XP':`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=isGameMaster?'100%':(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;document.getElementById('gm-logout-btn').style.display=isGameMaster?'block':'none';}
+function editName(){const n=prompt("Enter Name:",myName);if(n?.trim()&&n.trim().length<=20){myName=n.trim();localStorage.setItem('pName',myName);updateStatsUI();}}
+async function editNamePrompt(){
+    const n=prompt("Enter new name (max 20 characters):",myName);
+    if(!n||!n.trim())return;
+    const trimmed=n.trim();
+    if(trimmed.length>20){showToast('Name must be 20 characters or less');return;}
+    if(trimmed.length<1){showToast('Name cannot be empty');return;}
     try{
-        await fetch('/api/player/update-name',{
+        const res=await fetch('/api/player/update-name',{
             method:'POST',
             headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({userID,displayName:myName})
+            body:JSON.stringify({userID,displayName:trimmed})
         });
-    }catch(e){}
-
-    showToast('Name updated',true);
+        if(res.ok){
+            myName=trimmed;
+            localStorage.setItem('pName',myName);
+            updateStatsUI();
+            showToast('Name updated!',true);
+        }else{
+            const err=await res.json();
+            showToast(err.error||'Failed to update name');
+        }
+    }catch(e){
+        // Fallback to local only
+        myName=trimmed;
+        localStorage.setItem('pName',myName);
+        updateStatsUI();
+        showToast('Name updated locally',true);
+    }
 }
-
-function openProfile(){updateStatsUI();const inp=document.getElementById('profile-name-input');if(inp)inp.value=myName;document.getElementById('profile-modal').style.display='flex';}
+function openProfile(){updateStatsUI();document.getElementById('profile-modal').style.display='flex';}
 function closeProfile(){document.getElementById('profile-modal').style.display='none';}
 function openHowToPlay(){document.getElementById('howtoplay-modal').style.display='flex';}
 function closeHowToPlay(){document.getElementById('howtoplay-modal').style.display='none';}
@@ -1209,13 +1111,17 @@ startBtn.style.cursor=isFull?'pointer':'not-allowed';
 startBtn.style.border=isFull?'none':'2px solid rgba(255,255,255,0.3)';
 p.forEach(pl=>{if(pl.userID!==userID&&!stats.uniquePlayers.includes(pl.userID))stats.uniquePlayers.push(pl.userID);});saveStats();render(p,-1);});
 socket.on('gameInit',d=>{showLoading(false);document.getElementById('round-popup').style.display='none';document.getElementById('gameover-modal').style.display='none';document.getElementById('start-btn').style.display='none';isProcessingTurn=false;isFirstMove=d.isFirstMove!==undefined?d.isFirstMove:true;currentLeadSuit=null;rematchRequested=false;const h=new Date().getHours();if(h>=0&&h<6){stats.nightGames=(stats.nightGames||0)+1;saveStats();}update(d);});
-socket.on('clearTable',d=>{if(d.msg.toLowerCase()==='pangkah!'){flashScreen('pangkah');playSound('strike');if(d.winnerUserID===userID){stats.pangkahs=(stats.pangkahs||0)+1;stats.pangkahsReceived=(stats.pangkahsReceived||0)+1;addXP(3,"Pangkah!");}}else{flashScreen('clean');playSound('sweep');if(d.winnerUserID===userID){stats.cleanWins=(stats.cleanWins||0)+1;addXP(1,"Clean Round");}}saveStats();checkAllTitles();currentLeadSuit=null;const pop=document.getElementById('round-popup');document.getElementById('pop-title').className=d.msg==='Pangkah!'?'pangkah-text':'clean-text';document.getElementById('pop-title').innerText=d.msg.toUpperCase();document.getElementById('pop-desc').innerText=d.winner+" has the lead.";pop.style.display='block';setTimeout(()=>{pop.style.display='none';update(d);},2000);});
+socket.on('clearTable',d=>{if(d.msg.toLowerCase()==='pangkah!'){flashScreen('pangkah');playSound('strike');
+// Track pangkah received (the one who took the cards)
+if(d.winnerUserID===userID){stats.pangkahsReceived=(stats.pangkahsReceived||0)+1;addXP(0,"Got Pangkah'd",false);}
+// Track pangkah dealt (the one who broke suit)
+if(d.pangkahDealerUserID===userID){stats.pangkahs=(stats.pangkahs||0)+1;addXP(3,"Pangkah Dealt!");}}else{flashScreen('clean');playSound('sweep');if(d.winnerUserID===userID){stats.cleanWins=(stats.cleanWins||0)+1;addXP(1,"Clean Round");}}saveStats();checkAllTitles();currentLeadSuit=null;const pop=document.getElementById('round-popup');document.getElementById('pop-title').className=d.msg==='Pangkah!'?'pangkah-text':'clean-text';document.getElementById('pop-title').innerText=d.msg.toUpperCase();document.getElementById('pop-desc').innerText=d.winner+" has the lead.";pop.style.display='block';setTimeout(()=>{pop.style.display='none';update(d);},2000);});
 socket.on('updateTable',d=>{playSound('place');if(d.currentSuit)currentLeadSuit=d.currentSuit;if(d.table?.length>0)isFirstMove=false;stats.cardsPlayed=(stats.cardsPlayed||0)+1;saveStats();update(d);});
 socket.on('nextTurn',d=>{if(d.currentSuit)currentLeadSuit=d.currentSuit;update(d);});
 socket.on('errorMsg',m=>{showLoading(false);isProcessingTurn=false;showToast(m);});
 socket.on('roomClosed',()=>{showToast("Sect disbanded");setTimeout(()=>location.reload(),2000);});
 socket.on('rematchStatus',d=>{document.getElementById('rematch-status').innerText=`${d.readyCount}/${d.totalCount} players ready`;if(d.allReady)document.getElementById('rematch-status').innerText='Starting...';});
-socket.on('gameOver',data=>{setTurnIndicator(false);stats.games=(stats.games||0)+1;const myPos=data.finishOrder.indexOf(userID)+1;if(myPos===1){stats.wins=(stats.wins||0)+1;stats.currentStreak=(stats.currentStreak||0)+1;if(stats.currentStreak>(stats.bestStreak||0))stats.bestStreak=stats.currentStreak;addXP(15+stats.currentStreak*2,`1st! Streak:${stats.currentStreak}`,false);launchConfetti();}else if(myPos===2){stats.secondPlace=(stats.secondPlace||0)+1;stats.topTwo=(stats.topTwo||0)+1;stats.currentStreak=0;addXP(8,"2nd Place",false);}else if(myPos===3){stats.thirdPlace=(stats.thirdPlace||0)+1;stats.currentStreak=0;addXP(5,"3rd Place",false);}else if(data.loserUserID===userID){stats.losses=(stats.losses||0)+1;stats.currentStreak=0;addXP(-2,"Defeated",false);}else{stats.currentStreak=0;addXP(3,`${myPos}th`,false);}if(myPos<=2)stats.topTwo=(stats.topTwo||0)+1;saveStats();checkAllTitles();updateStatsUI();document.getElementById('game-number').innerText=`Game #${data.gameNumber}`;document.getElementById('finish-list').innerHTML=data.performanceData.sort((a,b)=>a.position-b.position).map(p=>{const isW=p.position===1,isL=p.position===data.performanceData.length,isMe=p.userID===userID;let xp=isW?15:p.position===2?8:p.position===3?5:isL?-2:3;const tHtml=p.equippedTitle?`<span class="title-rarity ${p.equippedTitle.rarity}" style="font-size:8px;margin-left:5px">${p.equippedTitle.icon}</span>`:'';return`<div class="finish-item ${isW?'winner':''} ${isL?'loser':''}" style="${isMe?'border-width:2px':''}"><div style="font-size:18px;font-weight:800;width:30px">${isW?'👑':isL?'💀':'#'+p.position}</div><div style="flex:1;text-align:left;margin-left:10px;font-weight:600">${p.name}${tHtml}${isMe?' (You)':''}</div><div style="font-size:12px;color:var(--primary-action);font-weight:800">${xp>0?'+':''}${xp} XP</div></div>`;}).join('');const myData=data.performanceData.find(p=>p.userID===userID);let bonuses=[];if(myPos===1){bonuses.push({n:'🏆 Victory',x:15});if(stats.currentStreak>1)bonuses.push({n:`🔥 Streak x${stats.currentStreak}`,x:stats.currentStreak*2});}else if(myPos===2)bonuses.push({n:'🥈 2nd',x:8});else if(myPos===3)bonuses.push({n:'🥉 3rd',x:5});else if(data.loserUserID===userID)bonuses.push({n:'💀 Defeated',x:-2});if(myData?.stats?.pangkahsDealt)bonuses.push({n:`⚡ Pangkahs (${myData.stats.pangkahsDealt})`,x:myData.stats.pangkahsDealt*3});if(myData?.stats?.cleanWins)bonuses.push({n:`✨ Clean (${myData.stats.cleanWins})`,x:myData.stats.cleanWins});const total=bonuses.reduce((s,b)=>s+b.x,0);document.getElementById('bonus-list').innerHTML=`<div style="font-weight:800;margin-bottom:10px;color:var(--gold)">🎁 YOUR BONUSES</div>${bonuses.map(b=>`<div class="bonus-item"><span>${b.n}</span><span style="color:${b.x>=0?'var(--primary-action)':'var(--danger)'};font-weight:800">${b.x>0?'+':''}${b.x} XP</span></div>`).join('')}<div class="bonus-item" style="border-top:2px solid var(--gold);margin-top:10px;padding-top:10px"><span style="font-weight:800">TOTAL</span><span style="color:var(--gold);font-weight:800;font-size:16px">${total>0?'+':''}${total} XP</span></div>`;document.getElementById('rematch-btn').innerText='⚡ REMATCH';document.getElementById('rematch-btn').style.opacity='1';document.getElementById('rematch-status').innerText='Waiting...';rematchRequested=false;document.getElementById('gameover-modal').style.display='flex';});
+socket.on('gameOver',data=>{setTurnIndicator(false);stats.games=(stats.games||0)+1;const myPos=data.finishOrder.indexOf(userID)+1;if(myPos===1){stats.wins=(stats.wins||0)+1;stats.currentStreak=(stats.currentStreak||0)+1;if(stats.currentStreak>(stats.bestStreak||0))stats.bestStreak=stats.currentStreak;addXP(15+stats.currentStreak*2,`1st! Streak:${stats.currentStreak}`,false);launchConfetti();}else if(myPos===2){stats.secondPlace=(stats.secondPlace||0)+1;stats.topTwo=(stats.topTwo||0)+1;stats.currentStreak=0;addXP(8,"2nd Place",false);}else if(myPos===3){stats.thirdPlace=(stats.thirdPlace||0)+1;stats.currentStreak=0;addXP(5,"3rd Place",false);}else if(data.loserUserID===userID){stats.losses=(stats.losses||0)+1;stats.currentStreak=0;addXP(-2,"Defeated",false);}else{stats.fourthToTenth=(stats.fourthToTenth||0)+1;stats.currentStreak=0;addXP(3,`${myPos}th`,false);}if(myPos<=2)stats.topTwo=(stats.topTwo||0)+1;saveStats();checkAllTitles();updateStatsUI();document.getElementById('game-number').innerText=`Game #${data.gameNumber}`;document.getElementById('finish-list').innerHTML=data.performanceData.sort((a,b)=>a.position-b.position).map(p=>{const isW=p.position===1,isL=p.position===data.performanceData.length,isMe=p.userID===userID;let xp=isW?15:p.position===2?8:p.position===3?5:isL?-2:3;const tHtml=p.equippedTitle?`<span class="title-rarity ${p.equippedTitle.rarity}" style="font-size:8px;margin-left:5px">${p.equippedTitle.icon}</span>`:'';return`<div class="finish-item ${isW?'winner':''} ${isL?'loser':''}" style="${isMe?'border-width:2px':''}"><div style="font-size:18px;font-weight:800;width:30px">${isW?'👑':isL?'💀':'#'+p.position}</div><div style="flex:1;text-align:left;margin-left:10px;font-weight:600">${p.name}${tHtml}${isMe?' (You)':''}</div><div style="font-size:12px;color:var(--primary-action);font-weight:800">${xp>0?'+':''}${xp} XP</div></div>`;}).join('');const myData=data.performanceData.find(p=>p.userID===userID);let bonuses=[];if(myPos===1){bonuses.push({n:'🏆 Victory',x:15});if(stats.currentStreak>1)bonuses.push({n:`🔥 Streak x${stats.currentStreak}`,x:stats.currentStreak*2});}else if(myPos===2)bonuses.push({n:'🥈 2nd',x:8});else if(myPos===3)bonuses.push({n:'🥉 3rd',x:5});else if(data.loserUserID===userID)bonuses.push({n:'💀 Defeated',x:-2});if(myData?.stats?.pangkahsDealt)bonuses.push({n:`⚡ Pangkahs (${myData.stats.pangkahsDealt})`,x:myData.stats.pangkahsDealt*3});if(myData?.stats?.cleanWins)bonuses.push({n:`✨ Clean (${myData.stats.cleanWins})`,x:myData.stats.cleanWins});const total=bonuses.reduce((s,b)=>s+b.x,0);document.getElementById('bonus-list').innerHTML=`<div style="font-weight:800;margin-bottom:10px;color:var(--gold)">🎁 YOUR BONUSES</div>${bonuses.map(b=>`<div class="bonus-item"><span>${b.n}</span><span style="color:${b.x>=0?'var(--primary-action)':'var(--danger)'};font-weight:800">${b.x>0?'+':''}${b.x} XP</span></div>`).join('')}<div class="bonus-item" style="border-top:2px solid var(--gold);margin-top:10px;padding-top:10px"><span style="font-weight:800">TOTAL</span><span style="color:var(--gold);font-weight:800;font-size:16px">${total>0?'+':''}${total} XP</span></div>`;document.getElementById('rematch-btn').innerText='⚡ REMATCH';document.getElementById('rematch-btn').style.opacity='1';document.getElementById('rematch-status').innerText='Waiting...';rematchRequested=false;document.getElementById('gameover-modal').style.display='flex';});
 socket.on('receiveSwapRequest',d=>{pendingSwapRequest=d.fromUserID;document.getElementById('swap-txt').innerText=d.fromName+" wants your hand!";document.getElementById('swap-modal').style.display='block';let t=15;const timer=document.getElementById('swap-timer');timer.innerText=`${t}s`;const cd=setInterval(()=>{t--;timer.innerText=`${t}s`;if(t<=0)clearInterval(cd);},1000);swapTimeoutId=setTimeout(()=>{clearInterval(cd);if(pendingSwapRequest===d.fromUserID){answerSwap(false);showToast("Swap expired");}},15000);});
 socket.on('swapOccurred',d=>{playSound('absorb');showToast(d.msg,true);if(d.requesterUserID===userID){stats.handsAbsorbed=(stats.handsAbsorbed||0)+1;addXP(5,"Hand Absorbed!");}if(d.accepterUserID===userID){stats.handsGiven=(stats.handsGiven||0)+1;addXP(3,"Hand Given!");}saveStats();checkAllTitles();update(d);});
 

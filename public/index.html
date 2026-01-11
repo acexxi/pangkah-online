@@ -72,7 +72,7 @@
         .header-title { font-size: 11px; color: var(--text-tertiary); }
         .header-menu-item { width: 100%; padding: 12px 14px; border-radius: 10px; background: transparent; border: 0; text-align: left; color: var(--text-primary); font-weight: 500; font-size: 13px; cursor: pointer; display: flex; align-items: center; transition: background 0.15s; }
         .header-menu-item:hover { background: var(--bg-hover); }
-        @media (max-width: 520px) { .lobby-header-right .profile-btn, .lobby-header-right .leaderboard-btn { display: none !important; } .lobby-header-right .header-btn.hamburger-btn { display: flex; } .lobby-header { padding: 0 16px; } }
+        @media (max-width: 520px) { .lobby-header-right .profile-btn, .lobby-header-right .leaderboard-btn, .lobby-header-right .gm-admin-header-btn { display: none !important; } .lobby-header-right .header-btn.hamburger-btn { display: flex; } .lobby-header { padding: 0 16px; } }
         .lobby-body { flex: 1; display: flex; align-items: center; justify-content: center; padding-top: 56px; }
         .room-list { height: 140px; overflow-y: auto; background: var(--bg-tertiary); border-radius: 12px; margin: 16px 0; border: 1px solid var(--border-subtle); }
         .room-item { padding: 14px 16px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 0.15s; }
@@ -332,6 +332,7 @@
         <div class="lobby-header-right">
             <button class="header-btn profile-btn" onclick="openProfile()" title="Profile"><img src="/icon/profile.svg" alt="Profile" style="width:18px;height:18px;filter:brightness(0) invert(1)"></button>
             <button class="header-btn leaderboard-btn" onclick="openLeaderboard()" title="Leaderboard"><img src="/icon/leaderboard.svg" alt="Leaderboard" style="width:18px;height:18px"></button>
+            <button class="header-btn gm-admin-header-btn" id="gm-admin-header-btn" onclick="openGMAdmin()" title="GM Admin Panel" style="display:none;background:linear-gradient(135deg,#fbbf24,#f43f5e);border:none"><img src="/icon/profile.svg" alt="GM" style="width:18px;height:18px;filter:brightness(0) invert(1)"></button>
             <button class="header-btn hamburger-btn" id="hamburger-btn" onclick="toggleHeaderMenu()" aria-label="Menu" title="Menu"><img src="/icon/hambuger.svg" alt="Menu" style="width:18px;height:18px"></button>
         </div>
     </div>
@@ -765,9 +766,10 @@ async function syncFromServer(){
 // Call sync on page load (after DOM ready)
 document.addEventListener('DOMContentLoaded',()=>{
     setTimeout(syncFromServer,500);
-    // Show GM Admin button if already logged in as GM
+    // Show GM Admin buttons if already logged in as GM
     if(isGameMaster){
         document.getElementById('gm-admin-btn').style.display='block';
+        document.getElementById('gm-admin-header-btn').style.display='flex';
     }
 });
 
@@ -945,8 +947,9 @@ async function gmLogin(){
             if(!stats.unlockedTitles.includes('shadow_magistrate'))stats.unlockedTitles.push('shadow_magistrate');
             saveStats();
             updateStatsUI();
-            // Show GM Admin button
+            // Show GM Admin buttons (both header and menu)
             document.getElementById('gm-admin-btn').style.display='block';
+            document.getElementById('gm-admin-header-btn').style.display='flex';
             showToast('⚜️ Game Master Mode Activated!',true);
         }else{
             showToast('Invalid password!',false);
@@ -956,8 +959,9 @@ async function gmLogin(){
 function gmLogout(){
     isGameMaster=false;
     localStorage.removeItem('pGM');
-    // Hide GM Admin button
+    // Hide GM Admin buttons (both header and menu)
     document.getElementById('gm-admin-btn').style.display='none';
+    document.getElementById('gm-admin-header-btn').style.display='none';
     // Remove GM titles
     stats.unlockedTitles=stats.unlockedTitles.filter(t=>t!=='celestial_marshal'&&t!=='shadow_magistrate');
     if(stats.equippedTitle==='celestial_marshal'||stats.equippedTitle==='shadow_magistrate')stats.equippedTitle=null;

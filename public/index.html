@@ -716,14 +716,16 @@ if(!savedStats.version||savedStats.version<STATS_VERSION){
 let stats={...DEFAULT_STATS,...savedStats};
 let myRoom='',myCurrentHand=[],pendingSwapRequest=null,swapTimeoutId=null,isProcessingTurn=false,isHost=false,isFirstMove=true,currentLeadSuit=null,currentFilter='all',rematchRequested=false,currentMaxPlayers=4;
 
-// Auto-sync from MongoDB on page load
+// Auto-sync from MongoDB on page load - ALWAYS sync to ensure GM changes are reflected
 async function syncFromServer(){
     try{
         console.log('🔄 Syncing from server for userID:', userID);
         const res=await fetch(`/api/stats/${userID}`);
+        console.log('📡 Server response status:', res.status);
+        
         if(res.ok){
             const serverData=await res.json();
-            console.log('📥 Server data received:', serverData);
+            console.log('📥 Server data received:', JSON.stringify(serverData));
             if(serverData&&serverData.userID){
                 // Check Beta Tester status from server
                 isBetaTester = serverData.isBetaTester || false;
@@ -732,7 +734,7 @@ async function syncFromServer(){
                 }
                 
                 // FORCE override local stats with server data (server is source of truth)
-                stats={
+                const newStats={
                     ...DEFAULT_STATS,
                     version:STATS_VERSION,
                     xp:serverData.xp||0,
@@ -759,8 +761,15 @@ async function syncFromServer(){
                     handsAbsorbedFromBot:serverData.handsAbsorbedFromBot||0,
                     unlockedTitles:serverData.unlockedTitles||[],
                     equippedTitle:serverData.equippedTitle||null,
-                    uniquePlayers:stats.uniquePlayers||[]
+                    uniquePlayers:[]
                 };
+                
+                // Log the difference between old and new
+                console.log('📊 Old stats XP:', stats.xp, '→ New XP:', newStats.xp);
+                console.log('📊 Old stats Wins:', stats.wins, '→ New Wins:', newStats.wins);
+                
+                stats = newStats;
+                
                 // Update display name if server has it
                 if(serverData.displayName && serverData.displayName !== displayName){
                     displayName = serverData.displayName;
@@ -768,27 +777,26 @@ async function syncFromServer(){
                     console.log('📝 Display name updated from server:', displayName);
                 }
                 localStorage.setItem('pStats',JSON.stringify(stats));
-                console.log('✅ Stats synced from server - XP:', stats.xp, 'Wins:', stats.wins, 'Games:', stats.games);
+                console.log('✅ Stats synced & saved to localStorage - XP:', stats.xp, 'Wins:', stats.wins, 'Games:', stats.games);
                 updateStatsUI();
+            }else{
+                console.log('⚠️ Server data missing userID field');
             }
         }else{
-            console.log('⚠️ Server returned status:', res.status);
+            const errorData = await res.json().catch(()=>({}));
+            console.log('⚠️ Server returned error:', res.status, errorData);
         }
-    }catch(e){console.log('❌ Server sync error:',e.message);}
+    }catch(e){
+        console.log('❌ Server sync error:', e.message);
+        console.error(e);
+    }
+}
 }
 
-// Call sync on page load - ONLY on first load of browser session
+// Call sync on EVERY page load - server is always source of truth
 document.addEventListener('DOMContentLoaded',()=>{
-    // Check if this is first load of this browser session
-    const alreadySynced = sessionStorage.getItem('pSessionSynced');
-    if(!alreadySynced){
-        // First time opening game in this session - force sync from server
-        console.log('🚀 First load of session - syncing from server');
-        syncFromServer();
-        sessionStorage.setItem('pSessionSynced', 'true');
-    }else{
-        console.log('📦 Session already synced - using localStorage');
-    }
+    // Always sync from server to get latest data (including GM edits)
+    syncFromServer();
     // Show GM Admin buttons if already logged in as GM
     if(isGameMaster){
         document.getElementById('gm-admin-btn').style.display='block';

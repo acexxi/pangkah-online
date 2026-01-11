@@ -709,6 +709,101 @@ app.post('/api/gm/verify', (req, res) => {
     }
 });
 
+// GM Admin Panel - Search Player
+app.get('/api/gm/search-player', async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q) return res.json({ player: null });
+        
+        // Search by displayName or userID
+        const player = await Player.findOne({
+            $or: [
+                { displayName: { $regex: q, $options: 'i' } },
+                { userID: q }
+            ]
+        });
+        
+        if (player) {
+            res.json({ player: {
+                userID: player.userID,
+                displayName: player.displayName,
+                xp: player.xp,
+                wins: player.wins,
+                losses: player.losses,
+                games: player.games,
+                pangkahs: player.pangkahs,
+                bestStreak: player.bestStreak,
+                isBetaTester: player.isBetaTester
+            }});
+        } else {
+            res.json({ player: null });
+        }
+    } catch (err) {
+        console.error('GM search error:', err);
+        res.status(500).json({ error: 'Search failed' });
+    }
+});
+
+// GM Admin Panel - Update Player Stats
+app.post('/api/gm/update-player', async (req, res) => {
+    try {
+        const { targetUserID, updates } = req.body;
+        if (!targetUserID) return res.status(400).json({ error: 'userID required' });
+        
+        const allowedFields = ['xp', 'wins', 'losses', 'games', 'pangkahs', 'bestStreak', 'isBetaTester'];
+        const safeUpdates = {};
+        for (const key of allowedFields) {
+            if (updates[key] !== undefined) {
+                safeUpdates[key] = updates[key];
+            }
+        }
+        
+        const player = await Player.findOneAndUpdate(
+            { userID: targetUserID },
+            { $set: safeUpdates },
+            { new: true }
+        );
+        
+        if (!player) return res.status(404).json({ error: 'Player not found' });
+        
+        console.log(`[GM] Updated player ${player.displayName}:`, safeUpdates);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('GM update error:', err);
+        res.status(500).json({ error: 'Update failed' });
+    }
+});
+
+// GM Admin Panel - Reset Player Stats
+app.post('/api/gm/reset-player', async (req, res) => {
+    try {
+        const { targetUserID } = req.body;
+        if (!targetUserID) return res.status(400).json({ error: 'userID required' });
+        
+        const player = await Player.findOneAndUpdate(
+            { userID: targetUserID },
+            { $set: {
+                xp: 0, wins: 0, losses: 0, games: 0, pangkahs: 0, pangkahsReceived: 0,
+                bestStreak: 0, currentStreak: 0, handsAbsorbed: 0, handsGiven: 0,
+                cleanWins: 0, maxCardsHeld: 0, autoPlays: 0, cardsPlayed: 0,
+                secondPlace: 0, thirdPlace: 0, fourthToTenth: 0, topTwo: 0, nightGames: 0,
+                pangkahsReceivedFromBot: 0, lossesToBot: 0, handsAbsorbedFromBot: 0,
+                unlockedTitles: [], equippedTitle: null,
+                isBetaTester: false
+            }},
+            { new: true }
+        );
+        
+        if (!player) return res.status(404).json({ error: 'Player not found' });
+        
+        console.log(`[GM] RESET player ${player.displayName} stats`);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('GM reset error:', err);
+        res.status(500).json({ error: 'Reset failed' });
+    }
+});
+
 // Admin API Routes (protected by password)
 app.post('/api/admin/reset-player/:userID', async (req, res) => {
     try {

@@ -719,9 +719,11 @@ let myRoom='',myCurrentHand=[],pendingSwapRequest=null,swapTimeoutId=null,isProc
 // Auto-sync from MongoDB on page load
 async function syncFromServer(){
     try{
+        console.log('🔄 Syncing from server for userID:', userID);
         const res=await fetch(`/api/stats/${userID}`);
         if(res.ok){
             const serverData=await res.json();
+            console.log('📥 Server data received:', serverData);
             if(serverData&&serverData.userID){
                 // Check Beta Tester status from server
                 isBetaTester = serverData.isBetaTester || false;
@@ -729,7 +731,7 @@ async function syncFromServer(){
                     console.log('🐉 Beta Tester detected!');
                 }
                 
-                // Merge server data with local (server takes priority)
+                // FORCE override local stats with server data (server is source of truth)
                 stats={
                     ...DEFAULT_STATS,
                     version:STATS_VERSION,
@@ -752,20 +754,41 @@ async function syncFromServer(){
                     fourthToTenth:serverData.fourthToTenth||0,
                     topTwo:serverData.topTwo||0,
                     nightGames:serverData.nightGames||0,
+                    pangkahsReceivedFromBot:serverData.pangkahsReceivedFromBot||0,
+                    lossesToBot:serverData.lossesToBot||0,
+                    handsAbsorbedFromBot:serverData.handsAbsorbedFromBot||0,
                     unlockedTitles:serverData.unlockedTitles||[],
                     equippedTitle:serverData.equippedTitle||null,
                     uniquePlayers:stats.uniquePlayers||[]
                 };
+                // Update display name if server has it
+                if(serverData.displayName && serverData.displayName !== displayName){
+                    displayName = serverData.displayName;
+                    localStorage.setItem('pName', displayName);
+                    console.log('📝 Display name updated from server:', displayName);
+                }
                 localStorage.setItem('pStats',JSON.stringify(stats));
-                console.log('✅ Stats synced from server');
+                console.log('✅ Stats synced from server - XP:', stats.xp, 'Wins:', stats.wins, 'Games:', stats.games);
                 updateStatsUI();
             }
+        }else{
+            console.log('⚠️ Server returned status:', res.status);
         }
-    }catch(e){console.log('Server sync skipped:',e.message);}
+    }catch(e){console.log('❌ Server sync error:',e.message);}
 }
-// Call sync on page load (after DOM ready)
+
+// Call sync on page load - ONLY on first load of browser session
 document.addEventListener('DOMContentLoaded',()=>{
-    setTimeout(syncFromServer,500);
+    // Check if this is first load of this browser session
+    const alreadySynced = sessionStorage.getItem('pSessionSynced');
+    if(!alreadySynced){
+        // First time opening game in this session - force sync from server
+        console.log('🚀 First load of session - syncing from server');
+        syncFromServer();
+        sessionStorage.setItem('pSessionSynced', 'true');
+    }else{
+        console.log('📦 Session already synced - using localStorage');
+    }
     // Show GM Admin buttons if already logged in as GM
     if(isGameMaster){
         document.getElementById('gm-admin-btn').style.display='block';

@@ -1849,8 +1849,8 @@ io.on('connection', (socket) => {
             return socket.emit('errorMsg', `Max players must be ${MIN_PLAYERS}-${MAX_PLAYERS}`);
         }
         
-        // Validate bot count (0, 1, or 2)
-        const numBots = Math.min(Math.max(parseInt(botCount) || 0, 0), 2);
+        // Validate bot count (0, 1, 2, or 3)
+        const numBots = Math.min(Math.max(parseInt(botCount) || 0, 0), 3);
         
         // Create room with host player
         rooms[roomID] = {

@@ -2363,6 +2363,34 @@ io.on('connection', (socket) => {
     });
 
     /**
+     * LEAVE ROOM HANDLER - Player voluntarily leaves room
+     */
+    socket.on('leaveRoom', ({ roomID, userID }) => {
+        const room = rooms[roomID];
+        if (!room) return;
+        
+        // Remove player from room
+        const playerIndex = room.players.findIndex(p => p.userID === userID);
+        if (playerIndex !== -1) {
+            const player = room.players[playerIndex];
+            console.log(`[LEAVE] ${player.name} left room ${roomID}`);
+            room.players.splice(playerIndex, 1);
+            socket.leave(roomID);
+            
+            // If room is empty or game is over, clean up
+            const humanPlayers = room.players.filter(p => !p.isBot);
+            if (humanPlayers.length === 0) {
+                // No human players left, close room
+                delete rooms[roomID];
+                console.log(`[ROOM] Room ${roomID} closed - no players left`);
+            } else {
+                // Notify remaining players
+                io.to(roomID).emit('playerLeft', { name: player.name, playersCount: humanPlayers.length });
+            }
+        }
+    });
+
+    /**
      * DISCONNECT HANDLER
      */
     socket.on('disconnect', () => {

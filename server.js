@@ -151,7 +151,8 @@ app.get('/api/hall-of-fame', async (req, res) => {
                 winRate: ((p.wins || 0) / games * 100).toFixed(1),
                 loseRate: ((p.losses || 0) / games * 100).toFixed(1),
                 pangkahPerGame: ((p.pangkahs || 0) / games).toFixed(2),
-                gotPangkahPerGame: ((p.pangkahsReceived || 0) / games).toFixed(2)
+                gotPangkahPerGame: ((p.pangkahsReceived || 0) / games).toFixed(2),
+                cleanPerGame: ((p.cleanWins || 0) / games).toFixed(2)
             };
         });
         
@@ -161,14 +162,15 @@ app.get('/api/hall-of-fame', async (req, res) => {
         
         const records = [];
         
-        // ============ PAGE 1: GLORY RECORDS ============
+        // ============ PAGE 1: GLORY RECORDS (9 records) ============
         
-        // Highest Win Rate
+        // 1. Highest Win Rate
         if (rateEligible.length > 0) {
             const best = rateEligible.reduce((a, b) => parseFloat(a.winRate) > parseFloat(b.winRate) ? a : b);
             if (parseFloat(best.winRate) > 0) {
                 records.push({
                     id: 'winrate',
+                    category: 'glory',
                     icon: '👑',
                     title: 'The Chosen One',
                     player: best.name,
@@ -178,11 +180,12 @@ app.get('/api/hall-of-fame', async (req, res) => {
             }
         }
         
-        // Most Wins
+        // 2. Most Wins
         const winKing = playersWithRates.reduce((a, b) => a.wins > b.wins ? a : b);
         if (winKing.wins > 0) {
             records.push({
                 id: 'wins',
+                category: 'glory',
                 icon: '🏆',
                 title: 'Victory Addict',
                 player: winKing.name,
@@ -191,11 +194,12 @@ app.get('/api/hall-of-fame', async (req, res) => {
             });
         }
         
-        // Best Win Streak
+        // 3. Best Win Streak
         const streakKing = playersWithRates.reduce((a, b) => a.bestStreak > b.bestStreak ? a : b);
         if (streakKing.bestStreak > 0) {
             records.push({
                 id: 'streak',
+                category: 'glory',
                 icon: '🔥',
                 title: 'Unstoppable Menace',
                 player: streakKing.name,
@@ -204,11 +208,12 @@ app.get('/api/hall-of-fame', async (req, res) => {
             });
         }
         
-        // Most XP
+        // 4. Most XP
         const xpKing = playersWithRates.reduce((a, b) => a.xp > b.xp ? a : b);
         if (xpKing.xp > 0) {
             records.push({
                 id: 'xp',
+                category: 'glory',
                 icon: '✨',
                 title: 'XP Goblin',
                 player: xpKing.name,
@@ -217,11 +222,12 @@ app.get('/api/hall-of-fame', async (req, res) => {
             });
         }
         
-        // Most Pangkahs Dealt
+        // 5. Most Pangkahs Dealt
         const pangkahDealer = playersWithRates.reduce((a, b) => a.pangkahs > b.pangkahs ? a : b);
         if (pangkahDealer.pangkahs > 0) {
             records.push({
                 id: 'pangkahs',
+                category: 'glory',
                 icon: '⚡',
                 title: 'Pangkah Terrorist',
                 player: pangkahDealer.name,
@@ -230,11 +236,12 @@ app.get('/api/hall-of-fame', async (req, res) => {
             });
         }
         
-        // Most Clean Wins
+        // 6. Most Clean Wins
         const cleanMaster = playersWithRates.reduce((a, b) => a.cleanWins > b.cleanWins ? a : b);
         if (cleanMaster.cleanWins > 0) {
             records.push({
                 id: 'cleanwins',
+                category: 'glory',
                 icon: '🧼',
                 title: 'Mr. Clean',
                 player: cleanMaster.name,
@@ -243,14 +250,59 @@ app.get('/api/hall-of-fame', async (req, res) => {
             });
         }
         
-        // ============ PAGE 2: SHAME RECORDS ============
+        // 7. Most Games Played
+        const grinder = playersWithRates.reduce((a, b) => a.games > b.games ? a : b);
+        if (grinder.games > 0) {
+            records.push({
+                id: 'games',
+                category: 'glory',
+                icon: '🎮',
+                title: 'No-Life Achievement',
+                player: grinder.name,
+                value: `${grinder.games} games`,
+                description: `${grinder.name} has played ${grinder.games} games. What is grass? What is sunlight? This gamer doesn't know and doesn't CARE! 🌿❌`
+            });
+        }
         
-        // Highest Lose Rate
+        // 8. Hand Absorber (Soul Stealer)
+        const handAbsorber = playersWithRates.reduce((a, b) => a.handsAbsorbed > b.handsAbsorbed ? a : b);
+        if (handAbsorber.handsAbsorbed > 0) {
+            records.push({
+                id: 'absorbed',
+                category: 'glory',
+                icon: '🦑',
+                title: 'Soul Stealer',
+                player: handAbsorber.name,
+                value: `${handAbsorber.handsAbsorbed} hands`,
+                description: `${handAbsorber.name} has absorbed ${handAbsorber.handsAbsorbed} hands. They collect cards like Thanos collects infinity stones! "I am inevitable!" 🫴`
+            });
+        }
+        
+        // 9. Pangkah per Game (Chaos Agent)
+        if (rateEligible.length > 0) {
+            const pangkahSpammer = rateEligible.reduce((a, b) => parseFloat(a.pangkahPerGame) > parseFloat(b.pangkahPerGame) ? a : b);
+            if (parseFloat(pangkahSpammer.pangkahPerGame) > 0) {
+                records.push({
+                    id: 'pangkahrate',
+                    category: 'glory',
+                    icon: '💣',
+                    title: 'Chaos Agent',
+                    player: pangkahSpammer.name,
+                    value: `${pangkahSpammer.pangkahPerGame}/game`,
+                    description: `${pangkahSpammer.name} deals ${pangkahSpammer.pangkahPerGame} pangkahs per game on average. Some people just want to watch the world burn! 🔥`
+                });
+            }
+        }
+        
+        // ============ PAGE 2: SHAME RECORDS (9 records) ============
+        
+        // 1. Highest Lose Rate
         if (rateEligible.length > 0) {
             const worst = rateEligible.reduce((a, b) => parseFloat(a.loseRate) > parseFloat(b.loseRate) ? a : b);
             if (parseFloat(worst.loseRate) > 0) {
                 records.push({
                     id: 'loserate',
+                    category: 'shame',
                     icon: '🤡',
                     title: 'Professional Clown',
                     player: worst.name,
@@ -260,11 +312,12 @@ app.get('/api/hall-of-fame', async (req, res) => {
             }
         }
         
-        // Most Losses
+        // 2. Most Losses
         const loseKing = playersWithRates.reduce((a, b) => a.losses > b.losses ? a : b);
         if (loseKing.losses > 0) {
             records.push({
                 id: 'losses',
+                category: 'shame',
                 icon: '💀',
                 title: 'L Collector',
                 player: loseKing.name,
@@ -273,11 +326,12 @@ app.get('/api/hall-of-fame', async (req, res) => {
             });
         }
         
-        // Most Pangkahs Received
+        // 3. Most Pangkahs Received
         const pangkahVictim = playersWithRates.reduce((a, b) => a.pangkahsReceived > b.pangkahsReceived ? a : b);
         if (pangkahVictim.pangkahsReceived > 0) {
             records.push({
                 id: 'gotpangkah',
+                category: 'shame',
                 icon: '🎯',
                 title: 'Human Dartboard',
                 player: pangkahVictim.name,
@@ -286,11 +340,12 @@ app.get('/api/hall-of-fame', async (req, res) => {
             });
         }
         
-        // Most AFK/Auto-plays
+        // 4. Most AFK/Auto-plays
         const afkKing = playersWithRates.reduce((a, b) => a.autoPlays > b.autoPlays ? a : b);
         if (afkKing.autoPlays > 0) {
             records.push({
                 id: 'afk',
+                category: 'shame',
                 icon: '😴',
                 title: 'AFK Speedrunner',
                 player: afkKing.name,
@@ -299,13 +354,90 @@ app.get('/api/hall-of-fame', async (req, res) => {
             });
         }
         
-        // ============ PAGE 3: MISC RECORDS ============
+        // 5. Got Pangkah per Game (Unluckiest)
+        if (rateEligible.length > 0) {
+            const unlucky = rateEligible.reduce((a, b) => parseFloat(a.gotPangkahPerGame) > parseFloat(b.gotPangkahPerGame) ? a : b);
+            if (parseFloat(unlucky.gotPangkahPerGame) > 0) {
+                records.push({
+                    id: 'unlucky',
+                    category: 'shame',
+                    icon: '🍀',
+                    title: 'Unluckiest Player',
+                    player: unlucky.name,
+                    value: `${unlucky.gotPangkahPerGame}/game`,
+                    description: `${unlucky.name} receives ${unlucky.gotPangkahPerGame} pangkahs per game. If bad luck was a person, it would be them! Maybe try a lucky charm? 🐈‍⬛`
+                });
+            }
+        }
         
-        // Always 2nd Place
+        // 6. Most Cards Held (Card Hoarder - moved to shame)
+        const cardHoarder = playersWithRates.reduce((a, b) => a.maxCardsHeld > b.maxCardsHeld ? a : b);
+        if (cardHoarder.maxCardsHeld > 0) {
+            records.push({
+                id: 'maxcards',
+                category: 'shame',
+                icon: '🐿️',
+                title: 'Card Hoarder',
+                player: cardHoarder.name,
+                value: `${cardHoarder.maxCardsHeld} cards`,
+                description: `${cardHoarder.name} once held ${cardHoarder.maxCardsHeld} cards in one game! They needed TWO HANDS just to hold them all! How did it feel being a walking deck? 🃏`
+            });
+        }
+        
+        // 7. Hand Giver (Santa - moved to shame, it's giving away wins!)
+        const handGiver = playersWithRates.reduce((a, b) => a.handsGiven > b.handsGiven ? a : b);
+        if (handGiver.handsGiven > 0) {
+            records.push({
+                id: 'given',
+                category: 'shame',
+                icon: '🎅',
+                title: 'Santa Claus',
+                player: handGiver.name,
+                value: `${handGiver.handsGiven} hands given`,
+                description: `${handGiver.name} has given away ${handGiver.handsGiven} hands. So generous! So kind! So... why are you helping others win?! 🎁`
+            });
+        }
+        
+        // 8. Lowest Win Rate (among eligible players)
+        if (rateEligible.length > 0) {
+            const worstWinRate = rateEligible.reduce((a, b) => parseFloat(a.winRate) < parseFloat(b.winRate) ? a : b);
+            records.push({
+                id: 'lowestwinrate',
+                category: 'shame',
+                icon: '📉',
+                title: 'Rock Bottom',
+                player: worstWinRate.name,
+                value: `${worstWinRate.winRate}% win rate`,
+                description: `${worstWinRate.name} has a ${worstWinRate.winRate}% win rate. At least they're consistent... consistently losing! The floor is their ceiling! 🪨`
+            });
+        }
+        
+        // 9. Most Games Without Improvement (high games, low win rate)
+        if (rateEligible.length > 0) {
+            const hopeless = rateEligible
+                .filter(p => p.games >= 10)
+                .sort((a, b) => (b.games * (100 - parseFloat(b.winRate))) - (a.games * (100 - parseFloat(a.winRate))))[0];
+            if (hopeless) {
+                records.push({
+                    id: 'hopeless',
+                    category: 'shame',
+                    icon: '🪦',
+                    title: 'Lost Cause',
+                    player: hopeless.name,
+                    value: `${hopeless.games} games, ${hopeless.winRate}% WR`,
+                    description: `${hopeless.name} has played ${hopeless.games} games but still has ${hopeless.winRate}% win rate. Definition of insanity: doing the same thing expecting different results! 🔄`
+                });
+            }
+        }
+        
+        // ============ PAGE 3: MISC RECORDS (9 records) ============
+        
+        // 1. Always 2nd Place
         const silverMedalist = playersWithRates.reduce((a, b) => a.secondPlace > b.secondPlace ? a : b);
         if (silverMedalist.secondPlace > 0) {
             records.push({
                 id: 'second',
+                category: 'misc',
                 icon: '🥈',
                 title: 'Forever Bridesmaid',
                 player: silverMedalist.name,
@@ -314,11 +446,12 @@ app.get('/api/hall-of-fame', async (req, res) => {
             });
         }
         
-        // Bronze Collector
+        // 2. Bronze Collector
         const bronzeCollector = playersWithRates.reduce((a, b) => a.thirdPlace > b.thirdPlace ? a : b);
         if (bronzeCollector.thirdPlace > 0) {
             records.push({
                 id: 'third',
+                category: 'misc',
                 icon: '🥉',
                 title: 'Bronze Enthusiast',
                 player: bronzeCollector.name,
@@ -327,63 +460,12 @@ app.get('/api/hall-of-fame', async (req, res) => {
             });
         }
         
-        // Most Games Played
-        const grinder = playersWithRates.reduce((a, b) => a.games > b.games ? a : b);
-        if (grinder.games > 0) {
-            records.push({
-                id: 'games',
-                icon: '🎮',
-                title: 'No-Life Achievement',
-                player: grinder.name,
-                value: `${grinder.games} games`,
-                description: `${grinder.name} has played ${grinder.games} games. What is grass? What is sunlight? This gamer doesn't know and doesn't CARE! 🌿❌`
-            });
-        }
-        
-        // Hand Absorber
-        const handAbsorber = playersWithRates.reduce((a, b) => a.handsAbsorbed > b.handsAbsorbed ? a : b);
-        if (handAbsorber.handsAbsorbed > 0) {
-            records.push({
-                id: 'absorbed',
-                icon: '🦑',
-                title: 'Soul Stealer',
-                player: handAbsorber.name,
-                value: `${handAbsorber.handsAbsorbed} hands`,
-                description: `${handAbsorber.name} has absorbed ${handAbsorber.handsAbsorbed} hands. They collect cards like Thanos collects infinity stones! "I am inevitable!" 🫴`
-            });
-        }
-        
-        // Hand Giver (Santa)
-        const handGiver = playersWithRates.reduce((a, b) => a.handsGiven > b.handsGiven ? a : b);
-        if (handGiver.handsGiven > 0) {
-            records.push({
-                id: 'given',
-                icon: '🎅',
-                title: 'Santa Claus',
-                player: handGiver.name,
-                value: `${handGiver.handsGiven} hands given`,
-                description: `${handGiver.name} has given away ${handGiver.handsGiven} hands. So generous! So kind! So... suspicious? What are they planning? 🎁`
-            });
-        }
-        
-        // Most Cards Held
-        const cardHoarder = playersWithRates.reduce((a, b) => a.maxCardsHeld > b.maxCardsHeld ? a : b);
-        if (cardHoarder.maxCardsHeld > 0) {
-            records.push({
-                id: 'maxcards',
-                icon: '🐿️',
-                title: 'Card Hoarder',
-                player: cardHoarder.name,
-                value: `${cardHoarder.maxCardsHeld} cards`,
-                description: `${cardHoarder.name} once held ${cardHoarder.maxCardsHeld} cards in one game! They needed TWO HANDS just to hold them all! Squirrel energy! 🃏🃏🃏`
-            });
-        }
-        
-        // Middle Child (4th-10th place)
+        // 3. Middle Child (4th-10th place)
         const middleChild = playersWithRates.reduce((a, b) => a.fourthToTenth > b.fourthToTenth ? a : b);
         if (middleChild.fourthToTenth > 0) {
             records.push({
                 id: 'middle',
+                category: 'misc',
                 icon: '😐',
                 title: 'Forgettable Player',
                 player: middleChild.name,
@@ -392,34 +474,101 @@ app.get('/api/hall-of-fame', async (req, res) => {
             });
         }
         
-        // Pangkah per Game (for aggressive players)
+        // 4. Most Consistent (closest to 50% win rate)
         if (rateEligible.length > 0) {
-            const pangkahSpammer = rateEligible.reduce((a, b) => parseFloat(a.pangkahPerGame) > parseFloat(b.pangkahPerGame) ? a : b);
-            if (parseFloat(pangkahSpammer.pangkahPerGame) > 0) {
+            const consistent = rateEligible.reduce((a, b) => 
+                Math.abs(50 - parseFloat(a.winRate)) < Math.abs(50 - parseFloat(b.winRate)) ? a : b
+            );
+            records.push({
+                id: 'consistent',
+                category: 'misc',
+                icon: '⚖️',
+                title: 'Perfectly Balanced',
+                player: consistent.name,
+                value: `${consistent.winRate}% win rate`,
+                description: `${consistent.name} has exactly ${consistent.winRate}% win rate. Perfectly balanced, as all things should be. Thanos would be proud! 💜`
+            });
+        }
+        
+        // 5. Clean Per Game
+        if (rateEligible.length > 0) {
+            const cleanRate = rateEligible.reduce((a, b) => parseFloat(a.cleanPerGame) > parseFloat(b.cleanPerGame) ? a : b);
+            if (parseFloat(cleanRate.cleanPerGame) > 0) {
                 records.push({
-                    id: 'pangkahrate',
-                    icon: '💣',
-                    title: 'Chaos Agent',
-                    player: pangkahSpammer.name,
-                    value: `${pangkahSpammer.pangkahPerGame}/game`,
-                    description: `${pangkahSpammer.name} deals ${pangkahSpammer.pangkahPerGame} pangkahs per game on average. Some people want to watch the world burn! 🔥`
+                    id: 'cleanrate',
+                    category: 'misc',
+                    icon: '🧹',
+                    title: 'Neat Freak',
+                    player: cleanRate.name,
+                    value: `${cleanRate.cleanPerGame}/game`,
+                    description: `${cleanRate.name} wins ${cleanRate.cleanPerGame} clean rounds per game. They keep it clean, they keep it tidy, they keep it WINNING! 🧽`
                 });
             }
         }
         
-        // Got Pangkah per Game (unluckiest)
-        if (rateEligible.length > 0) {
-            const unlucky = rateEligible.reduce((a, b) => parseFloat(a.gotPangkahPerGame) > parseFloat(b.gotPangkahPerGame) ? a : b);
-            if (parseFloat(unlucky.gotPangkahPerGame) > 0) {
-                records.push({
-                    id: 'unlucky',
-                    icon: '🍀',
-                    title: 'Unluckiest Player',
-                    player: unlucky.name,
-                    value: `${unlucky.gotPangkahPerGame}/game`,
-                    description: `${unlucky.name} receives ${unlucky.gotPangkahPerGame} pangkahs per game. If bad luck was a person, it would be them! Maybe try a lucky charm? 🐈‍⬛`
-                });
-            }
+        // 6. Most Top 2 Finishes
+        const topTwoKing = playersWithRates.reduce((a, b) => (a.wins + a.secondPlace) > (b.wins + b.secondPlace) ? a : b);
+        if ((topTwoKing.wins + topTwoKing.secondPlace) > 0) {
+            records.push({
+                id: 'toptwo',
+                category: 'misc',
+                icon: '🎖️',
+                title: 'Podium Regular',
+                player: topTwoKing.name,
+                value: `${topTwoKing.wins + topTwoKing.secondPlace} times`,
+                description: `${topTwoKing.name} has finished top 2 a total of ${topTwoKing.wins + topTwoKing.secondPlace} times. They may not always win, but they're ALWAYS up there! 🏅`
+            });
+        }
+        
+        // 7. Best Pangkah Ratio (dealt vs received)
+        const pangkahRatioPlayers = playersWithRates.filter(p => p.pangkahsReceived > 0);
+        if (pangkahRatioPlayers.length > 0) {
+            const bestRatio = pangkahRatioPlayers.reduce((a, b) => 
+                (a.pangkahs / a.pangkahsReceived) > (b.pangkahs / b.pangkahsReceived) ? a : b
+            );
+            const ratio = (bestRatio.pangkahs / bestRatio.pangkahsReceived).toFixed(2);
+            records.push({
+                id: 'pangkahratio',
+                category: 'misc',
+                icon: '🎭',
+                title: 'Karma Dealer',
+                player: bestRatio.name,
+                value: `${ratio}x ratio`,
+                description: `${bestRatio.name} deals ${ratio}x more pangkahs than they receive. They dish it out but never take it! Ultimate uno reverse energy! 🔄`
+            });
+        }
+        
+        // 8. Worst Pangkah Ratio (received more than dealt)
+        if (pangkahRatioPlayers.length > 0) {
+            const worstRatio = pangkahRatioPlayers.reduce((a, b) => 
+                (a.pangkahsReceived / Math.max(a.pangkahs, 1)) > (b.pangkahsReceived / Math.max(b.pangkahs, 1)) ? a : b
+            );
+            const ratio = (worstRatio.pangkahsReceived / Math.max(worstRatio.pangkahs, 1)).toFixed(2);
+            records.push({
+                id: 'badkarma',
+                category: 'misc',
+                icon: '☯️',
+                title: 'Bad Karma',
+                player: worstRatio.name,
+                value: `${ratio}x ratio`,
+                description: `${worstRatio.name} receives ${ratio}x more pangkahs than they deal. What did they do in their past life?! The universe is NOT on their side! 😵`
+            });
+        }
+        
+        // 9. Jack of All Trades (has wins, losses, pangkahs, clean wins - well rounded)
+        const allRounder = playersWithRates
+            .filter(p => p.wins > 0 && p.losses > 0 && p.pangkahs > 0 && p.cleanWins > 0)
+            .sort((a, b) => (b.wins + b.pangkahs + b.cleanWins) - (a.wins + a.pangkahs + a.cleanWins))[0];
+        if (allRounder) {
+            records.push({
+                id: 'allrounder',
+                category: 'misc',
+                icon: '🎪',
+                title: 'Jack of All Trades',
+                player: allRounder.name,
+                value: `${allRounder.wins}W/${allRounder.pangkahs}P/${allRounder.cleanWins}C`,
+                description: `${allRounder.name} does it all! ${allRounder.wins} wins, ${allRounder.pangkahs} pangkahs dealt, ${allRounder.cleanWins} clean rounds. Master of none? More like master of EVERYTHING! 🌟`
+            });
         }
         
         res.json({ records });
@@ -1440,6 +1589,9 @@ io.on('connection', (socket) => {
             broadcastRooms();
             
             console.log(`Game #${room.gameNumber} ended in room ${roomID} (via hand swap). Loser: ${survivors[0]?.name || 'None'}`);
+        } else {
+            // Game continues - reset turn timer back to 15 seconds
+            startTurnTimer(roomID);
         }
         
         console.log(`${requester.name} absorbed ${accepter.name}'s hand`);

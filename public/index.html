@@ -687,7 +687,15 @@ document.addEventListener('DOMContentLoaded',()=>setTimeout(syncFromServer,500))
 function getStatValue(t){switch(t){case'level':return getLevel();case'pangkahs':return stats.pangkahs||0;case'streak':return stats.bestStreak||0;case'wins':return stats.wins||0;case'games':return stats.games||0;case'xp':return stats.xp||0;case'handsAbsorbed':return stats.handsAbsorbed||0;case'nightGames':return stats.nightGames||0;case'uniquePlayers':return(stats.uniquePlayers||[]).length;case'topTwo':return stats.topTwo||0;case'secondPlace':return stats.secondPlace||0;case'thirdPlace':return stats.thirdPlace||0;case'cardsPlayed':return stats.cardsPlayed||0;case'losses':return stats.losses||0;case'maxCardsHeld':return stats.maxCardsHeld||0;case'comebacks':return stats.comebacks||0;case'perfectWins':return stats.perfectWins||0;case'fastWins':return stats.fastWins||0;case'handsGiven':return stats.handsGiven||0;case'autoPlays':return stats.autoPlays||0;case'cleanWins':return stats.cleanWins||0;case'pangkahsReceived':return stats.pangkahsReceived||0;default:return 0;}}
 function checkAllTitles(){TITLES.forEach(t=>{if(!stats.unlockedTitles.includes(t.id)&&getStatValue(t.req.t)>=t.req.v){stats.unlockedTitles.push(t.id);showAchievement(t);}});saveStats();}
 function showAchievement(t){const p=document.getElementById('achievement-popup');p.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:24px">${t.icon}</span><div><div style="font-size:10px;color:var(--gold);font-weight:800">TITLE UNLOCKED!</div><div style="font-size:16px;font-weight:800">${t.name}</div></div></div><div style="font-size:11px;opacity:0.7">${t.desc}</div><div class="title-rarity ${t.rarity}" style="margin-top:10px">${t.rarity.toUpperCase()}</div>`;p.style.display='block';setTimeout(()=>p.style.display='none',4000);}
-function equipTitle(id){if(stats.unlockedTitles.includes(id)){stats.equippedTitle=id;saveStats();updateStatsUI();renderTitleGrid();if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:getEquippedTitleData()});showToast('Equipped!',true);}}
+function equipTitle(id){
+    // Check if title is unlocked (regular titles) or special titles (GM/Beta)
+    const allTitles=[...TITLES,...GM_TITLES,...BETA_TESTER_TITLES];
+    const title=allTitles.find(t=>t.id===id);
+    const isGMTitle=title&&title.req.t==='gm';
+    const isBetaTitle=title&&title.req.t==='beta';
+    const canEquip=stats.unlockedTitles.includes(id)||(isGMTitle&&isGameMaster)||(isBetaTitle&&isBetaTester);
+    if(canEquip){stats.equippedTitle=id;saveStats();updateStatsUI();renderTitleGrid();if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:getEquippedTitleData()});showToast('Equipped!',true);}
+}
 function unequipTitle(){stats.equippedTitle=null;saveStats();updateStatsUI();renderTitleGrid();if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:null});}
 function getEquippedTitleData(){if(!stats.equippedTitle)return null;const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[]),...(isBetaTester?BETA_TESTER_TITLES:[])];const t=allTitles.find(x=>x.id===stats.equippedTitle);return t?{id:t.id,name:t.name,rarity:t.rarity,icon:t.icon}:null;}
 
@@ -706,7 +714,9 @@ function renderTitleGrid(){
         const isGMTitle=t.req.t==='gm';
         const isBetaTitle=t.req.t==='beta';
         const isSpecialTitle=isGMTitle||isBetaTitle;
-        const unlocked=stats.unlockedTitles.includes(t.id),equipped=stats.equippedTitle===t.id,prog=isSpecialTitle?1:getStatValue(t.req.t),max=t.req.v,pct=Math.min(prog/max*100,100).toFixed(0);
+        // Auto-unlock: GM titles for GMs, Beta titles for Beta Testers
+        const unlocked=stats.unlockedTitles.includes(t.id)||(isGMTitle&&isGameMaster)||(isBetaTitle&&isBetaTester);
+        const equipped=stats.equippedTitle===t.id,prog=isSpecialTitle?1:getStatValue(t.req.t),max=t.req.v,pct=Math.min(prog/max*100,100).toFixed(0);
         const labelText=isGMTitle?'GM':isBetaTitle?'BETA':t.rarity.toUpperCase();
         return`<div class="title-item ${unlocked?'':'locked'} ${equipped?'equipped':''} ${isGMTitle?'gm-title':''} ${isBetaTitle?'beta-title':''}" onclick="${unlocked?(equipped?'unequipTitle()':`equipTitle('${t.id}')`):''}">${equipped?'<span style="position:absolute;top:8px;right:8px">✓</span>':''}<span class="title-rarity ${t.rarity}">${labelText}</span><div class="title-name">${t.icon} ${t.name}</div><div class="title-desc">${t.desc}</div>${!unlocked&&!isSpecialTitle?`<div class="title-progress">${Math.min(prog,max)}/${max} (${pct}%)</div>`:''}</div>`;
     }).join('');

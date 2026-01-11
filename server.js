@@ -42,6 +42,7 @@ const playerSchema = new mongoose.Schema({
     cardsPlayed: { type: Number, default: 0 },
     secondPlace: { type: Number, default: 0 },
     thirdPlace: { type: Number, default: 0 },
+    fourthToTenth: { type: Number, default: 0 },
     topTwo: { type: Number, default: 0 },
     nightGames: { type: Number, default: 0 },
     
@@ -81,30 +82,6 @@ app.post('/api/stats/save', async (req, res) => {
     }
 });
 
-
-app.post('/api/player/update-name', async (req, res) => {
-    try {
-        const { userID, displayName } = req.body;
-        if (!userID) return res.status(400).json({ error: 'userID required' });
-
-        const name = (displayName || '').trim();
-        if (!name) return res.status(400).json({ error: 'displayName required' });
-        if (name.length > 20) return res.status(400).json({ error: 'displayName too long' });
-
-        const player = await Player.findOneAndUpdate(
-            { userID },
-            { $set: { displayName: name, lastPlayedAt: new Date() } },
-            { upsert: true, new: true }
-        );
-
-        res.json({ success: true, player });
-    } catch (err) {
-        console.error('Update name error:', err);
-        res.status(500).json({ error: 'Failed to update name' });
-    }
-});
-
-
 app.get('/api/stats/:userID', async (req, res) => {
     try {
         const player = await Player.findOne({ userID: req.params.userID });
@@ -118,7 +95,7 @@ app.get('/api/stats/:userID', async (req, res) => {
 app.get('/api/leaderboard/:type', async (req, res) => {
     try {
         const { type } = req.params;
-        const limit = parseInt(req.query.limit) || 10;
+        const limit = parseInt(req.query.limit) || 100;
         
         let sortField = 'xp';
         if (type === 'wins') sortField = 'wins';
@@ -132,11 +109,203 @@ app.get('/api/leaderboard/:type', async (req, res) => {
         const players = await Player.find()
             .sort({ [sortField]: -1 })
             .limit(limit)
-            .select('displayName userID xp wins losses games secondPlace thirdPlace pangkahs pangkahsReceived bestStreak equippedTitle');
+            .select('displayName userID xp wins losses games pangkahs pangkahsReceived bestStreak equippedTitle secondPlace thirdPlace fourthToTenth');
         
         res.json(players);
     } catch (err) {
         res.status(500).json({ error: 'Failed to get leaderboard' });
+    }
+});
+
+// Hall of Fame API - Get record holders
+app.get('/api/hall-of-fame', async (req, res) => {
+    try {
+        // Get all players with at least 1 game
+        const players = await Player.find({ games: { $gt: 0 } })
+            .select('displayName xp wins losses games pangkahs pangkahsReceived bestStreak secondPlace thirdPlace fourthToTenth');
+        
+        if (players.length === 0) {
+            return res.json({ records: [] });
+        }
+        
+        // Calculate rates for each player
+        const playersWithRates = players.map(p => {
+            const games = p.games || 1;
+            return {
+                name: p.displayName || 'Unknown',
+                xp: p.xp || 0,
+                wins: p.wins || 0,
+                losses: p.losses || 0,
+                games: games,
+                pangkahs: p.pangkahs || 0,
+                pangkahsReceived: p.pangkahsReceived || 0,
+                bestStreak: p.bestStreak || 0,
+                secondPlace: p.secondPlace || 0,
+                thirdPlace: p.thirdPlace || 0,
+                winRate: ((p.wins || 0) / games * 100).toFixed(1),
+                loseRate: ((p.losses || 0) / games * 100).toFixed(1),
+                pangkahRate: ((p.pangkahs || 0) / games).toFixed(2),
+                gotPangkahRate: ((p.pangkahsReceived || 0) / games).toFixed(2)
+            };
+        });
+        
+        // Find record holders (need at least 5 games for rate-based records)
+        const minGamesForRates = 5;
+        const rateEligible = playersWithRates.filter(p => p.games >= minGamesForRates);
+        
+        const records = [];
+        
+        // Highest Win Rate
+        if (rateEligible.length > 0) {
+            const best = rateEligible.reduce((a, b) => parseFloat(a.winRate) > parseFloat(b.winRate) ? a : b);
+            records.push({
+                id: 'winrate',
+                icon: '👑',
+                title: 'The Chosen One',
+                player: best.name,
+                value: `${best.winRate}%`,
+                description: `${best.name} is living their best life with a ${best.winRate}% win rate. Main character energy! 🌟`
+            });
+        }
+        
+        // Highest Lose Rate
+        if (rateEligible.length > 0) {
+            const worst = rateEligible.reduce((a, b) => parseFloat(a.loseRate) > parseFloat(b.loseRate) ? a : b);
+            records.push({
+                id: 'loserate',
+                icon: '🤡',
+                title: 'Professional Clown',
+                player: worst.name,
+                value: `${worst.loseRate}%`,
+                description: `${worst.name} needs divine intervention... currently leading with a ${worst.loseRate}% lose rate. Skill issue? 💀`
+            });
+        }
+        
+        // Best Win Streak
+        const streakKing = playersWithRates.reduce((a, b) => a.bestStreak > b.bestStreak ? a : b);
+        if (streakKing.bestStreak > 0) {
+            records.push({
+                id: 'streak',
+                icon: '🔥',
+                title: 'Unstoppable Force',
+                player: streakKing.name,
+                value: `${streakKing.bestStreak} wins`,
+                description: `${streakKing.name} went absolutely demon mode with ${streakKing.bestStreak} consecutive victories. Touch grass? Never heard of it! 💪`
+            });
+        }
+        
+        // Most Pangkahs Dealt
+        const pangkahDealer = playersWithRates.reduce((a, b) => a.pangkahs > b.pangkahs ? a : b);
+        if (pangkahDealer.pangkahs > 0) {
+            records.push({
+                id: 'pangkahs',
+                icon: '⚡',
+                title: 'Pangkah Terrorist',
+                player: pangkahDealer.name,
+                value: `${pangkahDealer.pangkahs} dealt`,
+                description: `${pangkahDealer.name} has dealt ${pangkahDealer.pangkahs} pangkahs. Certified menace to society! 😈`
+            });
+        }
+        
+        // Most Pangkahs Received
+        const pangkahVictim = playersWithRates.reduce((a, b) => a.pangkahsReceived > b.pangkahsReceived ? a : b);
+        if (pangkahVictim.pangkahsReceived > 0) {
+            records.push({
+                id: 'gotpangkah',
+                icon: '🎯',
+                title: 'Human Punching Bag',
+                player: pangkahVictim.name,
+                value: `${pangkahVictim.pangkahsReceived} received`,
+                description: `${pangkahVictim.name} has eaten ${pangkahVictim.pangkahsReceived} pangkahs. At this point, it's a talent. 🥊`
+            });
+        }
+        
+        // Most Games Played
+        const grinder = playersWithRates.reduce((a, b) => a.games > b.games ? a : b);
+        if (grinder.games > 0) {
+            records.push({
+                id: 'games',
+                icon: '🎮',
+                title: 'No Life Achievement',
+                player: grinder.name,
+                value: `${grinder.games} games`,
+                description: `${grinder.name} has played ${grinder.games} games. Touching grass is not in their vocabulary! 🌿❌`
+            });
+        }
+        
+        // Most XP
+        const xpKing = playersWithRates.reduce((a, b) => a.xp > b.xp ? a : b);
+        if (xpKing.xp > 0) {
+            records.push({
+                id: 'xp',
+                icon: '✨',
+                title: 'XP Hoarder',
+                player: xpKing.name,
+                value: `${xpKing.xp.toLocaleString()} XP`,
+                description: `${xpKing.name} has accumulated ${xpKing.xp.toLocaleString()} XP. They've ascended beyond mortal comprehension! 🧘`
+            });
+        }
+        
+        // Always 2nd Place (most second places)
+        const silverMedalist = playersWithRates.reduce((a, b) => a.secondPlace > b.secondPlace ? a : b);
+        if (silverMedalist.secondPlace > 0) {
+            records.push({
+                id: 'second',
+                icon: '🥈',
+                title: 'Forever Bridesmaid',
+                player: silverMedalist.name,
+                value: `${silverMedalist.secondPlace} times`,
+                description: `${silverMedalist.name} has finished 2nd place ${silverMedalist.secondPlace} times. So close yet so far... every single time! 😭`
+            });
+        }
+        
+        // Bronze Collector (most 3rd places)
+        const bronzeCollector = playersWithRates.reduce((a, b) => a.thirdPlace > b.thirdPlace ? a : b);
+        if (bronzeCollector.thirdPlace > 0) {
+            records.push({
+                id: 'third',
+                icon: '🥉',
+                title: 'Bronze Enthusiast',
+                player: bronzeCollector.name,
+                value: `${bronzeCollector.thirdPlace} times`,
+                description: `${bronzeCollector.name} has collected ${bronzeCollector.thirdPlace} bronze medals. Consistency is key... to mediocrity! 🤷`
+            });
+        }
+        
+        res.json({ records });
+    } catch (err) {
+        console.error('Hall of Fame error:', err);
+        res.status(500).json({ error: 'Failed to get hall of fame' });
+    }
+});
+
+// Update player name API
+app.post('/api/player/update-name', async (req, res) => {
+    try {
+        const { userID, displayName } = req.body;
+        if (!userID || !displayName) {
+            return res.status(400).json({ error: 'userID and displayName required' });
+        }
+        
+        // Validate name length
+        const trimmedName = displayName.trim();
+        if (trimmedName.length < 1 || trimmedName.length > 20) {
+            return res.status(400).json({ error: 'Name must be 1-20 characters' });
+        }
+        
+        const player = await Player.findOneAndUpdate(
+            { userID },
+            { $set: { displayName: trimmedName } },
+            { new: true }
+        );
+        
+        if (!player) {
+            return res.status(404).json({ error: 'Player not found' });
+        }
+        
+        res.json({ success: true, displayName: player.displayName });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to update name' });
     }
 });
 
@@ -198,7 +367,7 @@ app.post('/api/admin/reset-player/:userID', async (req, res) => {
                 xp: 0, wins: 0, losses: 0, games: 0, pangkahs: 0, pangkahsReceived: 0,
                 bestStreak: 0, currentStreak: 0, handsAbsorbed: 0, handsGiven: 0,
                 cleanWins: 0, maxCardsHeld: 0, autoPlays: 0, cardsPlayed: 0,
-                secondPlace: 0, thirdPlace: 0, topTwo: 0, nightGames: 0,
+                secondPlace: 0, thirdPlace: 0, fourthToTenth: 0, topTwo: 0, nightGames: 0,
                 unlockedTitles: [], equippedTitle: null
             }},
             { new: true }
@@ -237,7 +406,7 @@ app.post('/api/admin/reset-all', async (req, res) => {
             xp: 0, wins: 0, losses: 0, games: 0, pangkahs: 0, pangkahsReceived: 0,
             bestStreak: 0, currentStreak: 0, handsAbsorbed: 0, handsGiven: 0,
             cleanWins: 0, maxCardsHeld: 0, autoPlays: 0, cardsPlayed: 0,
-            secondPlace: 0, thirdPlace: 0, topTwo: 0, nightGames: 0,
+            secondPlace: 0, thirdPlace: 0, fourthToTenth: 0, topTwo: 0, nightGames: 0,
             unlockedTitles: [], equippedTitle: null
         }});
         res.json({ success: true, message: 'All players reset' });
@@ -426,6 +595,7 @@ function autoPlayCard(roomID) {
         
         if (player.gameStats && isPangkah) {
             player.gameStats.pangkahsDealt++;
+            room.pangkahDealer = player.userID; // Track who dealt the pangkah
         }
         
         // Count active players
@@ -497,9 +667,10 @@ function processCardPlay(roomID, playerIdx, cardObject) {
     // Determine if Pangkah occurred
     let isPangkah = playedCard.suit !== room.currentSuit;
     
-    // Track pangkah stats
+    // Track pangkah stats and dealer
     if (isPangkah && player.gameStats) {
         player.gameStats.pangkahsDealt++;
+        room.pangkahDealer = player.userID; // Track who dealt the pangkah
     }
     
     // Count active players
@@ -647,6 +818,7 @@ function resolveRound(roomID, isPangkah) {
             msg: isPangkah ? 'Pangkah!' : 'Clean!', 
             winner: winner.name,
             winnerUserID: winner.userID,
+            pangkahDealerUserID: isPangkah ? room.pangkahDealer : null,
             turn: room.turn, 
             players: room.players,
             fateAces: room.fateAces
@@ -878,18 +1050,6 @@ io.on('connection', (socket) => {
             io.to(roomID).emit('updatePlayers', room.players);
         }
     });
-
-    socket.on('updateName', ({ roomID, userID, playerName }) => {
-        const room = rooms[roomID];
-        if (!room) return;
-        const player = room.players.find(p => p.userID === userID);
-        if (!player) return;
-        const name = (playerName || '').trim();
-        if (!name) return;
-        player.name = name;
-        io.to(roomID).emit('updatePlayers', room.players, { maxPlayers: room.maxPlayers });
-    });
-
 
     /**
      * START GAME - Core Logic

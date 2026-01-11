@@ -46,6 +46,11 @@ const playerSchema = new mongoose.Schema({
     topTwo: { type: Number, default: 0 },
     nightGames: { type: Number, default: 0 },
     
+    // Bot-related Stats (Shame Records)
+    pangkahsReceivedFromBot: { type: Number, default: 0 },  // Pangkahs received from bots
+    lossesToBot: { type: Number, default: 0 },              // Losses where bot was last opponent
+    handsAbsorbedFromBot: { type: Number, default: 0 },     // Hands absorbed from bots
+    
     // Titles
     unlockedTitles: { type: [String], default: [] },
     equippedTitle: { type: String, default: null },
@@ -125,7 +130,7 @@ app.get('/api/hall-of-fame', async (req, res) => {
     try {
         // Get all players with at least 1 game
         const players = await Player.find({ games: { $gt: 0 } })
-            .select('displayName xp wins losses games pangkahs pangkahsReceived bestStreak secondPlace thirdPlace fourthToTenth handsAbsorbed handsGiven cleanWins autoPlays maxCardsHeld');
+            .select('displayName xp wins losses games pangkahs pangkahsReceived bestStreak secondPlace thirdPlace fourthToTenth handsAbsorbed handsGiven cleanWins autoPlays maxCardsHeld pangkahsReceivedFromBot lossesToBot handsAbsorbedFromBot');
         
         if (players.length === 0) {
             return res.json({ records: [] });
@@ -151,6 +156,11 @@ app.get('/api/hall-of-fame', async (req, res) => {
                 cleanWins: p.cleanWins || 0,
                 autoPlays: p.autoPlays || 0,
                 maxCardsHeld: p.maxCardsHeld || 0,
+                // Bot shame stats
+                pangkahsReceivedFromBot: p.pangkahsReceivedFromBot || 0,
+                lossesToBot: p.lossesToBot || 0,
+                handsAbsorbedFromBot: p.handsAbsorbedFromBot || 0,
+                // Calculated rates
                 winRate: ((p.wins || 0) / games * 100).toFixed(1),
                 loseRate: ((p.losses || 0) / games * 100).toFixed(1),
                 pangkahPerGame: ((p.pangkahs || 0) / games).toFixed(2),
@@ -431,6 +441,48 @@ app.get('/api/hall-of-fame', async (req, res) => {
                     description: `${hopeless.name} has played ${hopeless.games} games but still has ${hopeless.winRate}% win rate. Definition of insanity: doing the same thing expecting different results! 🔄`
                 });
             }
+        }
+        
+        // 10. Bot's Favorite Punching Bag (most pangkahs received from bots)
+        const botPunchingBag = playersWithRates.reduce((a, b) => a.pangkahsReceivedFromBot > b.pangkahsReceivedFromBot ? a : b);
+        if (botPunchingBag.pangkahsReceivedFromBot > 0) {
+            records.push({
+                id: 'botpunchingbag',
+                category: 'shame',
+                icon: '🤖',
+                title: "Bot's Punching Bag",
+                player: botPunchingBag.name,
+                value: `${botPunchingBag.pangkahsReceivedFromBot} bot pangkahs`,
+                description: `${botPunchingBag.name} got pangkah'd by BOTS ${botPunchingBag.pangkahsReceivedFromBot} times! Even the AI is bullying them! 🤖💥 The bots have chosen their favorite victim! `
+            });
+        }
+        
+        // 11. Lost to Artificial Stupidity (most losses where bot was last opponent)
+        const lostToBot = playersWithRates.reduce((a, b) => a.lossesToBot > b.lossesToBot ? a : b);
+        if (lostToBot.lossesToBot > 0) {
+            records.push({
+                id: 'losttobot',
+                category: 'shame',
+                icon: '🤡',
+                title: 'Lost to AI',
+                player: lostToBot.name,
+                value: `${lostToBot.lossesToBot} bot losses`,
+                description: `${lostToBot.name} lost to BOTS ${lostToBot.lossesToBot} times! Can't even beat artificial "intelligence"! 🤖😂 Maybe try playing against a toaster next? `
+            });
+        }
+        
+        // 12. Begging Bots for Help (most hands absorbed from bots)
+        const beggedBot = playersWithRates.reduce((a, b) => a.handsAbsorbedFromBot > b.handsAbsorbedFromBot ? a : b);
+        if (beggedBot.handsAbsorbedFromBot > 0) {
+            records.push({
+                id: 'beggedbot',
+                category: 'shame',
+                icon: '🙏',
+                title: 'Begging Bots',
+                player: beggedBot.name,
+                value: `${beggedBot.handsAbsorbedFromBot} bot hands`,
+                description: `${beggedBot.name} absorbed ${beggedBot.handsAbsorbedFromBot} hands from BOTS! So desperate they're asking robots for help! 🙏🤖 "Please sir, can I have some cards?" `
+            });
         }
         
         // ============ PAGE 3: MISC RECORDS (9 records) ============
@@ -1365,6 +1417,12 @@ function processCardPlay(roomID, playerIdx, cardObject) {
             }
         });
         
+        // Track if BOT pangkah'd a HUMAN (for shame record)
+        const victim = room.players[victimIdx];
+        if (player.isBot && victim && !victim.isBot && victim.gameStats) {
+            victim.gameStats.pangkahsReceivedFromBot = (victim.gameStats.pangkahsReceivedFromBot || 0) + 1;
+        }
+        
         // AI BRAIN: Record this pangkah event (permanent memory)
         PangkahAI.recordPangkah(room, playerIdx, victimIdx, room.currentSuit);
     }
@@ -1486,10 +1544,22 @@ function resolveRound(roomID, isPangkah) {
         // Game over - the last survivor is the LOSER
         clearTurnTimer(roomID);
         
-        if (survivors[0]) {
+        const loser = survivors[0];
+        
+        if (loser) {
             // Last player with cards = LAST PLACE (loser)
-            room.finishOrder.push(survivors[0].userID);
-            survivors[0].gameStats.finishPosition = room.players.length; // Last position
+            room.finishOrder.push(loser.userID);
+            loser.gameStats.finishPosition = room.players.length; // Last position
+            
+            // Track if loser is human and second-to-last was a bot (Lost to Bot shame)
+            if (!loser.isBot && room.finishOrder.length >= 2) {
+                const secondLastUserID = room.finishOrder[room.finishOrder.length - 2];
+                const secondLastPlayer = room.players.find(p => p.userID === secondLastUserID);
+                if (secondLastPlayer && secondLastPlayer.isBot) {
+                    loser.gameStats.lossesToBot = (loser.gameStats.lossesToBot || 0) + 1;
+                    console.log(`${loser.name} LOST TO BOT ${secondLastPlayer.name}!`);
+                }
+            }
         }
         
         const performanceData = room.players.map(p => ({
@@ -1501,8 +1571,8 @@ function resolveRound(roomID, isPangkah) {
         }));
         
         io.to(roomID).emit('gameOver', { 
-            loser: survivors[0]?.name || 'None',
-            loserUserID: survivors[0]?.userID || null,
+            loser: loser?.name || 'None',
+            loserUserID: loser?.userID || null,
             finishOrder: room.finishOrder,
             gameNumber: room.gameNumber,
             performanceData
@@ -1989,6 +2059,12 @@ io.on('connection', (socket) => {
                 const bot = currentRoom.players[targetIdx];
                 
                 if (!requester || !bot || bot.hand.length === 0) return;
+                
+                // Track human absorbing bot's hand (shame stat)
+                if (!requester.isBot && requester.gameStats) {
+                    requester.gameStats.handsAbsorbedFromBot = (requester.gameStats.handsAbsorbedFromBot || 0) + 1;
+                    console.log(`${requester.name} absorbed BOT ${bot.name}'s hand!`);
+                }
                 
                 requester.hand.push(...bot.hand);
                 bot.hand = [];

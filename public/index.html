@@ -27,7 +27,7 @@
         .header-title { font-size: 10px; opacity: 0.8; }
         .header-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--glass-light); border: 1px solid var(--border); color: #fff; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
         .header-btn:hover { background: var(--ui-blue); border-color: var(--ui-blue); transform: scale(1.1); }
-        .header-btn.profile-btn { width: auto; padding: 0 12px; border-radius: 12px; font-size: 11px; font-weight: 900; letter-spacing: 0.6px; }
+        .header-btn.profile-btn { border-radius: 50%; }
 
         /* Mobile header menu */
         .header-btn.hamburger-btn { display: none; width: 34px; height: 34px; border-radius: 12px; font-size: 18px; line-height: 1; }
@@ -247,7 +247,7 @@
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div id="connection-status">🟢 Connected</div>
 <div id="achievement-popup"></div>
-<div id="streak-indicator"><span>🔥</span><span id="streak-count">0</span><div style="font-size:9px;opacity:0.6">WIN STREAK</div></div>
+<div id="streak-indicator"><img src="/icon/streak.svg" alt="Streak" style="width:20px;height:20px"><span id="streak-count">0</span><div style="font-size:9px;opacity:0.6">WIN STREAK</div></div>
 
 <!-- Screen Edge Glow for Your Turn -->
 <div id="turn-glow"></div>
@@ -257,7 +257,7 @@
         <h3 style="color:var(--ui-blue);margin-top:0">CULTIVATION PROFILE</h3>
         <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:15px">
             <span id="prof-name" style="font-size:18px;font-weight:800;color:#fff"></span>
-            <button onclick="editNamePrompt()" style="background:var(--glass-light);border:1px solid var(--border);color:#fff;padding:4px 10px;border-radius:8px;font-size:10px;cursor:pointer;font-weight:700">✏️ EDIT</button>
+            <button onclick="editNamePrompt()" style="background:var(--glass-light);border:1px solid var(--border);color:#fff;padding:4px 10px;border-radius:8px;font-size:10px;cursor:pointer;font-weight:700;display:flex;align-items:center;gap:4px"><img src="/icon/edit.svg" alt="" style="width:14px;height:14px"> EDIT</button>
         </div>
         <div id="prof-equipped-title" style="margin-bottom:15px"></div>
         <div id="prof-level" style="font-size:28px;font-weight:800">LEVEL 1</div>
@@ -272,7 +272,7 @@
             <div class="stat-box"><div class="stat-value" id="prof-streak">0</div><div class="stat-label">Best Streak</div></div>
             <div class="stat-box"><div class="stat-value" id="prof-winrate">0%</div><div class="stat-label">Win Rate</div></div>
         </div>
-        <button class="btn btn-gold" onclick="openTitles()" style="margin-bottom:10px">🏆 VIEW TITLES</button>
+        <button class="btn btn-gold" onclick="openTitles()" style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:6px"><img src="/icon/halloffame.svg" alt="" style="width:18px;height:18px"> VIEW TITLES</button>
         <button id="gm-logout-btn" class="btn" onclick="gmLogout()" style="margin-bottom:10px;background:linear-gradient(90deg,#ff6b6b,#ffd700);color:#000;display:none">⚜️ EXIT GM MODE</button>
         <button class="btn btn-p" onclick="closeProfile()">RETURN</button>
     </div>
@@ -280,14 +280,14 @@
 
 <div class="modal-overlay" id="titles-modal">
     <div class="titles-card">
-        <h3 style="color:var(--purple);margin-top:0">🏆 ACHIEVEMENT TITLES</h3>
+        <h3 style="color:var(--purple);margin-top:0;display:flex;align-items:center;justify-content:center;gap:8px"><img src="/icon/halloffame.svg" alt="" style="width:24px;height:24px"> ACHIEVEMENT TITLES</h3>
         <p style="font-size:11px;opacity:0.6;margin-bottom:15px">Unlock titles and equip one to display!</p>
         <div class="filter-tabs" id="title-filters"></div>
         <div class="title-grid" id="title-grid"></div>
         <div id="title-pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:15px">
-            <button class="btn" onclick="titleNav(-1)" style="padding:8px 16px;background:rgba(255,255,255,0.1);color:#fff;font-size:11px">◀</button>
+            <button class="btn" onclick="titleNav(-1)" style="padding:8px 16px;background:rgba(255,255,255,0.1);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center"><img src="/icon/chevron-left.svg" alt="Prev" style="width:16px;height:16px;filter:brightness(0) invert(1)"></button>
             <span id="title-page-indicator" style="font-size:12px;color:rgba(255,255,255,0.7);min-width:50px;text-align:center">1 / 1</span>
-            <button class="btn" onclick="titleNav(1)" style="padding:8px 16px;background:rgba(255,255,255,0.1);color:#fff;font-size:11px">▶</button>
+            <button class="btn" onclick="titleNav(1)" style="padding:8px 16px;background:rgba(255,255,255,0.1);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center"><img src="/icon/chevron-right.svg" alt="Next" style="width:16px;height:16px;filter:brightness(0) invert(1)"></button>
         </div>
         <button class="btn btn-s" onclick="closeTitles()" style="margin-top:15px">BACK</button>
     </div>
@@ -323,16 +323,9 @@
             <img src="/PM-logo.png" alt="Pangkah Murim" class="header-logo">
         </div>
         <div class="lobby-header-right">
-            <div class="header-player-box">
-                <img id="lobby-badge" src="/badge/apprentice-badge.png" alt="badge" class="header-badge">
-                <div class="header-player-info">
-                    <span id="display-name" class="header-name"></span>
-                    <span id="header-title" class="header-title"></span>
-                </div>
-            </div>
-            <button class="header-btn profile-btn" onclick="openProfile()" title="Profile">PROFILE</button>
-            <button class="header-btn leaderboard-btn" onclick="openLeaderboard()" title="Leaderboard">🏆</button>
-            <button class="header-btn hamburger-btn" id="hamburger-btn" onclick="toggleHeaderMenu()" aria-label="Menu" title="Menu">☰</button>
+            <button class="header-btn profile-btn" onclick="openProfile()" title="Profile"><img src="/icon/profile.svg" alt="Profile" style="width:18px;height:18px;filter:brightness(0) invert(1)"></button>
+            <button class="header-btn leaderboard-btn" onclick="openLeaderboard()" title="Leaderboard"><img src="/icon/leaderboard.svg" alt="Leaderboard" style="width:18px;height:18px"></button>
+            <button class="header-btn hamburger-btn" id="hamburger-btn" onclick="toggleHeaderMenu()" aria-label="Menu" title="Menu"><img src="/icon/hambuger.svg" alt="Menu" style="width:18px;height:18px"></button>
         </div>
     </div>
 
@@ -347,8 +340,8 @@
                 </div>
             </div>
         </div>
-        <button class="header-menu-item" onclick="openProfile(); closeHeaderMenu();">Profile</button>
-        <button class="header-menu-item" onclick="openLeaderboard(); closeHeaderMenu();">Leaderboard</button>
+        <button class="header-menu-item" onclick="openProfile(); closeHeaderMenu();"><img src="/icon/profile.svg" alt="" style="width:16px;height:16px;filter:brightness(0) invert(1);vertical-align:middle;margin-right:8px">Profile</button>
+        <button class="header-menu-item" onclick="openLeaderboard(); closeHeaderMenu();"><img src="/icon/leaderboard.svg" alt="" style="width:16px;height:16px;vertical-align:middle;margin-right:8px">Leaderboard</button>
     </div>
     
     <!-- Body - Centered Panel -->
@@ -367,7 +360,7 @@
             <button class="btn btn-p" onclick="enter('create')">CREATE SECT</button>
             <button class="btn btn-s" onclick="enter('join')" style="margin-top:8px">JOIN SECT</button>
             <div onclick="openHowToPlay()" style="margin-top:20px;color:var(--ui-blue);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;opacity:0.8;transition:opacity 0.2s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
-                <span style="font-size:16px">📖</span> How to Play Pangkah
+                <img src="/icon/howtoplay.svg" alt="" style="width:18px;height:18px"> How to Play Pangkah
             </div>
         </div>
     </div>
@@ -376,15 +369,15 @@
 <!-- Leaderboard Modal -->
 <div class="modal-overlay" id="leaderboard-modal" style="display:none">
     <div class="leaderboard-card">
-        <h3 style="color:var(--gold);margin-top:0">🏆 HALL OF FAME</h3>
+        <h3 style="color:var(--gold);margin-top:0;display:flex;align-items:center;justify-content:center;gap:8px"><img src="/icon/halloffame.svg" alt="" style="width:24px;height:24px"> HALL OF FAME</h3>
         
         <!-- Hall of Fame Records -->
         <div class="hof-container" id="hof-container">
             <div class="hof-grid" id="hof-grid"></div>
             <div id="hof-pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;margin:15px 0">
-                <button class="btn" onclick="hofNav(-1)" style="width:44px;padding:8px 0;background:rgba(255,255,255,0.1);color:#fff;font-size:11px">◀</button>
+                <button class="btn" onclick="hofNav(-1)" style="width:44px;padding:8px 0;background:rgba(255,255,255,0.1);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center"><img src="/icon/chevron-left.svg" alt="Prev" style="width:16px;height:16px;filter:brightness(0) invert(1)"></button>
                 <span id="hof-page-indicator" style="font-size:12px;color:rgba(255,255,255,0.7);white-space:nowrap">1 / 1</span>
-                <button class="btn" onclick="hofNav(1)" style="width:44px;padding:8px 0;background:rgba(255,255,255,0.1);color:#fff;font-size:11px">▶</button>
+                <button class="btn" onclick="hofNav(1)" style="width:44px;padding:8px 0;background:rgba(255,255,255,0.1);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center"><img src="/icon/chevron-right.svg" alt="Next" style="width:16px;height:16px;filter:brightness(0) invert(1)"></button>
             </div>
             <button class="hof-btn" id="hof-toggle-btn" onclick="toggleFullTable()">📊 SHOW FULL TABLE</button>
         </div>
@@ -424,9 +417,9 @@
                 </table>
             </div>
             <div id="lb-pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:15px">
-                <button class="btn" onclick="lbNav(-1)" style="width:44px;padding:8px 0;background:rgba(255,255,255,0.1);color:#fff;font-size:11px">◀</button>
+                <button class="btn" onclick="lbNav(-1)" style="width:44px;padding:8px 0;background:rgba(255,255,255,0.1);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center"><img src="/icon/chevron-left.svg" alt="Prev" style="width:16px;height:16px;filter:brightness(0) invert(1)"></button>
                 <span id="lb-page-indicator" style="font-size:12px;color:rgba(255,255,255,0.7);white-space:nowrap;flex:0 0 auto;text-align:center">1 / 1</span>
-                <button class="btn" onclick="lbNav(1)" style="width:44px;padding:8px 0;background:rgba(255,255,255,0.1);color:#fff;font-size:11px">▶</button>
+                <button class="btn" onclick="lbNav(1)" style="width:44px;padding:8px 0;background:rgba(255,255,255,0.1);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center"><img src="/icon/chevron-right.svg" alt="Next" style="width:16px;height:16px;filter:brightness(0) invert(1)"></button>
             </div>
             <button class="hof-btn" onclick="toggleFullTable()" style="margin-top:15px">🏅 BACK TO HALL OF FAME</button>
         </div>
@@ -439,16 +432,16 @@
 <div class="modal-overlay" id="howtoplay-modal" style="display:none">
     <div class="howtoplay-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
-            <h3 style="color:var(--gold);margin:0;font-size:1.2rem">📖 HOW TO PLAY</h3>
+            <h3 style="color:var(--gold);margin:0;font-size:1.2rem;display:flex;align-items:center;gap:8px"><img src="/icon/howtoplay.svg" alt="" style="width:22px;height:22px"> HOW TO PLAY</h3>
             <span id="guide-page-indicator" style="font-size:11px;color:rgba(255,255,255,0.6)">1 / 5</span>
         </div>
         
         <div id="guide-content" style="min-height:280px"></div>
         
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:15px;gap:10px">
-            <button class="btn" id="guide-prev-btn" onclick="guideNav(-1)" style="flex:1;background:rgba(255,255,255,0.1);color:#fff;padding:10px">◀ PREV</button>
+            <button class="btn" id="guide-prev-btn" onclick="guideNav(-1)" style="flex:1;background:rgba(255,255,255,0.1);color:#fff;padding:10px;display:flex;align-items:center;justify-content:center;gap:4px"><img src="/icon/chevron-left.svg" alt="" style="width:14px;height:14px;filter:brightness(0) invert(1)"> PREV</button>
             <button class="btn btn-gold" onclick="closeHowToPlay()" style="flex:1;padding:10px;font-size:11px">SKIP</button>
-            <button class="btn btn-p" id="guide-next-btn" onclick="guideNav(1)" style="flex:1;padding:10px">NEXT ▶</button>
+            <button class="btn btn-p" id="guide-next-btn" onclick="guideNav(1)" style="flex:1;padding:10px;display:flex;align-items:center;justify-content:center;gap:4px">NEXT <img src="/icon/chevron-right.svg" alt="" style="width:14px;height:14px;filter:brightness(0) invert(1)"></button>
         </div>
     </div>
 </div>
@@ -476,7 +469,7 @@
 <div id="hand-area">
     <div class="hand-header">
         <div id="turn-indicator-inline">⚡ YOUR TURN <span id="turn-timer"></span></div>
-        <button class="btn" style="width:auto;padding:6px 18px;font-size:11px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid var(--border-light);border-radius:12px" onclick="sortHand()">SORT ⇅</button>
+        <button class="btn" style="width:auto;padding:6px 18px;font-size:11px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid var(--border-light);border-radius:12px;display:flex;align-items:center;gap:4px" onclick="sortHand()">SORT <img src="/icon/sort.svg" alt="" style="width:14px;height:14px;filter:brightness(0) invert(1)"></button>
         <div id="emote-bar">
             <button class="emote-btn" onclick="sendEmote('😂')">😂</button>
             <button class="emote-btn" onclick="sendEmote('👍')">👍</button>
@@ -1033,7 +1026,7 @@ async function syncStatsToServer(){
     } catch(e) { console.log('Sync failed:', e); }
 }
 function addXP(amt,reason,popup=true){const old=getLevel();stats.xp=Math.max(0,(stats.xp||0)+amt);saveStats();if(getLevel()>old)showToast(`⚡ LEVEL UP! Lv.${getLevel()}`,true);if(popup&&amt){const p=document.createElement('div');p.className='xp-popup';p.style.color=amt>0?'var(--primary-action)':'var(--danger)';p.innerText=`${amt>0?'+':''}${amt} XP`;document.body.appendChild(p);setTimeout(()=>p.remove(),1500);}updateStatsUI();checkAllTitles();}
-function updateStatsUI(){const lv=getLevel(),lvDisplay=getLevelDisplay(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();document.getElementById('display-name').innerText=myName;document.getElementById('lobby-badge').src=getBadgeImage(lv,isGameMaster);document.getElementById('header-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:9px;padding:1px 5px">${eq.icon} ${eq.name}</span>`:'';const mn=document.getElementById('menu-name');if(mn)mn.innerText=myName;const mb=document.getElementById('menu-badge');if(mb)mb.src=getBadgeImage(lv,isGameMaster);const mtitle=document.getElementById('menu-title');if(mtitle)mtitle.innerHTML=document.getElementById('header-title').innerHTML||'<span style="opacity:0.6">No title equipped</span>';document.getElementById('prof-name').innerText=myName;document.getElementById('prof-level').innerText=isGameMaster?'∞':`LEVEL ${lvDisplay}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=isGameMaster?'∞ XP':`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=isGameMaster?'100%':(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;document.getElementById('gm-logout-btn').style.display=isGameMaster?'block':'none';}
+function updateStatsUI(){const lv=getLevel(),lvDisplay=getLevelDisplay(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();const mn=document.getElementById('menu-name');if(mn)mn.innerText=myName;const mb=document.getElementById('menu-badge');if(mb)mb.src=getBadgeImage(lv,isGameMaster);const mtitle=document.getElementById('menu-title');if(mtitle)mtitle.innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:9px;padding:1px 5px">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.6">No title equipped</span>';document.getElementById('prof-name').innerText=myName;document.getElementById('prof-level').innerText=isGameMaster?'∞':`LEVEL ${lvDisplay}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=isGameMaster?'∞ XP':`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=isGameMaster?'100%':(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;document.getElementById('gm-logout-btn').style.display=isGameMaster?'block':'none';}
 function editName(){const n=prompt("Enter Name:",myName);if(n?.trim()&&n.trim().length<=20){myName=n.trim();localStorage.setItem('pName',myName);updateStatsUI();}}
 async function editNamePrompt(){
     const n=prompt("Enter new name (max 20 characters):",myName);

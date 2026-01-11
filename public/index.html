@@ -379,6 +379,11 @@
         <!-- Hall of Fame Records -->
         <div class="hof-container" id="hof-container">
             <div class="hof-grid" id="hof-grid"></div>
+            <div id="hof-pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;margin:15px 0">
+                <button class="btn" onclick="hofNav(-1)" style="width:44px;padding:8px 0;background:rgba(255,255,255,0.1);color:#fff;font-size:11px">◀</button>
+                <span id="hof-page-indicator" style="font-size:12px;color:rgba(255,255,255,0.7);white-space:nowrap">1 / 1</span>
+                <button class="btn" onclick="hofNav(1)" style="width:44px;padding:8px 0;background:rgba(255,255,255,0.1);color:#fff;font-size:11px">▶</button>
+            </div>
             <button class="hof-btn" id="hof-toggle-btn" onclick="toggleFullTable()">📊 SHOW FULL TABLE</button>
         </div>
         
@@ -595,7 +600,7 @@ const socket=io(),icons={Spades:'♠',Hearts:'♥',Diamonds:'♦',Clubs:'♣'},X
 
 // ============ VERSION RESET SYSTEM ============
 // Change this number to force all players to reset their stats
-const STATS_VERSION = 5;
+const STATS_VERSION = 3;
 // =============================================
 
 let userID=localStorage.getItem('pUserID')||'uid_'+Math.random().toString(36).substr(2,9);localStorage.setItem('pUserID',userID);
@@ -854,12 +859,15 @@ let lbPage=0;
 const LB_PER_PAGE=10;
 let showingFullTable=false;
 let hofData=[];
+let hofPage=0;
+const HOF_PER_PAGE=6;
 
 async function loadHallOfFame(){
     try{
         const res=await fetch('/api/hall-of-fame');
         if(res.ok){
             hofData=await res.json();
+            hofPage=0;
             renderHallOfFame();
         }
     }catch(e){console.log('Failed to load hall of fame');}
@@ -869,9 +877,15 @@ function renderHallOfFame(){
     const grid=document.getElementById('hof-grid');
     if(!hofData.records||hofData.records.length===0){
         grid.innerHTML='<div style="padding:20px;opacity:0.5;grid-column:1/-1">No records yet. Play some games!</div>';
+        document.getElementById('hof-pagination').style.display='none';
         return;
     }
-    grid.innerHTML=hofData.records.map(r=>`
+    
+    const totalPages=Math.ceil(hofData.records.length/HOF_PER_PAGE)||1;
+    const start=hofPage*HOF_PER_PAGE;
+    const pageRecords=hofData.records.slice(start,start+HOF_PER_PAGE);
+    
+    grid.innerHTML=pageRecords.map(r=>`
         <div class="hof-card">
             <div class="hof-card-header">
                 <span class="hof-icon">${r.icon}</span>
@@ -884,6 +898,16 @@ function renderHallOfFame(){
             <div class="hof-desc">${r.description}</div>
         </div>
     `).join('');
+    
+    document.getElementById('hof-pagination').style.display=totalPages>1?'flex':'none';
+    document.getElementById('hof-page-indicator').innerText=`${hofPage+1} / ${totalPages}`;
+}
+
+function hofNav(dir){
+    if(!hofData.records)return;
+    const totalPages=Math.ceil(hofData.records.length/HOF_PER_PAGE)||1;
+    hofPage=Math.max(0,Math.min(totalPages-1,hofPage+dir));
+    renderHallOfFame();
 }
 
 function toggleFullTable(){
@@ -955,6 +979,7 @@ function lbNav(dir){
 function openLeaderboard(){
     document.getElementById('leaderboard-modal').style.display='flex';
     showingFullTable=false;
+    hofPage=0;
     document.getElementById('hof-container').style.display='block';
     document.getElementById('full-table-section').style.display='none';
     loadHallOfFame();

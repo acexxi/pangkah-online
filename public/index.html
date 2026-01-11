@@ -450,6 +450,17 @@
     <div class="leaderboard-card" style="max-width:500px">
         <h3 style="color:var(--accent-red);margin-top:0;display:flex;align-items:center;justify-content:center;gap:8px">⚙️ GM ADMIN PANEL</h3>
         
+        <!-- Active Rooms Section -->
+        <div style="margin-bottom:15px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <label style="font-size:11px;color:var(--text-secondary)">ACTIVE ROOMS</label>
+                <button onclick="gmRefreshRooms()" style="background:none;border:none;color:var(--accent-blue);cursor:pointer;font-size:11px">🔄 Refresh</button>
+            </div>
+            <div id="gm-rooms-list" style="background:rgba(0,0,0,0.3);border-radius:8px;max-height:120px;overflow-y:auto">
+                <div style="padding:15px;text-align:center;color:var(--text-tertiary);font-size:11px">Loading...</div>
+            </div>
+        </div>
+        
         <div style="margin-bottom:15px">
             <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:5px">SEARCH PLAYER</label>
             <div style="display:flex;gap:8px">
@@ -1155,11 +1166,57 @@ function openGMAdmin(){
     document.getElementById('gm-player-result').style.display='none';
     document.getElementById('gm-no-result').style.display='none';
     document.getElementById('gm-search-input').value='';
+    gmRefreshRooms();
 }
 
 function closeGMAdmin(){
     document.getElementById('gm-admin-modal').style.display='none';
     gmCurrentPlayer=null;
+}
+
+async function gmRefreshRooms(){
+    try{
+        const res=await fetch('/api/gm/rooms');
+        const data=await res.json();
+        const container=document.getElementById('gm-rooms-list');
+        if(data.rooms&&data.rooms.length>0){
+            container.innerHTML=data.rooms.map(r=>`
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border-subtle)">
+                    <div>
+                        <span style="font-weight:600;color:#fff">#${r.id}</span>
+                        <span style="font-size:10px;color:var(--text-tertiary);margin-left:8px">${r.playerCount}/${r.maxPlayers} players</span>
+                        <span style="font-size:9px;padding:2px 6px;border-radius:4px;margin-left:6px;background:${r.inGame?'var(--accent-red)':'var(--accent-green)'};color:#fff">${r.inGame?'IN GAME':'LOBBY'}</span>
+                    </div>
+                    <button onclick="gmForceCloseRoom('${r.id}')" style="background:var(--accent-red);border:none;color:#fff;width:28px;height:28px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center" title="Force Close">✕</button>
+                </div>
+            `).join('');
+        }else{
+            container.innerHTML='<div style="padding:15px;text-align:center;color:var(--text-tertiary);font-size:11px">No active rooms</div>';
+        }
+    }catch(e){
+        console.error('Failed to fetch rooms:',e);
+        document.getElementById('gm-rooms-list').innerHTML='<div style="padding:15px;text-align:center;color:var(--accent-red);font-size:11px">Failed to load rooms</div>';
+    }
+}
+
+async function gmForceCloseRoom(roomID){
+    if(!confirm(`Force close room #${roomID}?\n\nAll players will be kicked.`))return;
+    try{
+        const res=await fetch('/api/gm/force-close-room',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({roomID})
+        });
+        const data=await res.json();
+        if(data.success){
+            showToast(`Room #${roomID} closed`,true);
+            gmRefreshRooms();
+        }else{
+            showToast(data.error||'Failed to close room');
+        }
+    }catch(e){
+        showToast('Failed to close room');
+    }
 }
 
 async function gmSearchPlayer(){

@@ -790,7 +790,7 @@ function createBot(existingNames = []) {
 /**
  * Bot plays a card (AI logic with memory)
  */
-function botPlayCard(roomID) {
+function botPlayCard(roomID, isLeadingNewRound = false) {
     const room = rooms[roomID];
     if (!room || room.resolving) return;
     
@@ -798,8 +798,10 @@ function botPlayCard(roomID) {
     const player = room.players[botIdx];
     if (!player || !player.isBot || player.hand.length === 0) return;
     
-    // Random delay to feel more human (1-2.5 seconds)
-    const delay = 1000 + Math.random() * 1500;
+    // BUG FIX 2: If bot is leading a new round, wait longer (use 8 second delay)
+    // This prevents the glitch where card isn't visible
+    // Normal play: 1-2.5 seconds, Leading new round: 7-8 seconds
+    const delay = isLeadingNewRound ? (7000 + Math.random() * 1000) : (1000 + Math.random() * 1500);
     
     setTimeout(() => {
         if (!rooms[roomID] || rooms[roomID].resolving) return;
@@ -812,6 +814,15 @@ function botPlayCard(roomID) {
         // Tracks which suits each player DOESN'T have (from pangkah observations)
         if (!room.pangkahMemory) {
             room.pangkahMemory = {};
+        }
+        
+        // BUG FIX 3: Track suits that caused this bot to receive pangkah
+        // So bot doesn't keep playing the same suit
+        if (!room.botDangerousSuits) {
+            room.botDangerousSuits = {};
+        }
+        if (!room.botDangerousSuits[botIdx]) {
+            room.botDangerousSuits[botIdx] = [];
         }
         
         // Helper: Count cards per suit in hand
@@ -828,17 +839,31 @@ function botPlayCard(roomID) {
             return [...new Set(hand.map(c => c.suit))];
         };
         
-        // Helper: Get suit with fewest cards (to clear it)
-        const getRarestSuit = () => {
+        // Helper: Get suit with fewest cards (to clear it), avoiding dangerous suits
+        const getRarestSafeSuit = () => {
             const counts = getSuitCounts();
+            const dangerousSuits = room.botDangerousSuits[botIdx] || [];
             let rarest = null;
             let minCount = Infinity;
+            
+            // First try to find a safe suit
             for (const suit in counts) {
-                if (counts[suit] < minCount) {
+                if (!dangerousSuits.includes(suit) && counts[suit] < minCount) {
                     minCount = counts[suit];
                     rarest = suit;
                 }
             }
+            
+            // If all suits are dangerous, just pick the rarest anyway
+            if (!rarest) {
+                for (const suit in counts) {
+                    if (counts[suit] < minCount) {
+                        minCount = counts[suit];
+                        rarest = suit;
+                    }
+                }
+            }
+            
             return rarest;
         };
         
@@ -853,13 +878,16 @@ function botPlayCard(roomID) {
             return playersWithout;
         };
         
-        // Helper: Find a suit I can use to bait others
+        // Helper: Find a suit I can use to bait others (avoiding dangerous suits)
         const findBaitSuit = () => {
             const mySuits = getMySuits();
+            const dangerousSuits = room.botDangerousSuits[botIdx] || [];
+            
             for (const suit of mySuits) {
+                // Skip suits that got me pangkah'd
+                if (dangerousSuits.includes(suit)) continue;
+                
                 const playersWithout = getPlayersWithoutSuit(suit);
-                // Check if there's a player BETWEEN me and the one without the suit
-                // who might get baited
                 if (playersWithout.length > 0) {
                     return { suit, targets: playersWithout };
                 }
@@ -903,6 +931,7 @@ function botPlayCard(roomID) {
         if (!cardToPlay) {
             const suitCounts = getSuitCounts();
             const mySuits = getMySuits();
+            const dangerousSuits = room.botDangerousSuits[botIdx] || [];
             
             // STRATEGY 1: BAIT TRICK (60% chance to try)
             // If I know someone doesn't have a suit, lead LOW card of that suit
@@ -916,10 +945,10 @@ function botPlayCard(roomID) {
                 }
             }
             
-            // STRATEGY 2: AVOID REVENGE
-            // Don't lead with a suit that was just used to pangkah me
+            // STRATEGY 2: AVOID DANGEROUS SUITS (Bug Fix 3)
+            // Don't lead with suits that caused me to receive pangkah
             if (!cardToPlay) {
-                const safeSuits = mySuits.filter(s => !wasPangkahedWith(s));
+                const safeSuits = mySuits.filter(s => !dangerousSuits.includes(s) && !wasPangkahedWith(s));
                 if (safeSuits.length > 0) {
                     // Among safe suits, pick the rarest to clear it
                     let rarestSafe = safeSuits[0];
@@ -935,9 +964,9 @@ function botPlayCard(roomID) {
                 }
             }
             
-            // STRATEGY 3: CLEAR RAREST SUIT (fallback)
+            // STRATEGY 3: CLEAR RAREST SAFE SUIT (fallback)
             if (!cardToPlay) {
-                const rarestSuit = getRarestSuit();
+                const rarestSuit = getRarestSafeSuit();
                 const rarestCards = hand.filter(c => c.suit === rarestSuit);
                 cardToPlay = rarestCards.reduce((min, c) => c.val < min.val ? c : min);
             }
@@ -962,13 +991,13 @@ function botPlayCard(roomID) {
 /**
  * Check if current player is bot and trigger bot play
  */
-function checkBotTurn(roomID) {
+function checkBotTurn(roomID, isLeadingNewRound = false) {
     const room = rooms[roomID];
     if (!room || !room.gameStarted || room.resolving) return;
     
     const currentPlayer = room.players[room.turn];
     if (currentPlayer && currentPlayer.isBot && currentPlayer.hand.length > 0) {
-        botPlayCard(roomID);
+        botPlayCard(roomID, isLeadingNewRound);
     }
 }
 
@@ -1308,6 +1337,17 @@ function resolveRound(roomID, isPangkah) {
                 winner.gameStats.hadMostCards = true;
             }
         }
+        
+        // BUG FIX 3: If winner is a bot, remember this suit as dangerous
+        // So bot doesn't keep playing the same suit and receiving pangkah
+        if (winner.isBot) {
+            if (!room.botDangerousSuits) room.botDangerousSuits = {};
+            if (!room.botDangerousSuits[winnerIdx]) room.botDangerousSuits[winnerIdx] = [];
+            if (!room.botDangerousSuits[winnerIdx].includes(room.currentSuit)) {
+                room.botDangerousSuits[winnerIdx].push(room.currentSuit);
+                console.log(`Bot ${winner.name} learned: ${room.currentSuit} is dangerous (received pangkah)`);
+            }
+        }
     } else {
         room.discarded.push(...room.table.map(t => t.card));
         if (winner.gameStats) {
@@ -1396,11 +1436,11 @@ function resolveRound(roomID, isPangkah) {
             fateAces: room.fateAces
         });
         
-        // Check if next player (winner) is a bot
+        // Check if next player (winner) is a bot - they are LEADING a new round
         const nextPlayer = room.players[room.turn];
         setTimeout(() => {
             if (nextPlayer && nextPlayer.isBot) {
-                checkBotTurn(roomID);
+                checkBotTurn(roomID, true); // true = leading new round, use longer delay
             } else {
                 startTurnTimer(roomID);
             }
@@ -1675,12 +1715,17 @@ io.on('connection', (socket) => {
         room.pangkahMemory = {};
         room.lastPangkahSuit = null;
         room.lastPangkahVictim = null;
+        room.botDangerousSuits = {}; // Reset dangerous suits memory
         
         // Reset rematch flags
         room.players.forEach(p => {
             p.rematchReady = false;
             initPlayerGameStats(p);
         });
+        
+        // BALANCE: Shuffle player positions (including bots) for fairness
+        shuffle(room.players);
+        console.log(`Shuffled player order: ${room.players.map(p => p.name).join(' → ')}`);
         
         let deck = generateDeck();
         room.discarded = [];
@@ -1723,11 +1768,11 @@ io.on('connection', (socket) => {
             gameNumber: room.gameNumber
         });
         
-        // Check if first player is a bot
+        // Check if first player is a bot - they are LEADING first round
         const firstPlayer = room.players[room.turn];
         setTimeout(() => {
             if (firstPlayer && firstPlayer.isBot) {
-                checkBotTurn(roomID);
+                checkBotTurn(roomID, true); // true = leading new round, use longer delay
             } else {
                 startTurnTimer(roomID);
             }
@@ -1813,6 +1858,90 @@ io.on('connection', (socket) => {
         
         if (attempts >= room.players.length) {
             return socket.emit('errorMsg', 'No valid target for hand absorption');
+        }
+        
+        const targetPlayer = room.players[targetIdx];
+        
+        // If target is a bot, auto-accept after 5 seconds
+        if (targetPlayer.isBot) {
+            console.log(`${room.players[myIdx].name} requests to absorb ${targetPlayer.name}'s hand (Bot will auto-accept)`);
+            
+            // Notify all players that bot received request
+            io.to(roomID).emit('botSwapPending', {
+                fromName: room.players[myIdx].name,
+                botName: targetPlayer.name,
+                countdown: 5
+            });
+            
+            // Bot auto-accepts after 5 seconds
+            setTimeout(() => {
+                if (!rooms[roomID]) return;
+                const currentRoom = rooms[roomID];
+                const requester = currentRoom.players.find(p => p.userID === fromUserID);
+                const bot = currentRoom.players[targetIdx];
+                
+                if (!requester || !bot || bot.hand.length === 0) return;
+                
+                requester.hand.push(...bot.hand);
+                bot.hand = [];
+                
+                // Track finish order for bot
+                if (currentRoom.finishOrder && !currentRoom.finishOrder.includes(bot.userID)) {
+                    currentRoom.finishOrder.push(bot.userID);
+                    if (bot.gameStats) {
+                        bot.gameStats.finishPosition = currentRoom.finishOrder.length;
+                    }
+                }
+                
+                io.to(roomID).emit('swapOccurred', { 
+                    msg: `${requester.name} absorbed ${bot.name}'s hand!`,
+                    requesterUserID: requester.userID,
+                    accepterUserID: bot.userID,
+                    requesterName: requester.name,
+                    accepterName: bot.name,
+                    players: currentRoom.players,
+                    turn: currentRoom.turn,
+                    table: currentRoom.table,
+                    finishOrder: currentRoom.finishOrder
+                });
+                
+                // Check if game should end
+                let survivors = currentRoom.players.filter(p => p.hand.length > 0);
+                if (survivors.length <= 1 && currentRoom.gameStarted) {
+                    clearTurnTimer(roomID);
+                    
+                    if (survivors[0]) {
+                        currentRoom.finishOrder.push(survivors[0].userID);
+                        survivors[0].gameStats.finishPosition = currentRoom.players.length;
+                    }
+                    
+                    const performanceData = currentRoom.players.map(p => ({
+                        userID: p.userID,
+                        name: p.name,
+                        position: p.gameStats?.finishPosition || 0,
+                        stats: p.gameStats,
+                        equippedTitle: p.equippedTitle
+                    }));
+                    
+                    io.to(roomID).emit('gameOver', { 
+                        loser: survivors[0]?.name || 'None',
+                        loserUserID: survivors[0]?.userID || null,
+                        finishOrder: currentRoom.finishOrder,
+                        gameNumber: currentRoom.gameNumber,
+                        performanceData
+                    });
+                    
+                    currentRoom.gameStarted = false;
+                    currentRoom.players.forEach(p => {
+                        if (p.isBot) p.rematchReady = true;
+                    });
+                    broadcastRooms();
+                }
+                
+                console.log(`Bot ${bot.name} auto-accepted hand swap from ${requester.name}`);
+            }, 5000);
+            
+            return;
         }
         
         io.to(room.players[targetIdx].id).emit('receiveSwapRequest', { 

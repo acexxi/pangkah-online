@@ -110,6 +110,8 @@
         .title-rarity.common { background: var(--common); color: #fff; }
         .title-item.gm-title { border-color: #ff6b6b; background: linear-gradient(135deg, rgba(255,107,107,0.2), rgba(255,215,0,0.1)); }
         .title-item.gm-title .title-rarity { background: linear-gradient(90deg, #ff6b6b, #ffd700); color: #000; }
+        .title-item.beta-title { border-color: #10b981; background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(59,130,246,0.1)); }
+        .title-item.beta-title .title-rarity { background: linear-gradient(90deg, #10b981, #3b82f6); color: #fff; }
         .title-progress { font-size: 8px; color: var(--ui-blue); margin-top: 4px; }
         .filter-tabs { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; }
         .filter-tab { padding: 6px 12px; border-radius: 20px; font-size: 10px; font-weight: 800; cursor: pointer; border: 1px solid var(--border); background: rgba(0,0,0,0.3); }
@@ -600,7 +602,7 @@ const socket=io(),icons={Spades:'♠',Hearts:'♥',Diamonds:'♦',Clubs:'♣'},X
 
 // ============ VERSION RESET SYSTEM ============
 // Change this number to force all players to reset their stats
-const STATS_VERSION = 8;
+const STATS_VERSION = 3;
 // =============================================
 
 let userID=localStorage.getItem('pUserID')||'uid_'+Math.random().toString(36).substr(2,9);localStorage.setItem('pUserID',userID);
@@ -612,6 +614,14 @@ let isGameMaster = localStorage.getItem('pGM') === 'true';
 const GM_TITLES = [
     {id:'celestial_marshal',name:'Celestial Marshal',desc:'Game Master Exclusive',rarity:'legendary',icon:'⚜️',req:{t:'gm',v:1}},
     {id:'shadow_magistrate',name:'Shadow Magistrate',desc:'Game Master Exclusive',rarity:'legendary',icon:'🐺',req:{t:'gm',v:1}}
+];
+
+// Beta Tester System (set from server, not localStorage)
+let isBetaTester = false;
+const BETA_TESTER_TITLES = [
+    {id:'dragon_vanguard',name:'Dragon Vanguard',desc:'Beta Tester Exclusive - The First Warriors',rarity:'legendary',icon:'🐉',req:{t:'beta',v:1}},
+    {id:'founders_circle',name:'Founders\' Circle',desc:'Beta Tester Exclusive - The Original Four',rarity:'legendary',icon:'👑',req:{t:'beta',v:1}},
+    {id:'supreme_leader',name:'Supreme Leader',desc:'Beta Tester Exclusive - Path Blazers',rarity:'legendary',icon:'🗡️',req:{t:'beta',v:1}}
 ];
 
 // Load stats and check version
@@ -631,6 +641,12 @@ async function syncFromServer(){
         if(res.ok){
             const serverData=await res.json();
             if(serverData&&serverData.userID){
+                // Check Beta Tester status from server
+                isBetaTester = serverData.isBetaTester || false;
+                if(isBetaTester){
+                    console.log('🐉 Beta Tester detected!');
+                }
+                
                 // Merge server data with local (server takes priority)
                 stats={
                     ...DEFAULT_STATS,
@@ -673,7 +689,7 @@ function checkAllTitles(){TITLES.forEach(t=>{if(!stats.unlockedTitles.includes(t
 function showAchievement(t){const p=document.getElementById('achievement-popup');p.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:24px">${t.icon}</span><div><div style="font-size:10px;color:var(--gold);font-weight:800">TITLE UNLOCKED!</div><div style="font-size:16px;font-weight:800">${t.name}</div></div></div><div style="font-size:11px;opacity:0.7">${t.desc}</div><div class="title-rarity ${t.rarity}" style="margin-top:10px">${t.rarity.toUpperCase()}</div>`;p.style.display='block';setTimeout(()=>p.style.display='none',4000);}
 function equipTitle(id){if(stats.unlockedTitles.includes(id)){stats.equippedTitle=id;saveStats();updateStatsUI();renderTitleGrid();if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:getEquippedTitleData()});showToast('Equipped!',true);}}
 function unequipTitle(){stats.equippedTitle=null;saveStats();updateStatsUI();renderTitleGrid();if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:null});}
-function getEquippedTitleData(){if(!stats.equippedTitle)return null;const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[])];const t=allTitles.find(x=>x.id===stats.equippedTitle);return t?{id:t.id,name:t.name,rarity:t.rarity,icon:t.icon}:null;}
+function getEquippedTitleData(){if(!stats.equippedTitle)return null;const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[]),...(isBetaTester?BETA_TESTER_TITLES:[])];const t=allTitles.find(x=>x.id===stats.equippedTitle);return t?{id:t.id,name:t.name,rarity:t.rarity,icon:t.icon}:null;}
 
 // Title Pagination
 let titlePage=0;
@@ -681,20 +697,23 @@ const TITLES_PER_PAGE=6;
 function renderTitleGrid(){
     const grid=document.getElementById('title-grid'),filters=document.getElementById('title-filters');
     filters.innerHTML=['all','legendary','epic','rare','common'].map(r=>`<div class="filter-tab ${currentFilter===r?'active':''}" onclick="currentFilter='${r}';titlePage=0;renderTitleGrid()">${r==='all'?'ALL':r.toUpperCase()}</div>`).join('');
-    const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[])];
+    const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[]),...(isBetaTester?BETA_TESTER_TITLES:[])];
     const filtered=currentFilter==='all'?allTitles:allTitles.filter(t=>t.rarity===currentFilter);
     const totalPages=Math.ceil(filtered.length/TITLES_PER_PAGE)||1;
     const start=titlePage*TITLES_PER_PAGE;
     const pageItems=filtered.slice(start,start+TITLES_PER_PAGE);
     grid.innerHTML=pageItems.map(t=>{
         const isGMTitle=t.req.t==='gm';
-        const unlocked=stats.unlockedTitles.includes(t.id),equipped=stats.equippedTitle===t.id,prog=isGMTitle?1:getStatValue(t.req.t),max=t.req.v,pct=Math.min(prog/max*100,100).toFixed(0);
-        return`<div class="title-item ${unlocked?'':'locked'} ${equipped?'equipped':''} ${isGMTitle?'gm-title':''}" onclick="${unlocked?(equipped?'unequipTitle()':`equipTitle('${t.id}')`):''}">${equipped?'<span style="position:absolute;top:8px;right:8px">✓</span>':''}<span class="title-rarity ${t.rarity}">${isGMTitle?'GM':t.rarity.toUpperCase()}</span><div class="title-name">${t.icon} ${t.name}</div><div class="title-desc">${t.desc}</div>${!unlocked&&!isGMTitle?`<div class="title-progress">${Math.min(prog,max)}/${max} (${pct}%)</div>`:''}</div>`;
+        const isBetaTitle=t.req.t==='beta';
+        const isSpecialTitle=isGMTitle||isBetaTitle;
+        const unlocked=stats.unlockedTitles.includes(t.id),equipped=stats.equippedTitle===t.id,prog=isSpecialTitle?1:getStatValue(t.req.t),max=t.req.v,pct=Math.min(prog/max*100,100).toFixed(0);
+        const labelText=isGMTitle?'GM':isBetaTitle?'BETA':t.rarity.toUpperCase();
+        return`<div class="title-item ${unlocked?'':'locked'} ${equipped?'equipped':''} ${isGMTitle?'gm-title':''} ${isBetaTitle?'beta-title':''}" onclick="${unlocked?(equipped?'unequipTitle()':`equipTitle('${t.id}')`):''}">${equipped?'<span style="position:absolute;top:8px;right:8px">✓</span>':''}<span class="title-rarity ${t.rarity}">${labelText}</span><div class="title-name">${t.icon} ${t.name}</div><div class="title-desc">${t.desc}</div>${!unlocked&&!isSpecialTitle?`<div class="title-progress">${Math.min(prog,max)}/${max} (${pct}%)</div>`:''}</div>`;
     }).join('');
     document.getElementById('title-page-indicator').innerText=`${titlePage+1} / ${totalPages}`;
 }
 function titleNav(dir){
-    const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[])];
+    const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[]),...(isBetaTester?BETA_TESTER_TITLES:[])];
     const filtered=currentFilter==='all'?allTitles:allTitles.filter(t=>t.rarity===currentFilter);
     const totalPages=Math.ceil(filtered.length/TITLES_PER_PAGE)||1;
     titlePage=Math.max(0,Math.min(totalPages-1,titlePage+dir));

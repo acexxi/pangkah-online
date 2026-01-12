@@ -1644,6 +1644,53 @@ socket.on('connect',()=>{document.getElementById('connection-status').innerHTML=
 socket.on('disconnect',()=>{document.getElementById('connection-status').innerHTML='🔴 Disconnected';showToast("Connection lost...");});
 socket.on('reconnectSuccess',d=>{myRoom=d.roomID;isFirstMove=d.isFirstMove||false;currentLeadSuit=d.currentSuit;if(d.players[0]?.userID===userID){isHost=true;document.getElementById('close-room-btn').style.display='block';}showLoading(false);document.getElementById('lobby').style.display='none';document.getElementById('room-tag').innerText="SECT: "+myRoom;showToast("Reconnected!",true);update(d);});
 socket.on('roomList',list=>{const box=document.getElementById('room-box');box.innerHTML=list.length?"":'<div style="padding:15px;opacity:0.3">No active sects...</div>';list.forEach(r=>{const d=document.createElement('div');d.className=`room-item ${r.inGame?'in-game':''}`;d.innerHTML=`<span>#${r.id}</span><span>${r.count}/${r.max}${r.inGame?' 🎮':''}</span>`;d.onclick=()=>{if(!r.inGame)document.getElementById('rid').value=r.id;};box.appendChild(d);});});
+
+// Handle room joined (for both create and join)
+socket.on('roomJoined',d=>{
+    showLoading(false);
+    myRoom=d.roomID;
+    isHost=d.isHost;
+    currentMaxPlayers=d.maxPlayers;
+    document.getElementById('lobby').style.display='none';
+    document.getElementById('room-tag').innerText="SECT: "+myRoom;
+    document.getElementById('close-room-btn').style.display=isHost?'block':'none';
+    
+    // Setup start button
+    const startBtn=document.getElementById('start-btn');
+    const p=d.players;
+    const isFull=p.length>=d.maxPlayers;
+    startBtn.style.display=isHost?'block':'none';
+    startBtn.innerText=`BEGIN DUEL (${p.length}/${d.maxPlayers})`;
+    startBtn.disabled=!isFull;
+    startBtn.style.background=isFull?'var(--primary-action)':'rgba(100,116,139,0.8)';
+    startBtn.style.color=isFull?'#000':'rgba(255,255,255,0.7)';
+    startBtn.style.cursor=isFull?'pointer':'not-allowed';
+    startBtn.style.border=isFull?'none':'2px solid rgba(255,255,255,0.3)';
+    
+    render(p,-1);
+    showToast(isHost?"Sect created!":"Joined sect!",true);
+});
+
+// Handle player joined (updates for existing room members)
+socket.on('playerJoined',d=>{
+    const p=d.players;
+    const maxP=d.maxPlayers||currentMaxPlayers;
+    currentMaxPlayers=maxP;
+    
+    // Update start button
+    const startBtn=document.getElementById('start-btn');
+    const isFull=p.length>=maxP;
+    startBtn.innerText=`BEGIN DUEL (${p.length}/${maxP})`;
+    startBtn.disabled=!isFull;
+    startBtn.style.background=isFull?'var(--primary-action)':'rgba(100,116,139,0.8)';
+    startBtn.style.color=isFull?'#000':'rgba(255,255,255,0.7)';
+    startBtn.style.cursor=isFull?'pointer':'not-allowed';
+    startBtn.style.border=isFull?'none':'2px solid rgba(255,255,255,0.3)';
+    
+    render(p,-1);
+    showToast("A disciple joined!",true);
+});
+
 socket.on('updatePlayers',(p,roomData)=>{showLoading(false);document.getElementById('lobby').style.display='none';document.getElementById('room-tag').innerText="SECT: "+myRoom;isHost=p[0]?.userID===userID;document.getElementById('close-room-btn').style.display=isHost?'block':'none';
 // Update start button with player count
 const startBtn=document.getElementById('start-btn');

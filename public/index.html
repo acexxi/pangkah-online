@@ -709,13 +709,21 @@ let userID=localStorage.getItem('pUserID')||'uid_'+Math.random().toString(36).su
 let myName=localStorage.getItem('pName')||'Disciple'+Math.floor(Math.random()*999);
 
 // Stats object - populated from MongoDB server
-let stats={xp:0,pangkahs:0,pangkahsReceived:0,wins:0,losses:0,games:0,currentStreak:0,bestStreak:0,handsAbsorbed:0,handsGiven:0,cleanWins:0,maxCardsHeld:0,autoPlays:0,cardsPlayed:0,secondPlace:0,thirdPlace:0,fourthToTenth:0,topTwo:0,nightGames:0,unlockedTitles:[],equippedTitle:null};
+let stats={xp:0,pangkahs:0,pangkahsReceived:0,wins:0,losses:0,games:0,currentStreak:0,bestStreak:0,handsAbsorbed:0,handsGiven:0,cleanWins:0,maxCardsHeld:0,autoPlays:0,cardsPlayed:0,secondPlace:0,thirdPlace:0,fourthToTenth:0,topTwo:0,nightGames:0,unlockedTitles:[],equippedTitle:null,isBetaTester:false};
 
 // GM System
 let isGameMaster = localStorage.getItem('pGM') === 'true';
 const GM_TITLES = [
     {id:'celestial_marshal',name:'Celestial Marshal',desc:'Game Master Exclusive',rarity:'legendary',icon:'⚜️',req:{t:'gm',v:1}},
     {id:'shadow_magistrate',name:'Shadow Magistrate',desc:'Game Master Exclusive',rarity:'legendary',icon:'🐺',req:{t:'gm',v:1}}
+];
+
+// Beta Tester Titles
+const BETA_TITLES = [
+    {id:'beta_pioneer',name:'Beta Pioneer',desc:'Early Access Tester',rarity:'epic',icon:'🧪',req:{t:'beta',v:1}},
+    {id:'bug_hunter',name:'Bug Hunter',desc:'Beta Tester Exclusive',rarity:'epic',icon:'🐛',req:{t:'beta',v:1}},
+    {id:'early_bird',name:'Early Bird',desc:'Beta Tester Exclusive',rarity:'rare',icon:'🐤',req:{t:'beta',v:1}},
+    {id:'test_subject',name:'Test Subject',desc:'Beta Tester Exclusive',rarity:'rare',icon:'🔬',req:{t:'beta',v:1}}
 ];
 
 // Hall of Fame Frame System
@@ -780,7 +788,8 @@ async function loadPlayerData(){
                 topTwo:data.topTwo||0,
                 nightGames:data.nightGames||0,
                 unlockedTitles:data.unlockedTitles||[],
-                equippedTitle:data.equippedTitle||null
+                equippedTitle:data.equippedTitle||null,
+                isBetaTester:data.isBetaTester||false
             };
             
             console.log('📊 Stats loaded - XP:', stats.xp, 'Wins:', stats.wins, 'Games:', stats.games);
@@ -880,7 +889,7 @@ function unequipTitle(){
         }
     });
 }
-function getEquippedTitleData(){if(!stats.equippedTitle)return null;const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[])];const t=allTitles.find(x=>x.id===stats.equippedTitle);return t?{id:t.id,name:t.name,rarity:t.rarity,icon:t.icon}:null;}
+function getEquippedTitleData(){if(!stats.equippedTitle)return null;const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[]),...(stats.isBetaTester?BETA_TITLES:[])];const t=allTitles.find(x=>x.id===stats.equippedTitle);return t?{id:t.id,name:t.name,rarity:t.rarity,icon:t.icon}:null;}
 
 // Title Pagination
 let titlePage=0;
@@ -888,24 +897,28 @@ const TITLES_PER_PAGE=6;
 function renderTitleGrid(){
     const grid=document.getElementById('title-grid'),filters=document.getElementById('title-filters');
     filters.innerHTML=['all','legendary','epic','rare','common'].map(r=>`<div class="filter-tab ${currentFilter===r?'active':''}" onclick="currentFilter='${r}';titlePage=0;renderTitleGrid()">${r==='all'?'ALL':r.toUpperCase()}</div>`).join('');
-    const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[])];
+    
+    // Include GM titles if GM, Beta titles if beta tester
+    const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[]),...(stats.isBetaTester?BETA_TITLES:[])];
     const filtered=currentFilter==='all'?allTitles:allTitles.filter(t=>t.rarity===currentFilter);
     const totalPages=Math.ceil(filtered.length/TITLES_PER_PAGE)||1;
     const start=titlePage*TITLES_PER_PAGE;
     const pageItems=filtered.slice(start,start+TITLES_PER_PAGE);
     grid.innerHTML=pageItems.map(t=>{
         const isGMTitle=t.req.t==='gm';
-        const isSpecialTitle=isGMTitle;
-        // Auto-unlock: GM titles for GMs
-        const unlocked=stats.unlockedTitles.includes(t.id)||(isGMTitle&&isGameMaster);
+        const isBetaTitle=t.req.t==='beta';
+        const isSpecialTitle=isGMTitle||isBetaTitle;
+        // Auto-unlock: GM titles for GMs, Beta titles for Beta Testers
+        const unlocked=stats.unlockedTitles.includes(t.id)||(isGMTitle&&isGameMaster)||(isBetaTitle&&stats.isBetaTester);
         const equipped=stats.equippedTitle===t.id,prog=isSpecialTitle?1:getStatValue(t.req.t),max=t.req.v,pct=Math.min(prog/max*100,100).toFixed(0);
-        const labelText=isGMTitle?'GM':t.rarity.toUpperCase();
-        return`<div class="title-item ${unlocked?'':'locked'} ${equipped?'equipped':''} ${isGMTitle?'gm-title':''}" onclick="${unlocked?(equipped?'unequipTitle()':`equipTitle('${t.id}')`):''}">${equipped?'<span style="position:absolute;top:8px;right:8px">✓</span>':''}<span class="title-rarity ${t.rarity}">${labelText}</span><div class="title-name">${t.icon} ${t.name}</div><div class="title-desc">${t.desc}</div>${!unlocked&&!isSpecialTitle?`<div class="title-progress">${Math.min(prog,max)}/${max} (${pct}%)</div>`:''}</div>`;
+        const labelText=isGMTitle?'GM':isBetaTitle?'BETA':t.rarity.toUpperCase();
+        const specialClass=isGMTitle?'gm-title':isBetaTitle?'beta-title':'';
+        return`<div class="title-item ${unlocked?'':'locked'} ${equipped?'equipped':''} ${specialClass}" onclick="${unlocked?(equipped?'unequipTitle()':`equipTitle('${t.id}')`):''}">${equipped?'<span style="position:absolute;top:8px;right:8px">✓</span>':''}<span class="title-rarity ${t.rarity}">${labelText}</span><div class="title-name">${t.icon} ${t.name}</div><div class="title-desc">${t.desc}</div>${!unlocked&&!isSpecialTitle?`<div class="title-progress">${Math.min(prog,max)}/${max} (${pct}%)</div>`:''}</div>`;
     }).join('');
     document.getElementById('title-page-indicator').innerText=`${titlePage+1} / ${totalPages}`;
 }
 function titleNav(dir){
-    const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[])];
+    const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[]),...(stats.isBetaTester?BETA_TITLES:[])];
     const filtered=currentFilter==='all'?allTitles:allTitles.filter(t=>t.rarity===currentFilter);
     const totalPages=Math.ceil(filtered.length/TITLES_PER_PAGE)||1;
     titlePage=Math.max(0,Math.min(totalPages-1,titlePage+dir));

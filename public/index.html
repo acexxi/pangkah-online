@@ -407,9 +407,9 @@
         <div id="full-table-section" style="display:none">
             <div class="leaderboard-filters">
                 <select id="lb-sort" onchange="loadLeaderboard()">
+                    <option value="winrate">Sort by Win Rate</option>
                     <option value="xp">Sort by XP</option>
                     <option value="wins">Sort by Wins</option>
-                    <option value="winrate">Sort by Win Rate</option>
                     <option value="losses">Sort by Losses</option>
                     <option value="streak">Sort by Win Streak</option>
                     <option value="pangkahs">Sort by Pangkah Dealt</option>
@@ -468,9 +468,9 @@
         
         <div style="margin-bottom:15px">
             <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:5px">SEARCH PLAYER</label>
-            <div style="display:flex;gap:8px">
-                <input id="gm-search-input" type="text" placeholder="Enter player name or userID" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border-light);background:rgba(0,0,0,0.3);color:#fff;font-size:12px">
-                <button class="btn btn-p" onclick="gmSearchPlayer()" style="width:auto;padding:10px 15px;font-size:11px">SEARCH</button>
+            <div style="display:flex;gap:8px;align-items:stretch">
+                <input id="gm-search-input" type="text" placeholder="Enter player name or userID" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border-light);background:rgba(0,0,0,0.3);color:#fff;font-size:12px;margin-bottom:0">
+                <button class="btn btn-p" onclick="gmSearchPlayer()" style="width:auto;padding:10px 15px;font-size:11px;height:auto;margin:0;display:flex;align-items:center">SEARCH</button>
             </div>
         </div>
         
@@ -480,7 +480,21 @@
                     <div id="gm-player-name" style="font-weight:800;font-size:16px;color:#fff"></div>
                     <div id="gm-player-id" style="font-size:10px;color:var(--text-tertiary)"></div>
                 </div>
-                <div id="gm-player-status" style="padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700"></div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <div id="gm-player-status" style="padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700"></div>
+                </div>
+            </div>
+            
+            <!-- Beta Tester Toggle -->
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:rgba(52,211,153,0.1);border:1px solid var(--accent-green);border-radius:8px;margin-bottom:15px">
+                <div>
+                    <div style="font-size:12px;font-weight:600;color:var(--accent-green)">🧪 Beta Tester</div>
+                    <div style="font-size:10px;color:var(--text-tertiary)">Grant beta tester status</div>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="gm-beta-toggle" onchange="gmToggleBetaTester()">
+                    <span class="toggle-slider"></span>
+                </label>
             </div>
             
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px">
@@ -977,7 +991,7 @@ function renderGuide(){
     const page=GUIDE_PAGES[guidePage];
     document.getElementById('guide-content').innerHTML=page.content;
     document.getElementById('guide-page-indicator').innerText=`${guidePage+1} / ${GUIDE_PAGES.length}`;
-    document.getElementById('guide-prev-btn').style.visibility=guidePage===0?'hidden':'visible';
+    document.getElementById('guide-prev-btn').style.display=guidePage===0?'none':'flex';
     document.getElementById('guide-next-btn').innerHTML=guidePage===GUIDE_PAGES.length-1?'DONE ✓':'NEXT <img src="/icon/chevron-right.svg" alt="" style="width:14px;height:14px;filter:brightness(0) invert(1)">';
 }
 function guideNav(dir){
@@ -1041,7 +1055,7 @@ document.addEventListener('keydown',e=>{
 // Leaderboard System
 let lbData=[];
 let lbPage=0;
-const LB_PER_PAGE=10;
+const LB_PER_PAGE=8;
 let showingFullTable=false;
 let hofData=[];
 let hofPage=0;
@@ -1256,10 +1270,14 @@ async function gmSearchPlayer(){
             document.getElementById('gm-player-name').innerText=data.player.displayName||'Unknown';
             document.getElementById('gm-player-id').innerText=data.player.userID;
             
-            // Check if player holds any HOF frame or is GM
+            // Check if player holds any HOF frame or is GM or Beta Tester
             const statusEl=document.getElementById('gm-player-status');
             const playerFrame = getPlayerFrame(data.player.userID, false);
-            if(playerFrame){
+            if(data.player.isBetaTester){
+                statusEl.innerText='BETA TESTER';
+                statusEl.style.background='var(--accent-green)';
+                statusEl.style.color='#fff';
+            }else if(playerFrame){
                 const frameName = HOF_FRAMES.find(f=>f.class===playerFrame)?.name || 'Frame Holder';
                 statusEl.innerText=frameName.toUpperCase();
                 statusEl.style.background='var(--accent-gold)';
@@ -1269,6 +1287,9 @@ async function gmSearchPlayer(){
                 statusEl.style.background='rgba(255,255,255,0.1)';
                 statusEl.style.color='#fff';
             }
+            
+            // Set beta tester toggle state
+            document.getElementById('gm-beta-toggle').checked=data.player.isBetaTester||false;
             
             document.getElementById('gm-stat-xp').value=data.player.xp||0;
             document.getElementById('gm-stat-wins').value=data.player.wins||0;
@@ -1340,6 +1361,53 @@ async function gmResetPlayer(){
     }catch(e){
         console.error('GM reset error:',e);
         showToast('Reset failed');
+    }
+}
+
+async function gmToggleBetaTester(){
+    if(!gmCurrentPlayer){showToast('No player selected');return;}
+    
+    const isBetaTester=document.getElementById('gm-beta-toggle').checked;
+    
+    try{
+        const res=await fetch('/api/gm/toggle-beta-tester',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({targetUserID:gmCurrentPlayer.userID,isBetaTester})
+        });
+        const data=await res.json();
+        if(data.success){
+            showToast(isBetaTester?'Beta Tester status granted!':'Beta Tester status removed!',true);
+            gmCurrentPlayer.isBetaTester=isBetaTester;
+            // Update status badge
+            const statusEl=document.getElementById('gm-player-status');
+            if(isBetaTester){
+                statusEl.innerText='BETA TESTER';
+                statusEl.style.background='var(--accent-green)';
+                statusEl.style.color='#fff';
+            }else{
+                const playerFrame = getPlayerFrame(gmCurrentPlayer.userID, false);
+                if(playerFrame){
+                    const frameName = HOF_FRAMES.find(f=>f.class===playerFrame)?.name || 'Frame Holder';
+                    statusEl.innerText=frameName.toUpperCase();
+                    statusEl.style.background='var(--accent-gold)';
+                    statusEl.style.color='#000';
+                }else{
+                    statusEl.innerText='NORMAL';
+                    statusEl.style.background='rgba(255,255,255,0.1)';
+                    statusEl.style.color='#fff';
+                }
+            }
+        }else{
+            showToast(data.error||'Toggle failed');
+            // Revert toggle state
+            document.getElementById('gm-beta-toggle').checked=!isBetaTester;
+        }
+    }catch(e){
+        console.error('GM beta toggle error:',e);
+        showToast('Toggle failed');
+        // Revert toggle state
+        document.getElementById('gm-beta-toggle').checked=!isBetaTester;
     }
 }
 // ============ END GM ADMIN PANEL ============

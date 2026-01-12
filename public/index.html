@@ -796,6 +796,9 @@ async function loadPlayerData(){
             };
             
             console.log('📊 Stats loaded - XP:', stats.xp, 'Wins:', stats.wins, 'Games:', stats.games);
+            console.log('🎖️ Unlocked titles:', stats.unlockedTitles);
+            console.log('🏆 Equipped title:', stats.equippedTitle);
+            console.log('🧪 Beta tester:', stats.isBetaTester);
             
             // Sync display name
             if(data.displayName && data.displayName !== myName){
@@ -869,23 +872,50 @@ function getStatValue(t){switch(t){case'level':return getLevel();case'pangkahs':
 function checkAllTitles(){TITLES.forEach(t=>{if(!stats.unlockedTitles.includes(t.id)&&getStatValue(t.req.t)>=t.req.v){stats.unlockedTitles.push(t.id);showAchievement(t);}});saveStats();}
 function showAchievement(t){const p=document.getElementById('achievement-popup');p.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:24px">${t.icon}</span><div><div style="font-size:10px;color:var(--gold);font-weight:800">TITLE UNLOCKED!</div><div style="font-size:16px;font-weight:800">${t.name}</div></div></div><div style="font-size:11px;opacity:0.7">${t.desc}</div><div class="title-rarity ${t.rarity}" style="margin-top:10px">${t.rarity.toUpperCase()}</div>`;p.style.display='block';setTimeout(()=>p.style.display='none',4000);}
 function equipTitle(id){
+    console.log('equipTitle called with id:', id);
+    console.log('stats.unlockedTitles:', stats.unlockedTitles);
+    console.log('isGameMaster:', isGameMaster);
+    console.log('stats.isBetaTester:', stats.isBetaTester);
+    
     // Check if title is unlocked (regular titles) or special titles (GM/Beta)
     const allTitles=[...TITLES,...GM_TITLES,...BETA_TITLES];
     const title=allTitles.find(t=>t.id===id);
-    if(!title) return;
+    if(!title) {
+        console.log('Title not found in allTitles');
+        return;
+    }
     
     const isGMTitle=title.req.t==='gm';
     const isBetaTitle=title.req.t==='beta';
-    const canEquip=stats.unlockedTitles.includes(id)||(isGMTitle&&isGameMaster)||(isBetaTitle&&stats.isBetaTester);
+    
+    // Regular titles: must be in unlockedTitles
+    // GM titles: must be GM
+    // Beta titles: must be beta tester
+    let canEquip = false;
+    if(isGMTitle){
+        canEquip = isGameMaster;
+    } else if(isBetaTitle){
+        canEquip = stats.isBetaTester;
+    } else {
+        canEquip = stats.unlockedTitles.includes(id);
+    }
+    
+    console.log('canEquip:', canEquip);
     
     if(canEquip){
         equipTitleOnServer(id).then(success => {
+            console.log('equipTitleOnServer result:', success);
             if(success){
                 renderTitleGrid();
                 if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:getEquippedTitleData()});
                 showToast('Equipped!',true);
+            } else {
+                showToast('Failed to equip',false);
             }
         });
+    } else {
+        console.log('Cannot equip - not unlocked');
+        showToast('Title not unlocked',false);
     }
 }
 function unequipTitle(){
@@ -1533,18 +1563,24 @@ function saveStats(){
 // Equip title via server API
 async function equipTitleOnServer(titleId){
     try{
+        console.log('equipTitleOnServer called with:', titleId, 'for userID:', userID);
         const res = await fetch('/api/player/equip-title', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userID, titleId })
         });
+        console.log('Server response status:', res.status);
         if(res.ok){
             const data = await res.json();
+            console.log('Server response data:', data);
             stats.equippedTitle = data.equippedTitle;
             updateStatsUI();
             return true;
+        } else {
+            const errData = await res.json().catch(()=>({}));
+            console.log('Server error:', errData);
         }
-    }catch(e){ console.log('Failed to equip title'); }
+    }catch(e){ console.log('Failed to equip title:', e); }
     return false;
 }
 

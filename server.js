@@ -879,6 +879,28 @@ app.get('/api/gm/rooms', (req, res) => {
     }
 });
 
+// GM Admin Panel - Toggle Beta Tester Status
+app.post('/api/gm/toggle-beta-tester', async (req, res) => {
+    try {
+        const { targetUserID, isBetaTester } = req.body;
+        if (!targetUserID) return res.status(400).json({ error: 'userID required' });
+        
+        const player = await Player.findOneAndUpdate(
+            { userID: targetUserID },
+            { $set: { isBetaTester: isBetaTester } },
+            { new: true }
+        );
+        
+        if (!player) return res.status(404).json({ error: 'Player not found' });
+        
+        console.log(`[GM] ${isBetaTester ? 'Granted' : 'Removed'} beta tester status for ${player.displayName}`);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('GM beta toggle error:', err);
+        res.status(500).json({ error: 'Toggle failed' });
+    }
+});
+
 // GM Admin Panel - Force Close Room
 app.post('/api/gm/force-close-room', (req, res) => {
     try {

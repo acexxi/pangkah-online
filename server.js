@@ -246,6 +246,27 @@ app.post('/api/gm/toggle-beta-tester', async (req, res) => {
     } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
+app.post('/api/gm/delete-player', async (req, res) => {
+    try {
+        const { targetUserID } = req.body;
+        if (!targetUserID) return res.status(400).json({ error: 'userID required' });
+        
+        console.log('[GM] ☠️ DELETE request for:', targetUserID);
+        const player = await Player.findOneAndDelete({ userID: targetUserID });
+        
+        if (!player) {
+            console.log('[GM] Player not found for delete:', targetUserID);
+            return res.status(404).json({ error: 'Player not found' });
+        }
+        
+        console.log('[GM] ☠️ DELETED player:', player.displayName, '(', player.userID, ')');
+        res.json({ success: true, deletedPlayer: player.displayName });
+    } catch (err) {
+        console.error('[GM] Delete error:', err);
+        res.status(500).json({ error: 'Delete failed' });
+    }
+});
+
 app.get('/api/gm/rooms', (req, res) => {
     const list = Object.values(rooms).map(r => ({ id: r.id, playerCount: r.players.filter(p=>!p.isBot).length, maxPlayers: r.maxPlayers, inGame: r.gameStarted, botCount: r.players.filter(p=>p.isBot).length }));
     res.json({ rooms: list });

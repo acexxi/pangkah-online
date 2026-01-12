@@ -641,7 +641,6 @@ const TITLES=[
 {id:'card_billionaire',name:'Card Billionaire',desc:'Hold 30+ cards in one game',rarity:'legendary',icon:'💰',req:{t:'maxCardsHeld',v:30}},
 {id:'comeback_king',name:'Comeback King',desc:'Win after holding 25+ cards (5x)',rarity:'legendary',icon:'👊',req:{t:'comebacks',v:5}},
 {id:'perfect_game',name:'Flawless',desc:'Win without receiving pangkah (10x)',rarity:'legendary',icon:'🌟',req:{t:'perfectWins',v:10}},
-{id:'social_emperor',name:'Social Emperor',desc:'Play with 200 unique players',rarity:'legendary',icon:'🤝',req:{t:'uniquePlayers',v:200}},
 {id:'no_life',name:'No Life',desc:'Play 5000 games',rarity:'legendary',icon:'💀',req:{t:'games',v:5000}},
 {id:'ultimate_loser',name:'Professional Clown',desc:'Lose 500 games',rarity:'legendary',icon:'🎪',req:{t:'losses',v:500}},
 {id:'clean_legend',name:'Spotless Legend',desc:'500 clean round wins',rarity:'legendary',icon:'🧼',req:{t:'cleanWins',v:500}},
@@ -671,7 +670,6 @@ const TITLES=[
 {id:'dedicated',name:'Dedicated',desc:'Play 500 games',rarity:'rare',icon:'📿',req:{t:'games',v:500}},
 {id:'cultivator',name:'Cultivator',desc:'10,000 XP earned',rarity:'rare',icon:'🌱',req:{t:'xp',v:10000}},
 {id:'hand_collector',name:'Hand Collector',desc:'Absorb 30 hands',rarity:'rare',icon:'🤲',req:{t:'handsAbsorbed',v:30}},
-{id:'social',name:'Social Butterfly',desc:'50 unique players',rarity:'rare',icon:'🦋',req:{t:'uniquePlayers',v:50}},
 {id:'consistent',name:'Consistent',desc:'Top 2 finish 50 times',rarity:'rare',icon:'📈',req:{t:'topTwo',v:50}},
 {id:'second_best',name:'Always Second',desc:'2nd place 25 times',rarity:'rare',icon:'🥈',req:{t:'secondPlace',v:25}},
 {id:'card_magnet',name:'Card Magnet',desc:'Hold 20+ cards in one game',rarity:'rare',icon:'🧲',req:{t:'maxCardsHeld',v:20}},
@@ -679,8 +677,6 @@ const TITLES=[
 {id:'afk_master',name:'AFK Master',desc:'50 auto-played turns',rarity:'rare',icon:'😴',req:{t:'autoPlays',v:50}},
 {id:'clean_player',name:'Clean Freak',desc:'100 clean round wins',rarity:'rare',icon:'✨',req:{t:'cleanWins',v:100}},
 {id:'pangkah_victim',name:'Pangkah Victim',desc:'Receive 100 pangkahs',rarity:'rare',icon:'😭',req:{t:'pangkahsReceived',v:100}},
-{id:'silent_killer',name:'Silent Killer',desc:'Win 50 games with 0 pangkahs dealt',rarity:'rare',icon:'🥷',req:{t:'silentWins',v:50}},
-{id:'marathon',name:'Marathon Runner',desc:'Play 10 games in one day',rarity:'rare',icon:'🏃',req:{t:'dailyGames',v:10}},
 {id:'elder',name:'Elder',desc:'Reach Level 20',rarity:'rare',icon:'👴',req:{t:'level',v:20}},
 // COMMON (22 total)
 {id:'warrior',name:'Warrior',desc:'Reach Level 5',rarity:'common',icon:'⚔️',req:{t:'level',v:5}},
@@ -701,7 +697,6 @@ const TITLES=[
 {id:'first_loser',name:'First Loser',desc:'Lose your first game',rarity:'common',icon:'💔',req:{t:'losses',v:1}},
 {id:'unlucky',name:'Unlucky',desc:'Lose 10 games',rarity:'common',icon:'🍀',req:{t:'losses',v:10}},
 {id:'sleepy',name:'Sleepy',desc:'Get auto-played 10 times',rarity:'common',icon:'💤',req:{t:'autoPlays',v:10}},
-{id:'friendly',name:'Friendly',desc:'Play with 10 unique players',rarity:'common',icon:'👋',req:{t:'uniquePlayers',v:10}},
 {id:'give_hand',name:'Helping Hand',desc:'Give away your hand once',rarity:'common',icon:'🤝',req:{t:'handsGiven',v:1}},
 {id:'heavy_hand',name:'Heavy Handed',desc:'Hold 15+ cards in one game',rarity:'common',icon:'🎒',req:{t:'maxCardsHeld',v:15}},
 {id:'clean_start',name:'Clean Start',desc:'Win 10 clean rounds',rarity:'common',icon:'🧽',req:{t:'cleanWins',v:10}}
@@ -868,8 +863,12 @@ document.addEventListener('DOMContentLoaded',()=>{
     }
 });
 
-function getStatValue(t){switch(t){case'level':return getLevel();case'pangkahs':return stats.pangkahs||0;case'streak':return stats.bestStreak||0;case'wins':return stats.wins||0;case'games':return stats.games||0;case'xp':return stats.xp||0;case'handsAbsorbed':return stats.handsAbsorbed||0;case'nightGames':return stats.nightGames||0;case'uniquePlayers':return(stats.uniquePlayers||[]).length;case'topTwo':return stats.topTwo||0;case'secondPlace':return stats.secondPlace||0;case'thirdPlace':return stats.thirdPlace||0;case'cardsPlayed':return stats.cardsPlayed||0;case'losses':return stats.losses||0;case'maxCardsHeld':return stats.maxCardsHeld||0;case'comebacks':return stats.comebacks||0;case'perfectWins':return stats.perfectWins||0;case'fastWins':return stats.fastWins||0;case'handsGiven':return stats.handsGiven||0;case'autoPlays':return stats.autoPlays||0;case'cleanWins':return stats.cleanWins||0;case'pangkahsReceived':return stats.pangkahsReceived||0;default:return 0;}}
-function checkAllTitles(){TITLES.forEach(t=>{if(!stats.unlockedTitles.includes(t.id)&&getStatValue(t.req.t)>=t.req.v){stats.unlockedTitles.push(t.id);showAchievement(t);}});saveStats();}
+function getStatValue(t){switch(t){case'level':return getLevel();case'pangkahs':return stats.pangkahs||0;case'streak':return stats.bestStreak||0;case'wins':return stats.wins||0;case'games':return stats.games||0;case'xp':return stats.xp||0;case'handsAbsorbed':return stats.handsAbsorbed||0;case'nightGames':return stats.nightGames||0;case'topTwo':return stats.topTwo||0;case'secondPlace':return stats.secondPlace||0;case'thirdPlace':return stats.thirdPlace||0;case'cardsPlayed':return stats.cardsPlayed||0;case'losses':return stats.losses||0;case'maxCardsHeld':return stats.maxCardsHeld||0;case'comebacks':return stats.comebacks||0;case'perfectWins':return stats.perfectWins||0;case'handsGiven':return stats.handsGiven||0;case'autoPlays':return stats.autoPlays||0;case'cleanWins':return stats.cleanWins||0;case'pangkahsReceived':return stats.pangkahsReceived||0;default:return 0;}}
+function checkAllTitles(){
+    // Title unlocking is now handled server-side
+    // This function only shows achievement popups for newly unlocked titles
+    // The actual unlocking happens in /api/player/:userID and processGameResults
+}
 function showAchievement(t){const p=document.getElementById('achievement-popup');p.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:24px">${t.icon}</span><div><div style="font-size:10px;color:var(--gold);font-weight:800">TITLE UNLOCKED!</div><div style="font-size:16px;font-weight:800">${t.name}</div></div></div><div style="font-size:11px;opacity:0.7">${t.desc}</div><div class="title-rarity ${t.rarity}" style="margin-top:10px">${t.rarity.toUpperCase()}</div>`;p.style.display='block';setTimeout(()=>p.style.display='none',4000);}
 function equipTitle(id){
     console.log('equipTitle called with id:', id);
@@ -1114,10 +1113,7 @@ async function gmLogin(){
         if(data.success&&data.isGM){
             isGameMaster=true;
             localStorage.setItem('pGM','true');
-            // Add GM exclusive titles if not already unlocked
-            if(!stats.unlockedTitles.includes('celestial_marshal'))stats.unlockedTitles.push('celestial_marshal');
-            if(!stats.unlockedTitles.includes('shadow_magistrate'))stats.unlockedTitles.push('shadow_magistrate');
-            saveStats();
+            // GM titles are handled by renderTitleGrid - no need to modify unlockedTitles
             updateStatsUI();
             // Show GM Admin buttons (both header and menu)
             document.getElementById('gm-admin-btn').style.display='block';
@@ -1134,10 +1130,10 @@ function gmLogout(){
     // Hide GM Admin buttons (both header and menu)
     document.getElementById('gm-admin-btn').style.display='none';
     document.getElementById('gm-admin-header-btn').style.display='none';
-    // Remove GM titles
-    stats.unlockedTitles=stats.unlockedTitles.filter(t=>t!=='celestial_marshal'&&t!=='shadow_magistrate');
-    if(stats.equippedTitle==='celestial_marshal'||stats.equippedTitle==='shadow_magistrate')stats.equippedTitle=null;
-    saveStats();
+    // If GM title is equipped, unequip it via server
+    if(stats.equippedTitle==='celestial_marshal'||stats.equippedTitle==='shadow_magistrate'){
+        equipTitleOnServer(null);
+    }
     updateStatsUI();
     showToast('Game Master Mode Deactivated',false);
 }
@@ -1801,7 +1797,7 @@ startBtn.style.background=isFull?'var(--primary-action)':'rgba(100,116,139,0.8)'
 startBtn.style.color=isFull?'#000':'rgba(255,255,255,0.7)';
 startBtn.style.cursor=isFull?'pointer':'not-allowed';
 startBtn.style.border=isFull?'none':'2px solid rgba(255,255,255,0.3)';
-p.forEach(pl=>{if(pl.userID!==userID&&!stats.uniquePlayers.includes(pl.userID))stats.uniquePlayers.push(pl.userID);});saveStats();render(p,-1);});
+render(p,-1);});
 socket.on('gameStarted',d=>{showLoading(false);document.getElementById('round-popup').style.display='none';document.getElementById('gameover-modal').style.display='none';document.getElementById('start-btn').style.display='none';isProcessingTurn=false;isFirstMove=true;currentLeadSuit=null;document.getElementById('close-room-btn').style.display=isHost?'block':'none';update({players:d.players,turn:d.turn,table:[]});showToast(`Game #${d.gameNumber} started!`,true);});
 socket.on('clearTable',d=>{
     // First, render the final table so players can see all cards

@@ -791,28 +791,58 @@ function deal(room) {
     room.turn = room.players.findIndex(p => p.hand.some(c => c.suit==='Spades' && c.rank==='K'));
 }
 function generateBotName() {
-    const pre = ['Iron','Shadow','Thunder','Jade','Silent','Azure','Crimson','Golden','Silver','Dark'];
-    const suf = ['Dragon','Phoenix','Tiger','Serpent','Lotus','Blade','Storm','Moon','Star','Fist'];
-    return pre[Math.floor(Math.random()*pre.length)] + ' ' + suf[Math.floor(Math.random()*suf.length)];
+    const names = [
+        'Keanu Reeves', 'Shrek', 'Gordon Ramsay', 'Snoop Dogg', 'Bob Ross',
+        'Mr. Bean', 'Jackie Chan', 'Danny DeVito', 'Morgan Freeman', 'The Rock',
+        'Samuel L Jackson', 'Chuck Norris', 'Will Smith', 'Rick Astley', 'John Cena',
+        'Elon Musk', 'Batman', 'Darth Vader', 'Yoda', 'SpongeBob',
+        'Thanos', 'Groot', 'Gandalf', 'Dumbledore', 'Sherlock',
+        'Mike Tyson', 'Cristiano', 'Messi', 'Lebron', 'Michael Jordan',
+        'Einstein', 'Newton', 'Tesla', 'Mozart', 'Shakespeare',
+        'Obama', 'Queen Elizabeth', 'Napoleon', 'Cleopatra', 'Caesar'
+    ];
+    return '[BOT] ' + names[Math.floor(Math.random() * names.length)];
 }
 function initStats(p) { p.gameStats = { pangkahsDealt:0, pangkahsReceived:0, pangkahsReceivedFromBot:0, cleanWins:0, cardsPlayed:0, comebacks:0, hadMostCards:false, maxCardsThisGame: p.hand?.length||0, finishPosition:0, lossesToBot:0 }; }
 
 // Timers
+const turnTimerIntervals = {};
 function startTimer(rid) {
     clearTimer(rid);
     const room = rooms[rid];
     if (!room?.gameStarted || room.players[room.turn]?.isBot) return;
+    
+    let timeLeft = Math.floor(TURN_LIMIT / 1000);
+    
+    // Send initial time
+    io.to(rid).emit('turnTimer', { timeLeft });
+    
+    // Countdown interval
+    turnTimerIntervals[rid] = setInterval(() => {
+        timeLeft--;
+        io.to(rid).emit('turnTimer', { timeLeft });
+        if (timeLeft <= 0) {
+            clearInterval(turnTimerIntervals[rid]);
+            delete turnTimerIntervals[rid];
+        }
+    }, 1000);
+    
+    // Auto-play timeout
     turnTimers[rid] = setTimeout(async () => {
         const r = rooms[rid]; if (!r?.gameStarted) return;
         const p = r.players[r.turn]; if (!p?.hand.length) return;
         let card = r.isFirstMove ? p.hand.find(c=>c.suit==='Spades'&&c.rank==='K') : r.currentSuit ? p.hand.find(c=>c.suit===r.currentSuit) : null;
         if (!card) card = p.hand[0];
         if (!p.isBot) await trackAutoPlay(p.userID);
+        io.to(rid).emit('autoPlayed', { playerName: p.name, card, players: r.players, turn: r.turn, table: r.table, currentSuit: r.currentSuit });
         processCard(rid, r.turn, card);
     }, TURN_LIMIT);
-    io.to(rid).emit('turnTimerStarted', { timeLimit: TURN_LIMIT });
 }
-function clearTimer(rid) { if(turnTimers[rid]){clearTimeout(turnTimers[rid]);delete turnTimers[rid];} }
+function clearTimer(rid) { 
+    if(turnTimers[rid]){clearTimeout(turnTimers[rid]);delete turnTimers[rid];} 
+    if(turnTimerIntervals[rid]){clearInterval(turnTimerIntervals[rid]);delete turnTimerIntervals[rid];}
+    io.to(rid).emit('turnTimer', { timeLeft: 0 });
+}
 
 function processCard(rid, idx, card) {
     const room = rooms[rid]; if(!room) return;
@@ -897,16 +927,40 @@ function botTurn(rid, leading = false) {
     setTimeout(() => {
         if (!rooms[rid]?.gameStarted || rooms[rid].turn !== room.players.indexOf(bot)) return;
         let card;
-        if (room.isFirstMove) card = bot.hand.find(c=>c.suit==='Spades'&&c.rank==='K');
-        else {
-            const suit = bot.hand.filter(c=>c.suit===room.currentSuit);
-            if (suit.length) {
-                const high = suit.reduce((a,b)=>a.val>b.val?a:b);
-                const low = suit.reduce((a,b)=>a.val<b.val?a:b);
+        
+        // PangkahAI Brain Module v2
+        if (room.isFirstMove) {
+            card = bot.hand.find(c=>c.suit==='Spades'&&c.rank==='K');
+        } else {
+            const suitCards = bot.hand.filter(c=>c.suit===room.currentSuit);
+            if (suitCards.length) {
+                // Has matching suit - smart play
+                const high = suitCards.reduce((a,b)=>a.val>b.val?a:b);
+                const low = suitCards.reduce((a,b)=>a.val<b.val?a:b);
                 const curHigh = room.table.filter(t=>t.card.suit===room.currentSuit).reduce((m,t)=>Math.max(m,t.card.val),-1);
-                card = (high.val > curHigh && Math.random() > 0.3) ? high : low;
-            } else card = bot.hand.reduce((a,b)=>a.val>b.val?a:b);
+                
+                // If can win cleanly, play high. Otherwise play low to minimize cards taken.
+                if (high.val > curHigh && Math.random() > 0.25) {
+                    card = high;
+                } else {
+                    card = low;
+                }
+            } else {
+                // No matching suit - PANGKAH! Play strategically
+                // Prefer to dump high value cards to get rid of them
+                const sorted = [...bot.hand].sort((a,b) => b.val - a.val);
+                // 60% chance play highest, 40% play random high card
+                card = Math.random() > 0.4 ? sorted[0] : sorted[Math.floor(Math.random() * Math.min(3, sorted.length))];
+            }
         }
+        
+        // Bot emotes (10% chance)
+        if (Math.random() < 0.1) {
+            const emotes = ['😎', '🤖', '💪', '🔥', '😈', '🎯', '⚡', '🃏', '👀', '😏', '🤔', '😅'];
+            const emote = emotes[Math.floor(Math.random() * emotes.length)];
+            io.to(rid).emit('botEmote', { botName: bot.name, emote });
+        }
+        
         if (card) processCard(rid, room.turn, card);
     }, leading ? BOT_LEAD_DELAY : BOT_DELAY);
 }
@@ -991,7 +1045,13 @@ io.on('connection', (socket) => {
         while (room.players[tgt].hand.length === 0 && att < room.players.length) { tgt = (tgt + 1) % room.players.length; att++; }
         if (tgt === myIdx || !room.players[tgt].hand.length) return;
         const target = room.players[tgt];
+        
+        // Pause timer during swap request
+        clearTimer(roomID);
+        
         if (target.isBot) {
+            // Bot auto-accepts after delay
+            io.to(roomID).emit('botSwapPending', { botName: target.name, countdown: 3 });
             setTimeout(async () => {
                 if (!rooms[roomID]) return;
                 const req = room.players[myIdx];
@@ -1005,6 +1065,9 @@ io.on('connection', (socket) => {
                     if (surv[0]) { room.finishOrder.push(surv[0].userID); if(surv[0].gameStats) surv[0].gameStats.finishPosition = room.players.length; }
                     io.to(roomID).emit('gameOver', { loser: surv[0]?.name||'None', loserUserID: surv[0]?.userID, finishOrder: room.finishOrder, gameNumber: room.gameNumber, performanceData: room.players.map(x=>({userID:x.userID,name:x.name,position:x.gameStats?.finishPosition||0,stats:x.gameStats,equippedTitle:x.equippedTitle})) });
                     processGameResults(room); room.gameStarted = false; broadcastRooms();
+                } else {
+                    // Restart timer after bot swap
+                    startTimer(roomID);
                 }
             }, 3000);
         } else io.to(target.id).emit('receiveSwapRequest', { fromName: room.players[myIdx].name, fromUserID });
@@ -1028,7 +1091,13 @@ io.on('connection', (socket) => {
         } else startTimer(roomID);
     });
     
-    socket.on('declineSwap', ({ roomID, fromUserID }) => { const room = rooms[roomID]; const req = room?.players.find(p=>p.userID===fromUserID); if(req) io.to(req.id).emit('swapDeclined'); });
+    socket.on('declineSwap', ({ roomID, fromUserID }) => { 
+        const room = rooms[roomID]; 
+        const req = room?.players.find(p=>p.userID===fromUserID); 
+        if(req) io.to(req.id).emit('swapDeclined');
+        // Restart timer after declined swap
+        if(room?.gameStarted) startTimer(roomID);
+    });
     socket.on('updateTitle', ({ roomID, userID, title }) => { const room = rooms[roomID]; const p = room?.players.find(x=>x.userID===userID); if(p){p.equippedTitle=title;io.to(roomID).emit('playerTitleUpdated',{userID,title,players:room.players});} });
     socket.on('requestRematch', ({ roomID, userID }) => { const room = rooms[roomID]; if(!room||room.gameStarted) return; const p = room.players.find(x=>x.userID===userID); if(p){p.rematchReady=true;io.to(roomID).emit('rematchStatus',{readyCount:room.players.filter(x=>x.rematchReady).length,totalCount:room.players.length,allReady:room.players.every(x=>x.rematchReady)});} });
     socket.on('sendEmote', ({ roomID, userID, playerName, emoji }) => { if(roomID) socket.to(roomID).emit('receiveEmote', { userID, playerName, emoji }); });

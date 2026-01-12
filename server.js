@@ -18,14 +18,10 @@ mongoose.connect(MONGODB_URI)
     .then(() => console.log('✅ MongoDB connected'))
     .catch(err => console.error('❌ MongoDB connection error:', err));
 
-// Player Schema
+// Player Schema - MongoDB is the SINGLE SOURCE OF TRUTH
 const playerSchema = new mongoose.Schema({
     userID: { type: String, required: true, unique: true },
     displayName: { type: String, default: 'Player' },
-    discordId: { type: String, default: null },
-    discordUsername: { type: String, default: null },
-    
-    // Stats
     xp: { type: Number, default: 0 },
     wins: { type: Number, default: 0 },
     losses: { type: Number, default: 0 },
@@ -45,2478 +41,559 @@ const playerSchema = new mongoose.Schema({
     fourthToTenth: { type: Number, default: 0 },
     topTwo: { type: Number, default: 0 },
     nightGames: { type: Number, default: 0 },
-    
-    // Bot-related Stats (Shame Records)
-    pangkahsReceivedFromBot: { type: Number, default: 0 },  // Pangkahs received from bots
-    lossesToBot: { type: Number, default: 0 },              // Losses where bot was last opponent
-    handsAbsorbedFromBot: { type: Number, default: 0 },     // Hands absorbed from bots
-    
-    // Titles
+    comebacks: { type: Number, default: 0 },
+    perfectWins: { type: Number, default: 0 },
+    pangkahsReceivedFromBot: { type: Number, default: 0 },
+    lossesToBot: { type: Number, default: 0 },
+    handsAbsorbedFromBot: { type: Number, default: 0 },
     unlockedTitles: { type: [String], default: [] },
     equippedTitle: { type: String, default: null },
-    
-    // Special Status
     isBetaTester: { type: Boolean, default: false },
-    
-    // Timestamps
     createdAt: { type: Date, default: Date.now },
     lastPlayedAt: { type: Date, default: Date.now }
 });
 
 const Player = mongoose.model('Player', playerSchema);
 
-// API Routes for stats
-app.post('/api/stats/save', async (req, res) => {
+const XP_PER_LEVEL = 100;
+function getLevel(xp) { return Math.floor((xp || 0) / XP_PER_LEVEL) + 1; }
+
+// Title requirements for server-side validation
+const TITLE_REQS = {
+    'ancient_ancestor': {t:'level',v:50}, 'pangkah_god': {t:'pangkahs',v:500}, 'unbreakable': {t:'streak',v:10},
+    'thousand_victories': {t:'wins',v:1000}, 'sect_master': {t:'games',v:2000}, 'immortal': {t:'xp',v:100000},
+    'warrior': {t:'level',v:5}, 'first_pangkah': {t:'pangkahs',v:1}, 'first_blood': {t:'wins',v:1},
+    'newcomer': {t:'games',v:10}, 'learner': {t:'xp',v:1000}, 'victor': {t:'wins',v:10}
+};
+
+function getStatValue(player, type) {
+    switch(type) {
+        case 'level': return getLevel(player.xp);
+        case 'pangkahs': return player.pangkahs || 0;
+        case 'streak': return player.bestStreak || 0;
+        case 'wins': return player.wins || 0;
+        case 'games': return player.games || 0;
+        case 'xp': return player.xp || 0;
+        case 'losses': return player.losses || 0;
+        case 'cleanWins': return player.cleanWins || 0;
+        case 'handsAbsorbed': return player.handsAbsorbed || 0;
+        default: return 0;
+    }
+}
+
+async function checkAndUnlockTitles(player) {
+    const newTitles = [];
+    for (const [id, req] of Object.entries(TITLE_REQS)) {
+        if (!player.unlockedTitles.includes(id) && getStatValue(player, req.t) >= req.v) {
+            player.unlockedTitles.push(id);
+            newTitles.push(id);
+        }
+    }
+    return newTitles;
+}
+
+// ============ API ROUTES ============
+app.get('/api/player/:userID', async (req, res) => {
     try {
-        const { userID, displayName, stats } = req.body;
-        if (!userID) return res.status(400).json({ error: 'userID required' });
-        
-        const updateData = {
-            displayName: displayName || 'Player',
-            lastPlayedAt: new Date(),
-            ...stats
-        };
-        
-        const player = await Player.findOneAndUpdate(
-            { userID },
-            { $set: updateData },
-            { upsert: true, new: true }
-        );
-        
-        res.json({ success: true, player });
-    } catch (err) {
-        console.error('Save stats error:', err);
-        res.status(500).json({ error: 'Failed to save stats' });
+        console.log('[API] Get player request for:', req.params.userID);
+        let player = await Player.findOne({ userID: req.params.userID });
+        if (!player) {
+            player = new Player({ userID: req.params.userID, displayName: 'Disciple' + Math.floor(Math.random() * 999) });
+            await player.save();
+            console.log('[API] Created new player:', player.displayName);
+        } else {
+            console.log('[API] Found player:', player.displayName, '- XP:', player.xp, 'Wins:', player.wins);
+        }
+        res.json(player);
+    } catch (err) { 
+        console.error('[API] Get player error:', err);
+        res.status(500).json({ error: 'Failed to get player' }); 
     }
 });
 
-app.get('/api/stats/:userID', async (req, res) => {
+app.post('/api/player/update-name', async (req, res) => {
     try {
-        const player = await Player.findOne({ userID: req.params.userID });
+        const { userID, displayName } = req.body;
+        if (!userID || !displayName) return res.status(400).json({ error: 'Missing fields' });
+        const trimmed = displayName.trim();
+        if (trimmed.length < 1 || trimmed.length > 20) return res.status(400).json({ error: 'Name must be 1-20 chars' });
+        const player = await Player.findOneAndUpdate({ userID }, { $set: { displayName: trimmed } }, { new: true });
         if (!player) return res.status(404).json({ error: 'Player not found' });
-        res.json(player);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to get stats' });
-    }
+        res.json({ success: true, displayName: player.displayName });
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.post('/api/player/equip-title', async (req, res) => {
+    try {
+        const { userID, titleId } = req.body;
+        const player = await Player.findOne({ userID });
+        if (!player) return res.status(404).json({ error: 'Player not found' });
+        if (titleId && !player.unlockedTitles.includes(titleId)) return res.status(400).json({ error: 'Title not unlocked' });
+        player.equippedTitle = titleId || null;
+        await player.save();
+        res.json({ success: true, equippedTitle: player.equippedTitle });
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
 app.get('/api/leaderboard/:type', async (req, res) => {
     try {
         const { type } = req.params;
-        const limit = parseInt(req.query.limit) || 100;
-        
-        let sortField = 'xp';
-        if (type === 'wins') sortField = 'wins';
-        if (type === 'losses') sortField = 'losses';
-        if (type === 'pangkahs') sortField = 'pangkahs';
-        if (type === 'pangkahsReceived') sortField = 'pangkahsReceived';
-        if (type === 'games') sortField = 'games';
-        if (type === 'streak') sortField = 'bestStreak';
-        if (type === 'winrate') sortField = 'wins'; // Will sort by wins, winrate calculated client-side
-        
-        const players = await Player.find()
-            .sort({ [sortField]: -1 })
-            .limit(limit)
-            .select('displayName userID xp wins losses games pangkahs pangkahsReceived bestStreak equippedTitle secondPlace thirdPlace fourthToTenth');
-        
+        let sortField = type === 'wins' ? 'wins' : type === 'losses' ? 'losses' : type === 'pangkahs' ? 'pangkahs' : type === 'streak' ? 'bestStreak' : 'xp';
+        const players = await Player.find().sort({ [sortField]: -1 }).limit(100)
+            .select('displayName userID xp wins losses games pangkahs pangkahsReceived bestStreak secondPlace thirdPlace fourthToTenth');
         res.json(players);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to get leaderboard' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// HOF Frames API - Get frame holders (for avatar frames)
 app.get('/api/hof-frames', async (req, res) => {
     try {
-        const minGames = 10; // Minimum games to qualify for a frame
-        
-        // Get all players with enough games
-        const players = await Player.find({ games: { $gte: minGames } })
-            .select('userID displayName wins losses games pangkahs pangkahsReceived bestStreak autoPlays');
-        
-        if (players.length === 0) {
-            return res.json({ holders: {} });
-        }
-        
+        const players = await Player.find({ games: { $gte: 10 } }).select('userID wins losses games pangkahs pangkahsReceived bestStreak');
+        if (players.length === 0) return res.json({ holders: {} });
         const holders = {};
-        
-        // Calculate rates
-        const playersWithRates = players.map(p => ({
-            userID: p.userID,
-            name: p.displayName,
-            games: p.games || 1,
-            winRate: ((p.wins || 0) / (p.games || 1) * 100),
-            loseRate: ((p.losses || 0) / (p.games || 1) * 100),
-            bestStreak: p.bestStreak || 0,
-            pangkahs: p.pangkahs || 0,
-            pangkahsReceived: p.pangkahsReceived || 0,
-            autoPlays: p.autoPlays || 0
-        }));
-        
-        // Glory Frames
-        // 1. Win Rate Champion - Highest win rate
-        const winRateChamp = playersWithRates.reduce((best, p) => p.winRate > (best?.winRate || 0) ? p : best, null);
-        if (winRateChamp) holders.winrate = winRateChamp.userID;
-        
-        // 2. Streak Master - Best win streak
-        const streakMaster = playersWithRates.reduce((best, p) => p.bestStreak > (best?.bestStreak || 0) ? p : best, null);
-        if (streakMaster && !Object.values(holders).includes(streakMaster.userID)) holders.streak = streakMaster.userID;
-        
-        // 3. Pangkah King - Most pangkahs dealt
-        const pangkahKing = playersWithRates.reduce((best, p) => p.pangkahs > (best?.pangkahs || 0) ? p : best, null);
-        if (pangkahKing && !Object.values(holders).includes(pangkahKing.userID)) holders.pangkah = pangkahKing.userID;
-        
-        // Shame Frames
-        // 4. Lose Rate Champion - Highest lose rate
-        const loseRateChamp = playersWithRates.reduce((best, p) => p.loseRate > (best?.loseRate || 0) ? p : best, null);
-        if (loseRateChamp && !Object.values(holders).includes(loseRateChamp.userID)) holders.loserate = loseRateChamp.userID;
-        
-        // 5. Pangkah Magnet - Most pangkahs received
-        const pangkahMagnet = playersWithRates.reduce((best, p) => p.pangkahsReceived > (best?.pangkahsReceived || 0) ? p : best, null);
-        if (pangkahMagnet && !Object.values(holders).includes(pangkahMagnet.userID)) holders.magnet = pangkahMagnet.userID;
-        
-        console.log('[HOF Frames]', holders);
+        const rates = players.map(p => ({ userID: p.userID, winRate: (p.wins||0)/(p.games||1)*100, loseRate: (p.losses||0)/(p.games||1)*100, bestStreak: p.bestStreak||0, pangkahs: p.pangkahs||0, pangkahsReceived: p.pangkahsReceived||0 }));
+        const best = (arr, key) => arr.reduce((a,b) => (a[key]||0) > (b[key]||0) ? a : b, {});
+        holders.winrate = best(rates, 'winRate').userID;
+        holders.streak = best(rates.filter(r=>r.userID!==holders.winrate), 'bestStreak').userID;
+        holders.pangkah = best(rates.filter(r=>!Object.values(holders).includes(r.userID)), 'pangkahs').userID;
+        holders.loserate = best(rates.filter(r=>!Object.values(holders).includes(r.userID)), 'loseRate').userID;
+        holders.magnet = best(rates.filter(r=>!Object.values(holders).includes(r.userID)), 'pangkahsReceived').userID;
         res.json({ holders });
-    } catch (err) {
-        console.error('HOF frames error:', err);
-        res.status(500).json({ error: 'Failed to get HOF frames' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// Hall of Fame API - Get record holders
 app.get('/api/hall-of-fame', async (req, res) => {
     try {
-        // Get all players with at least 1 game
-        const players = await Player.find({ games: { $gt: 0 } })
-            .select('displayName xp wins losses games pangkahs pangkahsReceived bestStreak secondPlace thirdPlace fourthToTenth handsAbsorbed handsGiven cleanWins autoPlays maxCardsHeld pangkahsReceivedFromBot lossesToBot handsAbsorbedFromBot');
-        
-        if (players.length === 0) {
-            return res.json({ records: [] });
-        }
-        
-        // Calculate rates for each player
-        const playersWithRates = players.map(p => {
-            const games = p.games || 1;
-            return {
-                name: p.displayName || 'Unknown',
-                xp: p.xp || 0,
-                wins: p.wins || 0,
-                losses: p.losses || 0,
-                games: games,
-                pangkahs: p.pangkahs || 0,
-                pangkahsReceived: p.pangkahsReceived || 0,
-                bestStreak: p.bestStreak || 0,
-                secondPlace: p.secondPlace || 0,
-                thirdPlace: p.thirdPlace || 0,
-                fourthToTenth: p.fourthToTenth || 0,
-                handsAbsorbed: p.handsAbsorbed || 0,
-                handsGiven: p.handsGiven || 0,
-                cleanWins: p.cleanWins || 0,
-                autoPlays: p.autoPlays || 0,
-                maxCardsHeld: p.maxCardsHeld || 0,
-                // Bot shame stats
-                pangkahsReceivedFromBot: p.pangkahsReceivedFromBot || 0,
-                lossesToBot: p.lossesToBot || 0,
-                handsAbsorbedFromBot: p.handsAbsorbedFromBot || 0,
-                // Calculated rates
-                winRate: ((p.wins || 0) / games * 100).toFixed(1),
-                loseRate: ((p.losses || 0) / games * 100).toFixed(1),
-                pangkahPerGame: ((p.pangkahs || 0) / games).toFixed(2),
-                gotPangkahPerGame: ((p.pangkahsReceived || 0) / games).toFixed(2),
-                cleanPerGame: ((p.cleanWins || 0) / games).toFixed(2)
-            };
-        });
-        
-        // Find record holders (need at least 5 games for rate-based records)
-        const minGamesForRates = 5;
-        const rateEligible = playersWithRates.filter(p => p.games >= minGamesForRates);
-        
+        const players = await Player.find({ games: { $gt: 0 } });
+        if (players.length === 0) return res.json({ records: [] });
         const records = [];
-        
-        // ============ PAGE 1: GLORY RECORDS (9 records) ============
-        
-        // 1. Highest Win Rate
-        if (rateEligible.length > 0) {
-            const best = rateEligible.reduce((a, b) => parseFloat(a.winRate) > parseFloat(b.winRate) ? a : b);
-            if (parseFloat(best.winRate) > 0) {
-                records.push({
-                    id: 'winrate',
-                    category: 'glory',
-                    icon: '👑',
-                    title: 'The Chosen One',
-                    player: best.name,
-                    value: `${best.winRate}% win rate`,
-                    description: `${best.name} was probably born under a lucky star. With ${best.winRate}% win rate, they're living proof that some people just have it all! 🌟`
-                });
-            }
-        }
-        
-        // 2. Most Wins
-        const winKing = playersWithRates.reduce((a, b) => a.wins > b.wins ? a : b);
-        if (winKing.wins > 0) {
-            records.push({
-                id: 'wins',
-                category: 'glory',
-                icon: '🏆',
-                title: 'Victory Addict',
-                player: winKing.name,
-                value: `${winKing.wins} wins`,
-                description: `${winKing.name} has won ${winKing.wins} times. At this point, winning isn't a hobby - it's a lifestyle. Others play for fun, they play for DOMINANCE! 💪`
-            });
-        }
-        
-        // 3. Best Win Streak
-        const streakKing = playersWithRates.reduce((a, b) => a.bestStreak > b.bestStreak ? a : b);
-        if (streakKing.bestStreak > 0) {
-            records.push({
-                id: 'streak',
-                category: 'glory',
-                icon: '🔥',
-                title: 'Unstoppable Menace',
-                player: streakKing.name,
-                value: `${streakKing.bestStreak} streak`,
-                description: `${streakKing.name} went absolutely DEMON MODE with ${streakKing.bestStreak} consecutive victories! Legend says opponents forfeit just seeing their name. 😈`
-            });
-        }
-        
-        // 4. Most XP
-        const xpKing = playersWithRates.reduce((a, b) => a.xp > b.xp ? a : b);
-        if (xpKing.xp > 0) {
-            records.push({
-                id: 'xp',
-                category: 'glory',
-                icon: '✨',
-                title: 'XP Goblin',
-                player: xpKing.name,
-                value: `${xpKing.xp.toLocaleString()} XP`,
-                description: `${xpKing.name} has hoarded ${xpKing.xp.toLocaleString()} XP like a dragon hoards gold. Touch grass? Never heard of her! 🐉`
-            });
-        }
-        
-        // 5. Most Pangkahs Dealt
-        const pangkahDealer = playersWithRates.reduce((a, b) => a.pangkahs > b.pangkahs ? a : b);
-        if (pangkahDealer.pangkahs > 0) {
-            records.push({
-                id: 'pangkahs',
-                category: 'glory',
-                icon: '⚡',
-                title: 'Pangkah Terrorist',
-                player: pangkahDealer.name,
-                value: `${pangkahDealer.pangkahs} dealt`,
-                description: `${pangkahDealer.name} has dealt ${pangkahDealer.pangkahs} pangkahs. Geneva Convention? More like Geneva SUGGESTION! This player chose violence and never looked back! 💀`
-            });
-        }
-        
-        // 6. Most Clean Wins
-        const cleanMaster = playersWithRates.reduce((a, b) => a.cleanWins > b.cleanWins ? a : b);
-        if (cleanMaster.cleanWins > 0) {
-            records.push({
-                id: 'cleanwins',
-                category: 'glory',
-                icon: '🧼',
-                title: 'Mr. Clean',
-                player: cleanMaster.name,
-                value: `${cleanMaster.cleanWins} clean rounds`,
-                description: `${cleanMaster.name} has won ${cleanMaster.cleanWins} clean rounds. So clean you could eat off their gameplay! OCD? No, just EXCELLENCE! ✨`
-            });
-        }
-        
-        // 7. Most Games Played
-        const grinder = playersWithRates.reduce((a, b) => a.games > b.games ? a : b);
-        if (grinder.games > 0) {
-            records.push({
-                id: 'games',
-                category: 'glory',
-                icon: '🎮',
-                title: 'No-Life Achievement',
-                player: grinder.name,
-                value: `${grinder.games} games`,
-                description: `${grinder.name} has played ${grinder.games} games. What is grass? What is sunlight? This gamer doesn't know and doesn't CARE! 🌿❌`
-            });
-        }
-        
-        // 8. Hand Absorber (Soul Stealer)
-        const handAbsorber = playersWithRates.reduce((a, b) => a.handsAbsorbed > b.handsAbsorbed ? a : b);
-        if (handAbsorber.handsAbsorbed > 0) {
-            records.push({
-                id: 'absorbed',
-                category: 'glory',
-                icon: '🦑',
-                title: 'Soul Stealer',
-                player: handAbsorber.name,
-                value: `${handAbsorber.handsAbsorbed} hands`,
-                description: `${handAbsorber.name} has absorbed ${handAbsorber.handsAbsorbed} hands. They collect cards like Thanos collects infinity stones! "I am inevitable!" 🫴`
-            });
-        }
-        
-        // 9. Pangkah per Game (Chaos Agent)
-        if (rateEligible.length > 0) {
-            const pangkahSpammer = rateEligible.reduce((a, b) => parseFloat(a.pangkahPerGame) > parseFloat(b.pangkahPerGame) ? a : b);
-            if (parseFloat(pangkahSpammer.pangkahPerGame) > 0) {
-                records.push({
-                    id: 'pangkahrate',
-                    category: 'glory',
-                    icon: '💣',
-                    title: 'Chaos Agent',
-                    player: pangkahSpammer.name,
-                    value: `${pangkahSpammer.pangkahPerGame}/game`,
-                    description: `${pangkahSpammer.name} deals ${pangkahSpammer.pangkahPerGame} pangkahs per game on average. Some people just want to watch the world burn! 🔥`
-                });
-            }
-        }
-        
-        // ============ PAGE 2: SHAME RECORDS (9 records) ============
-        
-        // 1. Highest Lose Rate
-        if (rateEligible.length > 0) {
-            const worst = rateEligible.reduce((a, b) => parseFloat(a.loseRate) > parseFloat(b.loseRate) ? a : b);
-            if (parseFloat(worst.loseRate) > 0) {
-                records.push({
-                    id: 'loserate',
-                    category: 'shame',
-                    icon: '🤡',
-                    title: 'Professional Clown',
-                    player: worst.name,
-                    value: `${worst.loseRate}% lose rate`,
-                    description: `${worst.name} needs an intervention... ${worst.loseRate}% lose rate! At this point, losing is their special talent. Should we start a GoFundMe? 🎪`
-                });
-            }
-        }
-        
-        // 2. Most Losses
-        const loseKing = playersWithRates.reduce((a, b) => a.losses > b.losses ? a : b);
-        if (loseKing.losses > 0) {
-            records.push({
-                id: 'losses',
-                category: 'shame',
-                icon: '💀',
-                title: 'L Collector',
-                player: loseKing.name,
-                value: `${loseKing.losses} losses`,
-                description: `${loseKing.name} has collected ${loseKing.losses} L's like Pokemon cards. Gotta catch 'em all! Their parents must be so proud... or concerned. 😭`
-            });
-        }
-        
-        // 3. Most Pangkahs Received
-        const pangkahVictim = playersWithRates.reduce((a, b) => a.pangkahsReceived > b.pangkahsReceived ? a : b);
-        if (pangkahVictim.pangkahsReceived > 0) {
-            records.push({
-                id: 'gotpangkah',
-                category: 'shame',
-                icon: '🎯',
-                title: 'Human Dartboard',
-                player: pangkahVictim.name,
-                value: `${pangkahVictim.pangkahsReceived} received`,
-                description: `${pangkahVictim.name} has eaten ${pangkahVictim.pangkahsReceived} pangkahs. They're not unlucky, they're just a MAGNET for disaster! Everyone's favorite target practice! 🥊`
-            });
-        }
-        
-        // 4. Most AFK/Auto-plays
-        const afkKing = playersWithRates.reduce((a, b) => a.autoPlays > b.autoPlays ? a : b);
-        if (afkKing.autoPlays > 0) {
-            records.push({
-                id: 'afk',
-                category: 'shame',
-                icon: '😴',
-                title: 'AFK Speedrunner',
-                player: afkKing.name,
-                value: `${afkKing.autoPlays} auto-plays`,
-                description: `${afkKing.name} has ${afkKing.autoPlays} auto-plays. Are they playing or just decorating the room? Their keyboard must be collecting dust! 💤`
-            });
-        }
-        
-        // 5. Got Pangkah per Game (Unluckiest)
-        if (rateEligible.length > 0) {
-            const unlucky = rateEligible.reduce((a, b) => parseFloat(a.gotPangkahPerGame) > parseFloat(b.gotPangkahPerGame) ? a : b);
-            if (parseFloat(unlucky.gotPangkahPerGame) > 0) {
-                records.push({
-                    id: 'unlucky',
-                    category: 'shame',
-                    icon: '🍀',
-                    title: 'Unluckiest Player',
-                    player: unlucky.name,
-                    value: `${unlucky.gotPangkahPerGame}/game`,
-                    description: `${unlucky.name} receives ${unlucky.gotPangkahPerGame} pangkahs per game. If bad luck was a person, it would be them! Maybe try a lucky charm? 🐈‍⬛`
-                });
-            }
-        }
-        
-        // 6. Most Cards Held (Card Hoarder - moved to shame)
-        const cardHoarder = playersWithRates.reduce((a, b) => a.maxCardsHeld > b.maxCardsHeld ? a : b);
-        if (cardHoarder.maxCardsHeld > 0) {
-            records.push({
-                id: 'maxcards',
-                category: 'shame',
-                icon: '🐿️',
-                title: 'Card Hoarder',
-                player: cardHoarder.name,
-                value: `${cardHoarder.maxCardsHeld} cards`,
-                description: `${cardHoarder.name} once held ${cardHoarder.maxCardsHeld} cards in one game! They needed TWO HANDS just to hold them all! How did it feel being a walking deck? 🃏`
-            });
-        }
-        
-        // 7. Hand Giver (Santa - moved to shame, it's giving away wins!)
-        const handGiver = playersWithRates.reduce((a, b) => a.handsGiven > b.handsGiven ? a : b);
-        if (handGiver.handsGiven > 0) {
-            records.push({
-                id: 'given',
-                category: 'shame',
-                icon: '🎅',
-                title: 'Santa Claus',
-                player: handGiver.name,
-                value: `${handGiver.handsGiven} hands given`,
-                description: `${handGiver.name} has given away ${handGiver.handsGiven} hands. So generous! So kind! So... why are you helping others win?! 🎁`
-            });
-        }
-        
-        // 8. Lowest Win Rate (among eligible players)
-        if (rateEligible.length > 0) {
-            const worstWinRate = rateEligible.reduce((a, b) => parseFloat(a.winRate) < parseFloat(b.winRate) ? a : b);
-            records.push({
-                id: 'lowestwinrate',
-                category: 'shame',
-                icon: '📉',
-                title: 'Rock Bottom',
-                player: worstWinRate.name,
-                value: `${worstWinRate.winRate}% win rate`,
-                description: `${worstWinRate.name} has a ${worstWinRate.winRate}% win rate. At least they're consistent... consistently losing! The floor is their ceiling! 🪨`
-            });
-        }
-        
-        // 9. Most Games Without Improvement (high games, low win rate)
-        if (rateEligible.length > 0) {
-            const hopeless = rateEligible
-                .filter(p => p.games >= 10)
-                .sort((a, b) => (b.games * (100 - parseFloat(b.winRate))) - (a.games * (100 - parseFloat(a.winRate))))[0];
-            if (hopeless) {
-                records.push({
-                    id: 'hopeless',
-                    category: 'shame',
-                    icon: '🪦',
-                    title: 'Lost Cause',
-                    player: hopeless.name,
-                    value: `${hopeless.games} games, ${hopeless.winRate}% WR`,
-                    description: `${hopeless.name} has played ${hopeless.games} games but still has ${hopeless.winRate}% win rate. Definition of insanity: doing the same thing expecting different results! 🔄`
-                });
-            }
-        }
-        
-        // 10. Bot's Favorite Punching Bag (most pangkahs received from bots)
-        const botPunchingBag = playersWithRates.reduce((a, b) => a.pangkahsReceivedFromBot > b.pangkahsReceivedFromBot ? a : b);
-        if (botPunchingBag.pangkahsReceivedFromBot > 0) {
-            records.push({
-                id: 'botpunchingbag',
-                category: 'shame',
-                icon: '🤖',
-                title: "Bot's Punching Bag",
-                player: botPunchingBag.name,
-                value: `${botPunchingBag.pangkahsReceivedFromBot} bot pangkahs`,
-                description: `${botPunchingBag.name} got pangkah'd by BOTS ${botPunchingBag.pangkahsReceivedFromBot} times! Even the AI is bullying them! 🤖💥 The bots have chosen their favorite victim! `
-            });
-        }
-        
-        // 11. Lost to Artificial Stupidity (most losses where bot was last opponent)
-        const lostToBot = playersWithRates.reduce((a, b) => a.lossesToBot > b.lossesToBot ? a : b);
-        if (lostToBot.lossesToBot > 0) {
-            records.push({
-                id: 'losttobot',
-                category: 'shame',
-                icon: '🤡',
-                title: 'Lost to AI',
-                player: lostToBot.name,
-                value: `${lostToBot.lossesToBot} bot losses`,
-                description: `${lostToBot.name} lost to BOTS ${lostToBot.lossesToBot} times! Can't even beat artificial "intelligence"! 🤖😂 Maybe try playing against a toaster next? `
-            });
-        }
-        
-        // 12. Begging Bots for Help (most hands absorbed from bots)
-        const beggedBot = playersWithRates.reduce((a, b) => a.handsAbsorbedFromBot > b.handsAbsorbedFromBot ? a : b);
-        if (beggedBot.handsAbsorbedFromBot > 0) {
-            records.push({
-                id: 'beggedbot',
-                category: 'shame',
-                icon: '🙏',
-                title: 'Begging Bots',
-                player: beggedBot.name,
-                value: `${beggedBot.handsAbsorbedFromBot} bot hands`,
-                description: `${beggedBot.name} absorbed ${beggedBot.handsAbsorbedFromBot} hands from BOTS! So desperate they're asking robots for help! 🙏🤖 "Please sir, can I have some cards?" `
-            });
-        }
-        
-        // ============ PAGE 3: MISC RECORDS (9 records) ============
-        
-        // 1. Always 2nd Place
-        const silverMedalist = playersWithRates.reduce((a, b) => a.secondPlace > b.secondPlace ? a : b);
-        if (silverMedalist.secondPlace > 0) {
-            records.push({
-                id: 'second',
-                category: 'misc',
-                icon: '🥈',
-                title: 'Forever Bridesmaid',
-                player: silverMedalist.name,
-                value: `${silverMedalist.secondPlace} times`,
-                description: `${silverMedalist.name} has finished 2nd place ${silverMedalist.secondPlace} times. SO CLOSE yet SO FAR! They're allergic to 1st place! Always the bridesmaid, never the bride! 💔`
-            });
-        }
-        
-        // 2. Bronze Collector
-        const bronzeCollector = playersWithRates.reduce((a, b) => a.thirdPlace > b.thirdPlace ? a : b);
-        if (bronzeCollector.thirdPlace > 0) {
-            records.push({
-                id: 'third',
-                category: 'misc',
-                icon: '🥉',
-                title: 'Bronze Enthusiast',
-                player: bronzeCollector.name,
-                value: `${bronzeCollector.thirdPlace} times`,
-                description: `${bronzeCollector.name} has collected ${bronzeCollector.thirdPlace} bronze medals. Not first, not last, just... there. The embodiment of "at least I tried"! 🤷`
-            });
-        }
-        
-        // 3. Middle Child (4th-10th place)
-        const middleChild = playersWithRates.reduce((a, b) => a.fourthToTenth > b.fourthToTenth ? a : b);
-        if (middleChild.fourthToTenth > 0) {
-            records.push({
-                id: 'middle',
-                category: 'misc',
-                icon: '😐',
-                title: 'Forgettable Player',
-                player: middleChild.name,
-                value: `${middleChild.fourthToTenth} times`,
-                description: `${middleChild.name} has finished 4th-10th place ${middleChild.fourthToTenth} times. Not good enough to win, not bad enough to meme. Just... existing. 🫥`
-            });
-        }
-        
-        // 4. Most Consistent (closest to 50% win rate)
-        if (rateEligible.length > 0) {
-            const consistent = rateEligible.reduce((a, b) => 
-                Math.abs(50 - parseFloat(a.winRate)) < Math.abs(50 - parseFloat(b.winRate)) ? a : b
-            );
-            records.push({
-                id: 'consistent',
-                category: 'misc',
-                icon: '⚖️',
-                title: 'Perfectly Balanced',
-                player: consistent.name,
-                value: `${consistent.winRate}% win rate`,
-                description: `${consistent.name} has exactly ${consistent.winRate}% win rate. Perfectly balanced, as all things should be. Thanos would be proud! 💜`
-            });
-        }
-        
-        // 5. Clean Per Game
-        if (rateEligible.length > 0) {
-            const cleanRate = rateEligible.reduce((a, b) => parseFloat(a.cleanPerGame) > parseFloat(b.cleanPerGame) ? a : b);
-            if (parseFloat(cleanRate.cleanPerGame) > 0) {
-                records.push({
-                    id: 'cleanrate',
-                    category: 'misc',
-                    icon: '🧹',
-                    title: 'Neat Freak',
-                    player: cleanRate.name,
-                    value: `${cleanRate.cleanPerGame}/game`,
-                    description: `${cleanRate.name} wins ${cleanRate.cleanPerGame} clean rounds per game. They keep it clean, they keep it tidy, they keep it WINNING! 🧽`
-                });
-            }
-        }
-        
-        // 6. Most Top 2 Finishes
-        const topTwoKing = playersWithRates.reduce((a, b) => (a.wins + a.secondPlace) > (b.wins + b.secondPlace) ? a : b);
-        if ((topTwoKing.wins + topTwoKing.secondPlace) > 0) {
-            records.push({
-                id: 'toptwo',
-                category: 'misc',
-                icon: '🎖️',
-                title: 'Podium Regular',
-                player: topTwoKing.name,
-                value: `${topTwoKing.wins + topTwoKing.secondPlace} times`,
-                description: `${topTwoKing.name} has finished top 2 a total of ${topTwoKing.wins + topTwoKing.secondPlace} times. They may not always win, but they're ALWAYS up there! 🏅`
-            });
-        }
-        
-        // 7. Best Pangkah Ratio (dealt vs received)
-        const pangkahRatioPlayers = playersWithRates.filter(p => p.pangkahsReceived > 0);
-        if (pangkahRatioPlayers.length > 0) {
-            const bestRatio = pangkahRatioPlayers.reduce((a, b) => 
-                (a.pangkahs / a.pangkahsReceived) > (b.pangkahs / b.pangkahsReceived) ? a : b
-            );
-            const ratio = (bestRatio.pangkahs / bestRatio.pangkahsReceived).toFixed(2);
-            records.push({
-                id: 'pangkahratio',
-                category: 'misc',
-                icon: '🎭',
-                title: 'Karma Dealer',
-                player: bestRatio.name,
-                value: `${ratio}x ratio`,
-                description: `${bestRatio.name} deals ${ratio}x more pangkahs than they receive. They dish it out but never take it! Ultimate uno reverse energy! 🔄`
-            });
-        }
-        
-        // 8. Worst Pangkah Ratio (received more than dealt)
-        if (pangkahRatioPlayers.length > 0) {
-            const worstRatio = pangkahRatioPlayers.reduce((a, b) => 
-                (a.pangkahsReceived / Math.max(a.pangkahs, 1)) > (b.pangkahsReceived / Math.max(b.pangkahs, 1)) ? a : b
-            );
-            const ratio = (worstRatio.pangkahsReceived / Math.max(worstRatio.pangkahs, 1)).toFixed(2);
-            records.push({
-                id: 'badkarma',
-                category: 'misc',
-                icon: '☯️',
-                title: 'Bad Karma',
-                player: worstRatio.name,
-                value: `${ratio}x ratio`,
-                description: `${worstRatio.name} receives ${ratio}x more pangkahs than they deal. What did they do in their past life?! The universe is NOT on their side! 😵`
-            });
-        }
-        
-        // 9. Jack of All Trades (has wins, losses, pangkahs, clean wins - well rounded)
-        const allRounder = playersWithRates
-            .filter(p => p.wins > 0 && p.losses > 0 && p.pangkahs > 0 && p.cleanWins > 0)
-            .sort((a, b) => (b.wins + b.pangkahs + b.cleanWins) - (a.wins + a.pangkahs + a.cleanWins))[0];
-        if (allRounder) {
-            records.push({
-                id: 'allrounder',
-                category: 'misc',
-                icon: '🎪',
-                title: 'Jack of All Trades',
-                player: allRounder.name,
-                value: `${allRounder.wins}W/${allRounder.pangkahs}P/${allRounder.cleanWins}C`,
-                description: `${allRounder.name} does it all! ${allRounder.wins} wins, ${allRounder.pangkahs} pangkahs dealt, ${allRounder.cleanWins} clean rounds. Master of none? More like master of EVERYTHING! 🌟`
-            });
-        }
-        
+        const rates = players.map(p => ({ name: p.displayName, xp: p.xp||0, wins: p.wins||0, losses: p.losses||0, games: p.games||1, pangkahs: p.pangkahs||0, pangkahsReceived: p.pangkahsReceived||0, bestStreak: p.bestStreak||0, cleanWins: p.cleanWins||0, handsAbsorbed: p.handsAbsorbed||0, autoPlays: p.autoPlays||0, maxCardsHeld: p.maxCardsHeld||0, handsGiven: p.handsGiven||0, winRate: ((p.wins||0)/(p.games||1)*100).toFixed(1), loseRate: ((p.losses||0)/(p.games||1)*100).toFixed(1) }));
+        const best = (arr, key) => arr.reduce((a,b) => (parseFloat(a[key])||0) > (parseFloat(b[key])||0) ? a : b, rates[0]);
+        const eligible = rates.filter(p => p.games >= 5);
+        if (eligible.length) { const b = best(eligible,'winRate'); records.push({id:'winrate',category:'glory',icon:'👑',title:'The Chosen One',player:b.name,value:b.winRate+'% win rate',description:'Highest win rate!'}); }
+        const w = best(rates,'wins'); if(w.wins>0) records.push({id:'wins',category:'glory',icon:'🏆',title:'Victory Addict',player:w.name,value:w.wins+' wins',description:'Most wins!'});
+        const s = best(rates,'bestStreak'); if(s.bestStreak>0) records.push({id:'streak',category:'glory',icon:'🔥',title:'Unstoppable',player:s.name,value:s.bestStreak+' streak',description:'Best streak!'});
+        const x = best(rates,'xp'); if(x.xp>0) records.push({id:'xp',category:'glory',icon:'✨',title:'XP Goblin',player:x.name,value:x.xp+' XP',description:'Most XP!'});
+        const pk = best(rates,'pangkahs'); if(pk.pangkahs>0) records.push({id:'pangkahs',category:'glory',icon:'⚡',title:'Pangkah King',player:pk.name,value:pk.pangkahs+' dealt',description:'Most pangkahs!'});
+        if (eligible.length) { const l = best(eligible,'loseRate'); records.push({id:'loserate',category:'shame',icon:'🤡',title:'Professional Clown',player:l.name,value:l.loseRate+'% lose rate',description:'Highest lose rate!'}); }
+        const lo = best(rates,'losses'); if(lo.losses>0) records.push({id:'losses',category:'shame',icon:'💀',title:'L Collector',player:lo.name,value:lo.losses+' losses',description:'Most losses!'});
+        const pv = best(rates,'pangkahsReceived'); if(pv.pangkahsReceived>0) records.push({id:'gotpangkah',category:'shame',icon:'🎯',title:'Human Dartboard',player:pv.name,value:pv.pangkahsReceived+' received',description:'Most pangkahs received!'});
         res.json({ records });
-    } catch (err) {
-        console.error('Hall of Fame error:', err);
-        res.status(500).json({ error: 'Failed to get hall of fame' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// Update player name API
-app.post('/api/player/update-name', async (req, res) => {
-    try {
-        const { userID, displayName } = req.body;
-        if (!userID || !displayName) {
-            return res.status(400).json({ error: 'userID and displayName required' });
-        }
-        
-        // Validate name length
-        const trimmedName = displayName.trim();
-        if (trimmedName.length < 1 || trimmedName.length > 20) {
-            return res.status(400).json({ error: 'Name must be 1-20 characters' });
-        }
-        
-        const player = await Player.findOneAndUpdate(
-            { userID },
-            { $set: { displayName: trimmedName } },
-            { new: true }
-        );
-        
-        if (!player) {
-            return res.status(404).json({ error: 'Player not found' });
-        }
-        
-        res.json({ success: true, displayName: player.displayName });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to update name' });
-    }
-});
-
-// Discord linking
-app.post('/api/discord/link', async (req, res) => {
-    try {
-        const { userID, discordId, discordUsername } = req.body;
-        if (!userID || !discordId) return res.status(400).json({ error: 'userID and discordId required' });
-        
-        // Check if discord already linked to another account
-        const existing = await Player.findOne({ discordId, userID: { $ne: userID } });
-        if (existing) return res.status(400).json({ error: 'Discord already linked to another account' });
-        
-        const player = await Player.findOneAndUpdate(
-            { userID },
-            { $set: { discordId, discordUsername } },
-            { new: true }
-        );
-        
-        if (!player) return res.status(404).json({ error: 'Player not found' });
-        res.json({ success: true, player });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to link Discord' });
-    }
-});
-
-app.get('/api/discord/:discordId', async (req, res) => {
-    try {
-        const player = await Player.findOne({ discordId: req.params.discordId });
-        if (!player) return res.status(404).json({ error: 'Player not found' });
-        res.json(player);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to get player' });
-    }
-});
-
-// GM Authentication
-const GM_PASSWORD = process.env.GM_PASSWORD || 'default_gm_password';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'default_admin_password';
+// ============ GM API ============
+const GM_PASSWORD = process.env.GM_PASSWORD || 'pangkahgm';
 
 app.post('/api/gm/verify', (req, res) => {
-    const { password } = req.body;
-    if (password === GM_PASSWORD) {
-        res.json({ success: true, isGM: true });
-    } else {
-        res.status(401).json({ success: false, error: 'Invalid password' });
-    }
+    res.json({ success: req.body.password === GM_PASSWORD, isGM: req.body.password === GM_PASSWORD });
 });
 
-// GM Admin Panel - Search Player
 app.get('/api/gm/search-player', async (req, res) => {
     try {
         const { q } = req.query;
         if (!q) return res.json({ player: null });
-        
-        // Search by displayName or userID
-        const player = await Player.findOne({
-            $or: [
-                { displayName: { $regex: q, $options: 'i' } },
-                { userID: q }
-            ]
-        });
-        
-        if (player) {
-            res.json({ player: {
-                userID: player.userID,
-                displayName: player.displayName,
-                xp: player.xp,
-                wins: player.wins,
-                losses: player.losses,
-                games: player.games,
-                pangkahs: player.pangkahs,
-                bestStreak: player.bestStreak,
-                isBetaTester: player.isBetaTester
-            }});
-        } else {
-            res.json({ player: null });
-        }
-    } catch (err) {
-        console.error('GM search error:', err);
-        res.status(500).json({ error: 'Search failed' });
-    }
+        const player = await Player.findOne({ $or: [{ displayName: { $regex: q, $options: 'i' } }, { userID: q }] });
+        res.json({ player: player ? { userID: player.userID, displayName: player.displayName, xp: player.xp, wins: player.wins, losses: player.losses, games: player.games, pangkahs: player.pangkahs, pangkahsReceived: player.pangkahsReceived, bestStreak: player.bestStreak, currentStreak: player.currentStreak, handsAbsorbed: player.handsAbsorbed, handsGiven: player.handsGiven, cleanWins: player.cleanWins, maxCardsHeld: player.maxCardsHeld, autoPlays: player.autoPlays, isBetaTester: player.isBetaTester, unlockedTitles: player.unlockedTitles, equippedTitle: player.equippedTitle } : null });
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// GM Admin Panel - Update Player Stats
 app.post('/api/gm/update-player', async (req, res) => {
     try {
         const { targetUserID, updates } = req.body;
-        if (!targetUserID) return res.status(400).json({ error: 'userID required' });
-        
-        const allowedFields = ['xp', 'wins', 'losses', 'games', 'pangkahs', 'bestStreak'];
-        const safeUpdates = {};
-        for (const key of allowedFields) {
-            if (updates[key] !== undefined) {
-                safeUpdates[key] = updates[key];
-            }
+        console.log('[GM] Update request for:', targetUserID, 'Updates:', updates);
+        const allowed = ['xp','wins','losses','games','pangkahs','pangkahsReceived','bestStreak','currentStreak','handsAbsorbed','handsGiven','cleanWins','maxCardsHeld','autoPlays','secondPlace','thirdPlace','fourthToTenth'];
+        const safe = {}; allowed.forEach(k => { if(updates[k] !== undefined) safe[k] = updates[k]; });
+        console.log('[GM] Safe updates:', safe);
+        const player = await Player.findOneAndUpdate({ userID: targetUserID }, { $set: safe }, { new: true });
+        if (!player) {
+            console.log('[GM] Player not found:', targetUserID);
+            return res.status(404).json({ error: 'Not found' });
         }
-        
-        const player = await Player.findOneAndUpdate(
-            { userID: targetUserID },
-            { $set: safeUpdates },
-            { new: true }
-        );
-        
-        if (!player) return res.status(404).json({ error: 'Player not found' });
-        
-        console.log(`[GM] Updated player ${player.displayName}:`, safeUpdates);
-        res.json({ success: true });
-    } catch (err) {
-        console.error('GM update error:', err);
-        res.status(500).json({ error: 'Update failed' });
+        await checkAndUnlockTitles(player);
+        await player.save();
+        console.log('[GM] Updated successfully:', player.displayName, '- New XP:', player.xp, 'Wins:', player.wins);
+        res.json({ success: true, player: { xp: player.xp, wins: player.wins, games: player.games } });
+    } catch (err) { 
+        console.error('[GM] Update error:', err);
+        res.status(500).json({ error: 'Failed' }); 
     }
 });
 
-// GM Admin Panel - Reset Player Stats
 app.post('/api/gm/reset-player', async (req, res) => {
     try {
         const { targetUserID } = req.body;
-        if (!targetUserID) return res.status(400).json({ error: 'userID required' });
-        
-        const player = await Player.findOneAndUpdate(
-            { userID: targetUserID },
-            { $set: {
-                xp: 0, wins: 0, losses: 0, games: 0, pangkahs: 0, pangkahsReceived: 0,
-                bestStreak: 0, currentStreak: 0, handsAbsorbed: 0, handsGiven: 0,
-                cleanWins: 0, maxCardsHeld: 0, autoPlays: 0, cardsPlayed: 0,
-                secondPlace: 0, thirdPlace: 0, fourthToTenth: 0, topTwo: 0, nightGames: 0,
-                pangkahsReceivedFromBot: 0, lossesToBot: 0, handsAbsorbedFromBot: 0,
-                unlockedTitles: [], equippedTitle: null,
-                isBetaTester: false
-            }},
-            { new: true }
-        );
-        
-        if (!player) return res.status(404).json({ error: 'Player not found' });
-        
-        console.log(`[GM] RESET player ${player.displayName} stats`);
+        console.log('[GM] Reset request for:', targetUserID);
+        const player = await Player.findOneAndUpdate({ userID: targetUserID }, { $set: { xp:0,wins:0,losses:0,games:0,pangkahs:0,pangkahsReceived:0,bestStreak:0,currentStreak:0,handsAbsorbed:0,handsGiven:0,cleanWins:0,maxCardsHeld:0,autoPlays:0,secondPlace:0,thirdPlace:0,fourthToTenth:0,topTwo:0,nightGames:0,comebacks:0,perfectWins:0,pangkahsReceivedFromBot:0,lossesToBot:0,handsAbsorbedFromBot:0,unlockedTitles:[],equippedTitle:null,isBetaTester:false }}, { new: true });
+        if (!player) {
+            console.log('[GM] Player not found for reset:', targetUserID);
+            return res.status(404).json({ error: 'Not found' });
+        }
+        console.log('[GM] RESET successful:', player.displayName, '- XP is now:', player.xp);
         res.json({ success: true });
-    } catch (err) {
-        console.error('GM reset error:', err);
-        res.status(500).json({ error: 'Reset failed' });
+    } catch (err) { 
+        console.error('[GM] Reset error:', err);
+        res.status(500).json({ error: 'Failed' }); 
     }
 });
 
-// GM Admin Panel - Get Active Rooms
-app.get('/api/gm/rooms', (req, res) => {
-    try {
-        const roomList = Object.values(rooms).map(room => ({
-            id: room.id,
-            playerCount: room.players.filter(p => !p.isBot).length,
-            maxPlayers: room.maxPlayers,
-            inGame: room.inGame || false,
-            botCount: room.players.filter(p => p.isBot).length
-        }));
-        res.json({ rooms: roomList });
-    } catch (err) {
-        console.error('GM rooms error:', err);
-        res.status(500).json({ error: 'Failed to get rooms' });
-    }
-});
-
-// GM Admin Panel - Toggle Beta Tester Status
 app.post('/api/gm/toggle-beta-tester', async (req, res) => {
     try {
         const { targetUserID, isBetaTester } = req.body;
-        if (!targetUserID) return res.status(400).json({ error: 'userID required' });
-        
-        const player = await Player.findOneAndUpdate(
-            { userID: targetUserID },
-            { $set: { isBetaTester: isBetaTester } },
-            { new: true }
-        );
-        
-        if (!player) return res.status(404).json({ error: 'Player not found' });
-        
-        console.log(`[GM] ${isBetaTester ? 'Granted' : 'Removed'} beta tester status for ${player.displayName}`);
+        const player = await Player.findOneAndUpdate({ userID: targetUserID }, { $set: { isBetaTester } }, { new: true });
+        if (!player) return res.status(404).json({ error: 'Not found' });
+        console.log('[GM] Beta tester', player.displayName, isBetaTester);
         res.json({ success: true });
-    } catch (err) {
-        console.error('GM beta toggle error:', err);
-        res.status(500).json({ error: 'Toggle failed' });
-    }
+    } catch (err) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// GM Admin Panel - Force Close Room
+app.get('/api/gm/rooms', (req, res) => {
+    const list = Object.values(rooms).map(r => ({ id: r.id, playerCount: r.players.filter(p=>!p.isBot).length, maxPlayers: r.maxPlayers, inGame: r.gameStarted, botCount: r.players.filter(p=>p.isBot).length }));
+    res.json({ rooms: list });
+});
+
 app.post('/api/gm/force-close-room', (req, res) => {
-    try {
-        const { roomID } = req.body;
-        if (!roomID) return res.status(400).json({ error: 'roomID required' });
-        
-        const room = rooms[roomID];
-        if (!room) return res.status(404).json({ error: 'Room not found' });
-        
-        // Notify all players in the room
-        io.to(roomID).emit('roomClosed');
-        
-        // Delete the room
-        delete rooms[roomID];
-        
-        console.log(`[GM] Force closed room ${roomID}`);
-        res.json({ success: true });
-    } catch (err) {
-        console.error('GM force close error:', err);
-        res.status(500).json({ error: 'Failed to close room' });
-    }
+    const { roomID } = req.body;
+    if (!rooms[roomID]) return res.status(404).json({ error: 'Not found' });
+    io.to(roomID).emit('roomClosed');
+    delete rooms[roomID];
+    res.json({ success: true });
 });
 
-// Admin API Routes (protected by password)
-app.post('/api/admin/reset-player/:userID', async (req, res) => {
-    try {
-        const { password } = req.body;
-        if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
-        
-        const player = await Player.findOneAndUpdate(
-            { userID: req.params.userID },
-            { $set: {
-                xp: 0, wins: 0, losses: 0, games: 0, pangkahs: 0, pangkahsReceived: 0,
-                bestStreak: 0, currentStreak: 0, handsAbsorbed: 0, handsGiven: 0,
-                cleanWins: 0, maxCardsHeld: 0, autoPlays: 0, cardsPlayed: 0,
-                secondPlace: 0, thirdPlace: 0, fourthToTenth: 0, topTwo: 0, nightGames: 0,
-                unlockedTitles: [], equippedTitle: null
-            }},
-            { new: true }
-        );
-        if (!player) return res.status(404).json({ error: 'Player not found' });
-        res.json({ success: true, player });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to reset player' });
-    }
-});
+// ============ GAME STATE ============
+const rooms = {};
+const MIN_PLAYERS = 2, MAX_PLAYERS = 10, ROUND_DELAY = 1500, BOT_DELAY = 1200, BOT_LEAD_DELAY = 2000, TURN_LIMIT = 15000;
+const turnTimers = {};
 
-app.post('/api/admin/update-player/:userID', async (req, res) => {
-    try {
-        const { password, updates } = req.body;
-        if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
-        
-        const player = await Player.findOneAndUpdate(
-            { userID: req.params.userID },
-            { $set: updates },
-            { new: true }
-        );
-        if (!player) return res.status(404).json({ error: 'Player not found' });
-        res.json({ success: true, player });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to update player' });
-    }
-});
-
-app.post('/api/admin/reset-all', async (req, res) => {
-    try {
-        const { password, confirm } = req.body;
-        if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
-        if (confirm !== 'RESET_ALL_PLAYERS') return res.status(400).json({ error: 'Confirmation required' });
-        
-        await Player.updateMany({}, { $set: {
-            xp: 0, wins: 0, losses: 0, games: 0, pangkahs: 0, pangkahsReceived: 0,
-            bestStreak: 0, currentStreak: 0, handsAbsorbed: 0, handsGiven: 0,
-            cleanWins: 0, maxCardsHeld: 0, autoPlays: 0, cardsPlayed: 0,
-            secondPlace: 0, thirdPlace: 0, fourthToTenth: 0, topTwo: 0, nightGames: 0,
-            unlockedTitles: [], equippedTitle: null
-        }});
-        res.json({ success: true, message: 'All players reset' });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to reset all players' });
-    }
-});
-
-app.get('/api/admin/players', async (req, res) => {
-    try {
-        const { password } = req.query;
-        if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
-        
-        const players = await Player.find().select('userID displayName xp wins games lastPlayedAt');
-        res.json(players);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to get players' });
-    }
-});
-
-// Constants
-const ROUND_RESOLUTION_DELAY = 1500;
-const MIN_PLAYERS = 4;
-const MAX_PLAYERS = 10;
-const TURN_TIMER_SECONDS = 15;
-
-// Fate configuration: how many aces to discard per player count
-const FATE_CONFIG = {
-    4: 0,   // 52 cards / 4 = 13 each, 0 leftover
-    5: 2,   // 52 cards / 5 = 10 each, 2 leftover -> discard 2 random aces
-    6: 4,   // 52 cards / 6 = 8 each, 4 leftover -> discard all 4 aces
-    7: 3,   // 52 cards / 7 = 7 each, 3 leftover -> discard 3 random aces
-    8: 4,   // 52 cards / 8 = 6 each, 4 leftover -> discard all 4 aces
-    10: 2   // 52 cards / 10 = 5 each, 2 leftover -> discard 2 random aces
-};
-
-let rooms = {};
-let turnTimers = {}; // Store turn timers per room
-
-// Bot Configuration
-const BOT_NAMES = [
-    'Keanu Reeves', 'Shrek', 'Gandalf', 'Yoda', 'SpongeBob', 
-    'Dobby', 'Groot', 'Pikachu', 'Batman', 'Gollum',
-    'Thanos', 'Dumbledore', 'Sherlock', 'Mario', 'Sonic',
-    'Elsa', 'Buzz Lightyear', 'Dora', 'Mr Bean', 'John Wick',
-    'Naruto', 'Goku', 'Luffy', 'Saitama', 'Levi Ackerman'
-];
-
-const BOT_EMOTES = ['😂', '👍', '😡', '🔥', '💀', '👏', '🤡', '😎', '🥲', '💪'];
-
-/**
- * ================================================================
- * PANGKAH AI BRAIN MODULE
- * ================================================================
- * Smart AI that remembers, strategizes, and plays optimally
- */
-const PangkahAI = {
-    
-    /**
-     * Initialize AI memory for a room (called once per game)
-     */
-    init(room) {
-        room.ai = {
-            // Permanent memory: which player lacks which suits
-            // Format: { playerIdx: Set(['Hearts', 'Clubs']) }
-            missingSuits: {},
+// Server-side game result processing
+async function processGameResults(room) {
+    const isNight = new Date().getHours() >= 22 || new Date().getHours() < 6;
+    for (const p of room.players) {
+        if (p.isBot) continue;
+        try {
+            const db = await Player.findOne({ userID: p.userID });
+            if (!db) continue;
+            const pos = p.gameStats?.finishPosition || room.players.length;
+            const isWin = pos === 1, isLose = pos === room.players.length;
             
-            // Track all cards played this game
-            playedCards: [],
+            db.games = (db.games||0) + 1;
+            db.lastPlayedAt = new Date();
             
-            // Track pangkah history for pattern recognition
-            pangkahLog: []
-        };
-        console.log('[AI Brain] Initialized for room');
-    },
-    
-    /**
-     * Record that a player doesn't have a suit (PERMANENT for this game)
-     */
-    recordMissingSuit(room, playerIdx, suit) {
-        if (!room.ai) this.init(room);
-        if (!room.ai.missingSuits[playerIdx]) {
-            room.ai.missingSuits[playerIdx] = new Set();
-        }
-        if (!room.ai.missingSuits[playerIdx].has(suit)) {
-            room.ai.missingSuits[playerIdx].add(suit);
-            const playerName = room.players[playerIdx]?.name || `Player ${playerIdx}`;
-            console.log(`[AI Brain] LEARNED: ${playerName} has NO ${suit}`);
-        }
-    },
-    
-    /**
-     * Record a pangkah event for learning
-     */
-    recordPangkah(room, pangkaherIdx, victimIdx, leadSuit) {
-        if (!room.ai) this.init(room);
-        room.ai.pangkahLog.push({
-            pangkaher: pangkaherIdx,
-            victim: victimIdx,
-            suit: leadSuit,
-            timestamp: Date.now()
-        });
-        // The pangkaher didn't have the lead suit - remember this!
-        this.recordMissingSuit(room, pangkaherIdx, leadSuit);
-    },
-    
-    /**
-     * Check if a specific player lacks a suit
-     */
-    playerLacksSuit(room, playerIdx, suit) {
-        if (!room.ai) return false;
-        return room.ai.missingSuits[playerIdx]?.has(suit) || false;
-    },
-    
-    /**
-     * Get all players (indices) who lack a specific suit
-     */
-    getPlayersLackingSuit(room, suit) {
-        if (!room.ai) return [];
-        const lacking = [];
-        for (const pIdx in room.ai.missingSuits) {
-            if (room.ai.missingSuits[pIdx].has(suit)) {
-                lacking.push(parseInt(pIdx));
-            }
-        }
-        return lacking;
-    },
-    
-    /**
-     * Check if any ACTIVE player after botIdx lacks the suit
-     * Returns the first one found (most dangerous)
-     */
-    findPlayerAfterMeLackingSuit(room, botIdx, suit) {
-        if (!room.ai) return null;
-        const playerCount = room.players.length;
-        
-        // Check players in turn order after bot
-        for (let offset = 1; offset < playerCount; offset++) {
-            const checkIdx = (botIdx + offset) % playerCount;
-            const player = room.players[checkIdx];
-            
-            // Skip eliminated players
-            if (!player || player.hand.length === 0) continue;
-            
-            // Found someone who lacks this suit!
-            if (this.playerLacksSuit(room, checkIdx, suit)) {
-                return {
-                    playerIdx: checkIdx,
-                    playerName: player.name,
-                    offset: offset // How many positions after bot
-                };
-            }
-        }
-        return null;
-    },
-    
-    /**
-     * STRATEGY: Find safe suits to lead (no one after me lacks them)
-     */
-    getSafeSuits(room, botIdx, availableSuits) {
-        const safeSuits = [];
-        for (const suit of availableSuits) {
-            const danger = this.findPlayerAfterMeLackingSuit(room, botIdx, suit);
-            if (!danger) {
-                safeSuits.push(suit);
-            }
-        }
-        return safeSuits;
-    },
-    
-    /**
-     * STRATEGY: Find bait opportunities
-     * If player at offset 2+ lacks a suit, I can bait the player at offset 1
-     */
-    findBaitOpportunity(room, botIdx, availableSuits) {
-        if (!room.ai) return null;
-        const playerCount = room.players.length;
-        
-        for (const suit of availableSuits) {
-            const lacking = this.findPlayerAfterMeLackingSuit(room, botIdx, suit);
-            
-            // If someone at offset 2+ lacks this suit, check if offset 1 can be baited
-            if (lacking && lacking.offset >= 2) {
-                const baitTargetIdx = (botIdx + 1) % playerCount;
-                const baitTarget = room.players[baitTargetIdx];
-                
-                // Bait target must be active and NOT lack this suit
-                if (baitTarget && baitTarget.hand.length > 0 && 
-                    !this.playerLacksSuit(room, baitTargetIdx, suit)) {
-                    return {
-                        suit: suit,
-                        baitTargetIdx: baitTargetIdx,
-                        baitTargetName: baitTarget.name,
-                        pangkaherIdx: lacking.playerIdx,
-                        pangkaherName: lacking.playerName
-                    };
-                }
-            }
-        }
-        return null;
-    },
-    
-    /**
-     * Get current highest card on table for a suit
-     */
-    getHighestOnTable(room, suit) {
-        if (!room.table || room.table.length === 0) return null;
-        let highest = null;
-        for (const entry of room.table) {
-            if (entry.card.suit === suit) {
-                if (!highest || entry.card.val > highest.val) {
-                    highest = entry.card;
-                }
-            }
-        }
-        return highest;
-    },
-    
-    /**
-     * ============================================
-     * MAIN DECISION ENGINE: Choose best card to play
-     * ============================================
-     */
-    chooseCard(room, botIdx) {
-        const player = room.players[botIdx];
-        const hand = player.hand;
-        
-        if (!room.ai) this.init(room);
-        
-        // Helper: Get cards by suit
-        const getCardsBySuit = (suit) => hand.filter(c => c.suit === suit);
-        
-        // Helper: Get all suits in hand
-        const getMySuits = () => [...new Set(hand.map(c => c.suit))];
-        
-        // Helper: Count cards per suit
-        const getSuitCounts = () => {
-            const counts = {};
-            hand.forEach(c => { counts[c.suit] = (counts[c.suit] || 0) + 1; });
-            return counts;
-        };
-        
-        // Helper: Get lowest card from array
-        const getLowest = (cards) => cards.reduce((min, c) => c.val < min.val ? c : min);
-        
-        // Helper: Get highest card from array
-        const getHighest = (cards) => cards.reduce((max, c) => c.val > max.val ? c : max);
-        
-        // ========== SCENARIO 1: First Move (Must play King of Spades) ==========
-        if (room.isFirstMove) {
-            return hand.find(c => c.suit === 'Spades' && c.rank === 'K');
-        }
-        
-        // ========== SCENARIO 2: Must Follow Suit ==========
-        if (room.currentSuit) {
-            const suitCards = getCardsBySuit(room.currentSuit);
-            
-            if (suitCards.length > 0) {
-                // I HAVE the lead suit - must follow
-                const highestOnTable = this.getHighestOnTable(room, room.currentSuit);
-                
-                if (highestOnTable) {
-                    // SMART PLAY: If high card already on table, dump my high cards below it
-                    const cardsBelow = suitCards.filter(c => c.val < highestOnTable.val);
-                    if (cardsBelow.length > 0) {
-                        // Play highest card that's still below table's highest (dump high cards safely)
-                        return getHighest(cardsBelow);
-                    }
-                }
-                
-                // Default: Play lowest to avoid winning
-                return getLowest(suitCards);
-                
-            } else {
-                // I DON'T HAVE lead suit - PANGKAH TIME!
-                // Strategy: Dump highest cards (high cards are dangerous to keep)
-                return getHighest(hand);
-            }
-        }
-        
-        // ========== SCENARIO 3: Leading a New Round ==========
-        const mySuits = getMySuits();
-        const suitCounts = getSuitCounts();
-        
-        // STRATEGY A: Find safe suits (no one after me lacks them)
-        const safeSuits = this.getSafeSuits(room, botIdx, mySuits);
-        
-        // STRATEGY B: Find bait opportunities
-        const bait = this.findBaitOpportunity(room, botIdx, mySuits);
-        
-        // DECISION PRIORITY:
-        
-        // 1. BAIT TRICK (70% chance if available)
-        if (bait && Math.random() < 0.7) {
-            const baitCards = getCardsBySuit(bait.suit);
-            console.log(`[AI Brain] ${player.name} BAITING ${bait.baitTargetName} with ${bait.suit} (${bait.pangkaherName} will pangkah)`);
-            // Play LOW card to bait
-            return getLowest(baitCards);
-        }
-        
-        // 2. SAFE SUIT - Clear rarest safe suit
-        if (safeSuits.length > 0) {
-            // Pick the rarest safe suit to clear it
-            let rarestSafe = safeSuits[0];
-            let minCount = suitCounts[rarestSafe];
-            for (const suit of safeSuits) {
-                if (suitCounts[suit] < minCount) {
-                    minCount = suitCounts[suit];
-                    rarestSafe = suit;
-                }
-            }
-            const safeCards = getCardsBySuit(rarestSafe);
-            console.log(`[AI Brain] ${player.name} playing SAFE suit ${rarestSafe}`);
-            return getLowest(safeCards);
-        }
-        
-        // 3. NO SAFE SUITS - Pick least dangerous option
-        // Try to find suit where the lacking player is furthest away
-        let bestSuit = mySuits[0];
-        let bestOffset = 0;
-        
-        for (const suit of mySuits) {
-            const danger = this.findPlayerAfterMeLackingSuit(room, botIdx, suit);
-            if (!danger) {
-                bestSuit = suit;
-                break;
-            }
-            if (danger.offset > bestOffset) {
-                bestOffset = danger.offset;
-                bestSuit = suit;
-            }
-        }
-        
-        // Play mid-value card (not lowest, not highest) to minimize damage
-        const cards = getCardsBySuit(bestSuit);
-        cards.sort((a, b) => a.val - b.val);
-        const midIndex = Math.floor(cards.length / 2);
-        console.log(`[AI Brain] ${player.name} NO SAFE OPTION - playing mid ${bestSuit}`);
-        return cards[midIndex] || cards[0];
-    }
-};
-
-/**
- * Get random bot name
- */
-function getRandomBotName(existingNames = []) {
-    const available = BOT_NAMES.filter(n => !existingNames.includes(`[BOT] ${n}`));
-    if (available.length === 0) return `[BOT] Bot${Math.floor(Math.random() * 1000)}`;
-    return `[BOT] ${available[Math.floor(Math.random() * available.length)]}`;
-}
-
-/**
- * Create bot player object
- */
-function createBot(existingNames = []) {
-    const botName = getRandomBotName(existingNames);
-    return {
-        id: `bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name: botName,
-        userID: `bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        hand: [],
-        equippedTitle: null,
-        level: Math.floor(Math.random() * 10) + 1,
-        isGM: false,
-        isBot: true,
-        gameStats: null,
-        rematchReady: false
-    };
-}
-
-/**
- * Bot plays a card using AI Brain
- */
-function botPlayCard(roomID, isLeadingNewRound = false) {
-    const room = rooms[roomID];
-    if (!room || room.resolving) return;
-    
-    const botIdx = room.turn;
-    const player = room.players[botIdx];
-    if (!player || !player.isBot || player.hand.length === 0) return;
-    
-    // Delay: Leading new round = 7-8s, Normal = 1-2.5s
-    const delay = isLeadingNewRound ? (7000 + Math.random() * 1000) : (1000 + Math.random() * 1500);
-    
-    setTimeout(() => {
-        if (!rooms[roomID] || rooms[roomID].resolving) return;
-        if (rooms[roomID].turn !== botIdx) return;
-        
-        // Use AI Brain to choose card
-        const cardToPlay = PangkahAI.chooseCard(room, botIdx);
-        
-        if (cardToPlay) {
-            // Sometimes send emote (20% chance)
-            if (Math.random() < 0.2) {
-                const emote = BOT_EMOTES[Math.floor(Math.random() * BOT_EMOTES.length)];
-                io.to(roomID).emit('emote', { 
-                    from: player.name, 
-                    emote: emote,
-                    playerIdx: botIdx
-                });
+            if (isWin) {
+                db.wins = (db.wins||0) + 1;
+                db.currentStreak = (db.currentStreak||0) + 1;
+                if (db.currentStreak > (db.bestStreak||0)) db.bestStreak = db.currentStreak;
+                db.topTwo = (db.topTwo||0) + 1;
+                if (p.gameStats?.pangkahsReceived === 0) db.perfectWins = (db.perfectWins||0) + 1;
+            } else if (pos === 2) {
+                db.secondPlace = (db.secondPlace||0) + 1;
+                db.topTwo = (db.topTwo||0) + 1;
+                db.currentStreak = 0;
+            } else if (pos === 3) {
+                db.thirdPlace = (db.thirdPlace||0) + 1;
+                db.currentStreak = 0;
+            } else if (pos >= 4) {
+                db.fourthToTenth = (db.fourthToTenth||0) + 1;
+                db.currentStreak = 0;
             }
             
-            processCardPlay(roomID, room.turn, cardToPlay);
-        }
-    }, delay);
-}
-
-/**
- * Check if current player is bot and trigger bot play
- */
-function checkBotTurn(roomID, isLeadingNewRound = false) {
-    const room = rooms[roomID];
-    if (!room || !room.gameStarted || room.resolving) return;
-    
-    const currentPlayer = room.players[room.turn];
-    if (currentPlayer && currentPlayer.isBot && currentPlayer.hand.length > 0) {
-        botPlayCard(roomID, isLeadingNewRound);
-    }
-}
-
-/**
- * Fisher-Yates shuffle - unbiased randomization
- */
-function shuffle(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
-}
-
-/**
- * Generate a shuffled 52-card deck
- */
-function generateDeck() {
-    const suits = ['Spades', 'Hearts', 'Diamonds', 'Clubs'];
-    const ranks = [
-        {n:'A',v:1}, {n:'2',v:2}, {n:'3',v:3}, {n:'4',v:4}, {n:'5',v:5},
-        {n:'6',v:6}, {n:'7',v:7}, {n:'8',v:8}, {n:'9',v:9}, {n:'10',v:10},
-        {n:'J',v:11}, {n:'Q',v:12}, {n:'K',v:13}
-    ];
-    let deck = [];
-    suits.forEach(s => ranks.forEach(r => deck.push({ suit: s, rank: r.n, val: r.v })));
-    return shuffle(deck);
-}
-
-/**
- * Clear turn timer for a room
- */
-function clearTurnTimer(roomID) {
-    if (turnTimers[roomID]) {
-        clearTimeout(turnTimers[roomID].timeout);
-        clearInterval(turnTimers[roomID].interval);
-        delete turnTimers[roomID];
-    }
-}
-
-/**
- * Start turn timer for current player
- */
-function startTurnTimer(roomID) {
-    const room = rooms[roomID];
-    if (!room || !room.gameStarted) return;
-    
-    // Clear existing timer
-    clearTurnTimer(roomID);
-    
-    const player = room.players[room.turn];
-    if (!player || player.hand.length === 0) return;
-    
-    let timeLeft = TURN_TIMER_SECONDS;
-    
-    // Emit initial timer
-    io.to(roomID).emit('turnTimer', { timeLeft, playerIdx: room.turn });
-    
-    // Countdown interval
-    turnTimers[roomID] = {
-        interval: setInterval(() => {
-            timeLeft--;
-            io.to(roomID).emit('turnTimer', { timeLeft, playerIdx: room.turn });
-            if (timeLeft <= 0) {
-                clearInterval(turnTimers[roomID]?.interval);
+            if (isLose) {
+                db.losses = (db.losses||0) + 1;
+                db.currentStreak = 0;
+                if (p.gameStats?.lossesToBot) db.lossesToBot = (db.lossesToBot||0) + 1;
             }
-        }, 1000),
-        timeout: setTimeout(() => {
-            autoPlayCard(roomID);
-        }, TURN_TIMER_SECONDS * 1000)
-    };
-}
-
-/**
- * Auto-play card when timer expires
- */
-function autoPlayCard(roomID) {
-    // Clear the timer first to stop any more timer events
-    clearTurnTimer(roomID);
-    
-    const room = rooms[roomID];
-    if (!room || room.resolving) return;
-    
-    const currentTurn = room.turn;
-    const player = room.players[currentTurn];
-    if (!player || player.hand.length === 0) return;
-    
-    let cardToPlay = null;
-    
-    // First move - must play King of Spades
-    if (room.isFirstMove) {
-        cardToPlay = player.hand.find(c => c.suit === 'Spades' && c.rank === 'K');
-    } 
-    // Has lead suit - play highest of that suit
-    else if (room.currentSuit) {
-        const suitCards = player.hand.filter(c => c.suit === room.currentSuit);
-        if (suitCards.length > 0) {
-            cardToPlay = suitCards.reduce((max, c) => c.val > max.val ? c : max);
-        }
-    }
-    
-    // No lead suit or starting new round - play lowest card
-    if (!cardToPlay) {
-        cardToPlay = player.hand.reduce((min, c) => c.val < min.val ? c : min);
-    }
-    
-    if (cardToPlay) {
-        console.log(`Auto-play for ${player.name}: ${cardToPlay.rank} of ${cardToPlay.suit}`);
-        
-        // Process the card play directly (no delay)
-        const playedCard = player.hand.find(c => c.suit === cardToPlay.suit && c.rank === cardToPlay.rank);
-        if (!playedCard) return;
-        
-        const cardIndex = player.hand.indexOf(playedCard);
-        player.hand.splice(cardIndex, 1);
-        
-        if (room.isFirstMove) {
-            room.isFirstMove = false;
-        }
-        
-        room.table.push({ 
-            playerIdx: currentTurn, 
-            playerName: player.name, 
-            card: playedCard 
-        });
-        
-        if (player.gameStats) {
-            player.gameStats.cardsPlayed++;
-        }
-        
-        if (room.table.length === 1) {
-            room.currentSuit = playedCard.suit;
-        }
-        
-        // Emit autoPlayed with FULL game state so client can render properly
-        io.to(roomID).emit('autoPlayed', { 
-            playerName: player.name,
-            playerUserID: player.userID,
-            card: cardToPlay,
-            // Include full state for re-render
-            table: room.table,
-            turn: room.turn,
-            players: room.players,
-            currentSuit: room.currentSuit,
-            fateAces: room.fateAces
-        });
-        
-        // Determine if Pangkah occurred
-        let isPangkah = playedCard.suit !== room.currentSuit;
-        
-        if (player.gameStats && isPangkah) {
-            player.gameStats.pangkahsDealt++;
-            room.pangkahDealer = player.userID; // Track who dealt the pangkah
-        }
-        
-        // Count active players
-        let activePlayers = room.players.filter(p => 
-            p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p))
-        );
-        let roundComplete = room.table.length >= activePlayers.length;
-
-        if (isPangkah || roundComplete) {
-            room.resolving = true;
-            setTimeout(() => {
-                resolveRound(roomID, isPangkah);
-            }, ROUND_RESOLUTION_DELAY);
-        } else {
-            advanceToNextPlayer(roomID);
-        }
-    }
-}
-
-/**
- * Process card play (shared logic for manual and auto play)
- */
-function processCardPlay(roomID, playerIdx, cardObject) {
-    const room = rooms[roomID];
-    if (!room) return;
-    
-    const player = room.players[playerIdx];
-    const cardIndex = player.hand.findIndex(c => 
-        c.suit === cardObject.suit && c.rank === cardObject.rank
-    );
-    
-    if (cardIndex === -1) return;
-    
-    const playedCard = player.hand[cardIndex];
-    
-    // Clear timer
-    clearTurnTimer(roomID);
-    
-    // Update first move flag
-    if (room.isFirstMove) {
-        room.isFirstMove = false;
-    }
-
-    // Play the card
-    player.hand.splice(cardIndex, 1);
-    room.table.push({ 
-        playerIdx: playerIdx, 
-        playerName: player.name, 
-        card: playedCard 
-    });
-    
-    // Track stats
-    if (player.gameStats) {
-        player.gameStats.cardsPlayed++;
-    }
-    
-    // Set lead suit if first card
-    if (room.table.length === 1) {
-        room.currentSuit = playedCard.suit;
-    }
-
-    io.to(roomID).emit('updateTable', { 
-        table: room.table, 
-        turn: room.turn, 
-        players: room.players,
-        currentSuit: room.currentSuit
-    });
-
-    // Determine if Pangkah occurred
-    let isPangkah = playedCard.suit !== room.currentSuit;
-    
-    // Track pangkah stats and teach AI Brain
-    if (isPangkah && player.gameStats) {
-        player.gameStats.pangkahsDealt++;
-        room.pangkahDealer = player.userID;
-        
-        // Find who will receive the pangkah (highest lead suit holder)
-        let victimIdx = -1;
-        let highVal = -1;
-        room.table.forEach(t => {
-            if (t.card.suit === room.currentSuit && t.card.val > highVal) {
-                highVal = t.card.val;
-                victimIdx = t.playerIdx;
+            
+            if (p.gameStats) {
+                db.pangkahs = (db.pangkahs||0) + (p.gameStats.pangkahsDealt||0);
+                db.pangkahsReceived = (db.pangkahsReceived||0) + (p.gameStats.pangkahsReceived||0);
+                db.cleanWins = (db.cleanWins||0) + (p.gameStats.cleanWins||0);
+                db.cardsPlayed = (db.cardsPlayed||0) + (p.gameStats.cardsPlayed||0);
+                if (p.gameStats.comebacks) db.comebacks = (db.comebacks||0) + p.gameStats.comebacks;
+                if ((p.gameStats.maxCardsThisGame||0) > (db.maxCardsHeld||0)) db.maxCardsHeld = p.gameStats.maxCardsThisGame;
+                if (p.gameStats.pangkahsReceivedFromBot) db.pangkahsReceivedFromBot = (db.pangkahsReceivedFromBot||0) + p.gameStats.pangkahsReceivedFromBot;
             }
-        });
-        
-        // Track if BOT pangkah'd a HUMAN (for shame record)
-        const victim = room.players[victimIdx];
-        if (player.isBot && victim && !victim.isBot && victim.gameStats) {
-            victim.gameStats.pangkahsReceivedFromBot = (victim.gameStats.pangkahsReceivedFromBot || 0) + 1;
-        }
-        
-        // AI BRAIN: Record this pangkah event (permanent memory)
-        PangkahAI.recordPangkah(room, playerIdx, victimIdx, room.currentSuit);
-    }
-    
-    // Count active players
-    let activePlayers = room.players.filter(p => 
-        p.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(p))
-    );
-    let roundComplete = room.table.length >= activePlayers.length;
-
-    if (isPangkah || roundComplete) {
-        room.resolving = true;
-        
-        setTimeout(() => {
-            resolveRound(roomID, isPangkah);
-        }, ROUND_RESOLUTION_DELAY);
-    } else {
-        // Next player's turn
-        advanceToNextPlayer(roomID);
+            
+            if (isNight) db.nightGames = (db.nightGames||0) + 1;
+            
+            let xp = isWin ? 15 + (db.currentStreak > 1 ? db.currentStreak * 2 : 0) : pos === 2 ? 8 : pos === 3 ? 5 : isLose ? -2 : 2;
+            xp += (p.gameStats?.pangkahsDealt||0) * 3 + (p.gameStats?.cleanWins||0);
+            db.xp = Math.max(0, (db.xp||0) + xp);
+            
+            const newTitles = await checkAndUnlockTitles(db);
+            await db.save();
+            
+            console.log('[RESULT]', db.displayName, 'Pos:', pos, 'XP:', xp>0?'+'+xp:xp);
+            
+            const sock = room.players.find(x => x.userID === p.userID);
+            if (sock?.id) io.to(sock.id).emit('statsUpdated', { xp: db.xp, wins: db.wins, losses: db.losses, games: db.games, pangkahs: db.pangkahs, bestStreak: db.bestStreak, currentStreak: db.currentStreak, unlockedTitles: db.unlockedTitles, newTitles, xpGain: xp, position: pos });
+        } catch (e) { console.error('[RESULT ERR]', p.userID, e.message); }
     }
 }
 
-/**
- * Advance to next player with cards
- */
-function advanceToNextPlayer(roomID) {
-    const room = rooms[roomID];
-    if (!room) return;
-    
-    let nextTurn = (room.turn + 1) % room.players.length;
-    let attempts = 0;
-    
-    while (room.players[nextTurn].hand.length === 0 && attempts < room.players.length) {
-        nextTurn = (nextTurn + 1) % room.players.length;
-        attempts++;
-    }
-    
-    room.turn = nextTurn;
-    
-    io.to(roomID).emit('nextTurn', { 
-        turn: room.turn, 
-        players: room.players,
-        currentSuit: room.currentSuit,
-        table: room.table,
-        fateAces: room.fateAces
-    });
-    
-    // Check if next player is a bot
-    const nextPlayer = room.players[room.turn];
-    if (nextPlayer && nextPlayer.isBot) {
-        checkBotTurn(roomID);
-    } else {
-        // Start timer for human player
-        startTurnTimer(roomID);
-    }
+async function trackAutoPlay(userID) {
+    await Player.findOneAndUpdate({ userID }, { $inc: { autoPlays: 1 } }).catch(()=>{});
 }
 
-/**
- * Resolve round (pangkah or clean)
- */
-function resolveRound(roomID, isPangkah) {
-    const room = rooms[roomID];
-    if (!room) return;
-    
-    // Find winner (highest card of lead suit)
-    let winnerIdx = -1;
-    let highVal = -1;
-    
-    room.table.forEach(t => {
-        if (t.card.suit === room.currentSuit && t.card.val > highVal) {
-            highVal = t.card.val;
-            winnerIdx = t.playerIdx;
-        }
-    });
-    
-    if (winnerIdx === -1) {
-        winnerIdx = room.table[0].playerIdx;
-        console.warn('Warning: No player played lead suit!');
+async function trackHandAbsorb(absorbID, giveID, isBot) {
+    await Player.findOneAndUpdate({ userID: absorbID }, { $inc: { handsAbsorbed: 1, ...(isBot ? { handsAbsorbedFromBot: 1 } : {}) } }).catch(()=>{});
+    if (!isBot) await Player.findOneAndUpdate({ userID: giveID }, { $inc: { handsGiven: 1 } }).catch(()=>{});
+}
+
+// Deck
+function createDeck() {
+    const suits = ['Spades','Hearts','Diamonds','Clubs'], ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+    return suits.flatMap(s => ranks.map((r,i) => ({ suit: s, rank: r, val: i })));
+}
+function shuffle(arr) { for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];} return arr; }
+function deal(room) {
+    const deck = shuffle(createDeck());
+    room.players.forEach(p => p.hand = []);
+    deck.forEach((c,i) => room.players[i % room.players.length].hand.push(c));
+    room.turn = room.players.findIndex(p => p.hand.some(c => c.suit==='Spades' && c.rank==='K'));
+}
+function generateBotName() {
+    const pre = ['Iron','Shadow','Thunder','Jade','Silent','Azure','Crimson','Golden','Silver','Dark'];
+    const suf = ['Dragon','Phoenix','Tiger','Serpent','Lotus','Blade','Storm','Moon','Star','Fist'];
+    return pre[Math.floor(Math.random()*pre.length)] + ' ' + suf[Math.floor(Math.random()*suf.length)];
+}
+function initStats(p) { p.gameStats = { pangkahsDealt:0, pangkahsReceived:0, pangkahsReceivedFromBot:0, cleanWins:0, cardsPlayed:0, comebacks:0, hadMostCards:false, maxCardsThisGame: p.hand?.length||0, finishPosition:0, lossesToBot:0 }; }
+
+// Timers
+function startTimer(rid) {
+    clearTimer(rid);
+    const room = rooms[rid];
+    if (!room?.gameStarted || room.players[room.turn]?.isBot) return;
+    turnTimers[rid] = setTimeout(async () => {
+        const r = rooms[rid]; if (!r?.gameStarted) return;
+        const p = r.players[r.turn]; if (!p?.hand.length) return;
+        let card = r.isFirstMove ? p.hand.find(c=>c.suit==='Spades'&&c.rank==='K') : r.currentSuit ? p.hand.find(c=>c.suit===r.currentSuit) : null;
+        if (!card) card = p.hand[0];
+        if (!p.isBot) await trackAutoPlay(p.userID);
+        processCard(rid, r.turn, card);
+    }, TURN_LIMIT);
+    io.to(rid).emit('turnTimerStarted', { timeLimit: TURN_LIMIT });
+}
+function clearTimer(rid) { if(turnTimers[rid]){clearTimeout(turnTimers[rid]);delete turnTimers[rid];} }
+
+function processCard(rid, idx, card) {
+    const room = rooms[rid]; if(!room) return;
+    clearTimer(rid);
+    const p = room.players[idx];
+    const ci = p.hand.findIndex(c => c.suit===card.suit && c.rank===card.rank);
+    if (ci === -1) return;
+    const played = p.hand.splice(ci, 1)[0];
+    if (p.gameStats) { p.gameStats.cardsPlayed++; if(p.hand.length > p.gameStats.maxCardsThisGame) p.gameStats.maxCardsThisGame = p.hand.length; }
+    if (room.table.length === 0) room.currentSuit = played.suit;
+    room.table.push({ card: played, playerIdx: idx, playerName: p.name });
+    room.isFirstMove = false;
+    const isPangkah = played.suit !== room.currentSuit;
+    if (isPangkah && p.gameStats) { p.gameStats.pangkahsDealt++; room.pangkahDealer = p.userID; }
+    io.to(rid).emit('cardPlayed', { playerIdx: idx, playerName: p.name, card: played, leadSuit: room.currentSuit, isPangkah, players: room.players, turn: room.turn, table: room.table });
+    if (p.hand.length === 0 && !room.finishOrder.includes(p.userID)) {
+        room.finishOrder.push(p.userID);
+        if(p.gameStats) { p.gameStats.finishPosition = room.finishOrder.length; if(p.gameStats.hadMostCards && p.gameStats.finishPosition <= 2) p.gameStats.comebacks++; }
     }
-    
-    const winner = room.players[winnerIdx];
-    
-    // Handle round outcome
+    const complete = room.table.length >= room.players.filter(x => x.hand.length > 0 || room.table.some(t => t.playerIdx === room.players.indexOf(x))).length;
+    if (isPangkah || complete) { room.resolving = true; setTimeout(() => resolveRound(rid, isPangkah), ROUND_DELAY); }
+    else advancePlayer(rid);
+}
+
+function advancePlayer(rid) {
+    const room = rooms[rid]; if(!room) return;
+    let next = (room.turn + 1) % room.players.length, att = 0;
+    while (room.players[next].hand.length === 0 && att < room.players.length) { next = (next + 1) % room.players.length; att++; }
+    room.turn = next;
+    io.to(rid).emit('nextTurn', { turn: room.turn, players: room.players, currentSuit: room.currentSuit, table: room.table, fateAces: room.fateAces });
+    if (room.players[room.turn]?.isBot) botTurn(rid); else startTimer(rid);
+}
+
+function resolveRound(rid, isPangkah) {
+    const room = rooms[rid]; if(!room) return;
+    let winIdx = -1, high = -1;
+    room.table.forEach(t => { if(t.card.suit === room.currentSuit && t.card.val > high) { high = t.card.val; winIdx = t.playerIdx; } });
+    if (winIdx === -1) winIdx = room.table[0].playerIdx;
+    const winner = room.players[winIdx];
     if (isPangkah) {
         winner.hand.push(...room.table.map(t => t.card));
-        
         if (winner.gameStats) {
             winner.gameStats.pangkahsReceived++;
-            const maxCards = Math.max(...room.players.map(p => p.hand.length));
-            if (winner.hand.length === maxCards && winner.hand.length >= 15) {
-                winner.gameStats.hadMostCards = true;
-            }
+            const dealer = room.players.find(x => x.userID === room.pangkahDealer);
+            if (dealer?.isBot && !winner.isBot) winner.gameStats.pangkahsReceivedFromBot = (winner.gameStats.pangkahsReceivedFromBot||0) + 1;
+            if (winner.hand.length > winner.gameStats.maxCardsThisGame) winner.gameStats.maxCardsThisGame = winner.hand.length;
+            if (winner.hand.length >= 15) winner.gameStats.hadMostCards = true;
         }
-        // AI Brain already learned from pangkah in processCardPlay
     } else {
         room.discarded.push(...room.table.map(t => t.card));
-        if (winner.gameStats) {
-            winner.gameStats.cleanWins++;
-        }
+        if (winner.gameStats) winner.gameStats.cleanWins++;
     }
-    
-    // Check for game over
-    let survivors = room.players.filter(p => p.hand.length > 0);
-    
-    // Track finish order - players who just emptied their hand
-    room.players.forEach((p, idx) => {
-        if (p.hand.length === 0 && !room.finishOrder.includes(p.userID)) {
-            room.finishOrder.push(p.userID);
-            // Position 1 = first to empty (WINNER), Position N = last with cards (LOSER)
-            p.gameStats.finishPosition = room.finishOrder.length;
-            
-            if (p.gameStats.hadMostCards && p.gameStats.finishPosition <= 2) {
-                p.gameStats.comebacks++;
-            }
-        }
-    });
-    
+    room.players.forEach(p => { if(p.hand.length===0 && !room.finishOrder.includes(p.userID)) { room.finishOrder.push(p.userID); if(p.gameStats){p.gameStats.finishPosition=room.finishOrder.length;if(p.gameStats.hadMostCards&&p.gameStats.finishPosition<=2)p.gameStats.comebacks++;} } });
+    const survivors = room.players.filter(p => p.hand.length > 0);
     if (survivors.length <= 1) {
-        // Game over - the last survivor is the LOSER
-        clearTurnTimer(roomID);
-        
+        clearTimer(rid);
         const loser = survivors[0];
-        
         if (loser) {
-            // Last player with cards = LAST PLACE (loser)
             room.finishOrder.push(loser.userID);
-            loser.gameStats.finishPosition = room.players.length; // Last position
-            
-            // Track if loser is human and second-to-last was a bot (Lost to Bot shame)
+            if(loser.gameStats) loser.gameStats.finishPosition = room.players.length;
             if (!loser.isBot && room.finishOrder.length >= 2) {
-                const secondLastUserID = room.finishOrder[room.finishOrder.length - 2];
-                const secondLastPlayer = room.players.find(p => p.userID === secondLastUserID);
-                if (secondLastPlayer && secondLastPlayer.isBot) {
-                    loser.gameStats.lossesToBot = (loser.gameStats.lossesToBot || 0) + 1;
-                    console.log(`${loser.name} LOST TO BOT ${secondLastPlayer.name}!`);
-                }
+                const prev = room.players.find(x => x.userID === room.finishOrder[room.finishOrder.length-2]);
+                if (prev?.isBot && loser.gameStats) loser.gameStats.lossesToBot = 1;
             }
         }
-        
-        const performanceData = room.players.map(p => ({
-            userID: p.userID,
-            name: p.name,
-            position: p.gameStats.finishPosition,
-            stats: p.gameStats,
-            equippedTitle: p.equippedTitle
-        }));
-        
-        io.to(roomID).emit('gameOver', { 
-            loser: loser?.name || 'None',
-            loserUserID: loser?.userID || null,
-            finishOrder: room.finishOrder,
-            gameNumber: room.gameNumber,
-            performanceData
-        });
-        
+        io.to(rid).emit('gameOver', { loser: loser?.name||'None', loserUserID: loser?.userID, finishOrder: room.finishOrder, gameNumber: room.gameNumber, performanceData: room.players.map(x=>({userID:x.userID,name:x.name,position:x.gameStats?.finishPosition||0,stats:x.gameStats,equippedTitle:x.equippedTitle,isBot:x.isBot})) });
+        processGameResults(room);
         room.gameStarted = false;
-        
-        // Auto-ready bots for rematch
-        room.players.forEach(p => {
-            if (p.isBot) {
-                p.rematchReady = true;
-            }
-        });
-        
-        // Emit rematch status with bots already ready
-        const botReadyCount = room.players.filter(p => p.isBot).length;
-        if (botReadyCount > 0) {
-            io.to(roomID).emit('rematchStatus', {
-                readyCount: botReadyCount,
-                totalCount: room.players.length,
-                allReady: false
-            });
-        }
-        
+        room.players.forEach(p => { if(p.isBot) p.rematchReady = true; });
         broadcastRooms();
-        
-        console.log(`Game #${room.gameNumber} ended in room ${roomID}. Loser: ${survivors[0]?.name || 'None'}`);
     } else {
-        // Continue game
-        room.table = [];
-        room.currentSuit = null;
-        room.turn = winnerIdx;
-        room.resolving = false;
-        
-        io.to(roomID).emit('clearTable', { 
-            msg: isPangkah ? 'Pangkah!' : 'Clean!', 
-            winner: winner.name,
-            winnerUserID: winner.userID,
-            pangkahDealerUserID: isPangkah ? room.pangkahDealer : null,
-            turn: room.turn, 
-            players: room.players,
-            fateAces: room.fateAces
-        });
-        
-        // Check if next player (winner) is a bot - they are LEADING a new round
-        const nextPlayer = room.players[room.turn];
-        setTimeout(() => {
-            if (nextPlayer && nextPlayer.isBot) {
-                checkBotTurn(roomID, true); // true = leading new round, use longer delay
-            } else {
-                startTurnTimer(roomID);
-            }
-        }, 500);
+        room.table = []; room.currentSuit = null; room.turn = winIdx; room.resolving = false;
+        io.to(rid).emit('clearTable', { msg: isPangkah?'Pangkah!':'Clean!', winner: winner.name, winnerUserID: winner.userID, pangkahDealerUserID: isPangkah?room.pangkahDealer:null, turn: room.turn, players: room.players, fateAces: room.fateAces });
+        setTimeout(() => { if(room.players[room.turn]?.isBot) botTurn(rid, true); else startTimer(rid); }, 500);
     }
 }
 
-/**
- * Broadcast current room list to all clients
- */
-const broadcastRooms = () => {
-    const list = Object.keys(rooms).map(id => ({
-        id, 
-        count: rooms[id].players.length, 
-        max: rooms[id].maxPlayers,
-        inGame: rooms[id].gameStarted
-    }));
-    io.emit('roomList', list);
-};
-
-/**
- * Find the next active player (with cards in hand)
- */
-function getNextActivePlayer(room, startIdx) {
-    let nextIdx = startIdx;
-    let attempts = 0;
-    
-    do {
-        nextIdx = (nextIdx + 1) % room.players.length;
-        attempts++;
-        
-        if (attempts >= room.players.length) {
-            return -1;
+function botTurn(rid, leading = false) {
+    const room = rooms[rid]; if(!room?.gameStarted) return;
+    const bot = room.players[room.turn]; if(!bot?.isBot || !bot.hand.length) return;
+    setTimeout(() => {
+        if (!rooms[rid]?.gameStarted || rooms[rid].turn !== room.players.indexOf(bot)) return;
+        let card;
+        if (room.isFirstMove) card = bot.hand.find(c=>c.suit==='Spades'&&c.rank==='K');
+        else {
+            const suit = bot.hand.filter(c=>c.suit===room.currentSuit);
+            if (suit.length) {
+                const high = suit.reduce((a,b)=>a.val>b.val?a:b);
+                const low = suit.reduce((a,b)=>a.val<b.val?a:b);
+                const curHigh = room.table.filter(t=>t.card.suit===room.currentSuit).reduce((m,t)=>Math.max(m,t.card.val),-1);
+                card = (high.val > curHigh && Math.random() > 0.3) ? high : low;
+            } else card = bot.hand.reduce((a,b)=>a.val>b.val?a:b);
         }
-    } while (room.players[nextIdx].hand.length === 0);
-    
-    return nextIdx;
+        if (card) processCard(rid, room.turn, card);
+    }, leading ? BOT_LEAD_DELAY : BOT_DELAY);
 }
 
-/**
- * Initialize player game stats for a new game
- */
-function initPlayerGameStats(player) {
-    player.gameStats = {
-        pangkahsDealt: 0,      // Times they pangkah'd someone
-        pangkahsReceived: 0,   // Times they got pangkah'd
-        cleanWins: 0,          // Clean rounds they won
-        cardsPlayed: 0,        // Total cards played
-        perfectRounds: 0,      // Rounds where they played optimally
-        comebacks: 0,          // Times they recovered from 15+ cards
-        hadMostCards: false,   // At some point had most cards
-        finishPosition: 0      // Final position (1st, 2nd, etc.)
-    };
-}
+const broadcastRooms = () => io.emit('roomList', Object.keys(rooms).map(id => ({ id, count: rooms[id].players.length, max: rooms[id].maxPlayers, inGame: rooms[id].gameStarted })));
 
-/**
- * Health check endpoint for Render
- */
-app.get('/health', (req, res) => {
-    res.status(200).json({ 
-        status: 'ok', 
-        rooms: Object.keys(rooms).length,
-        uptime: process.uptime()
-    });
-});
+app.get('/health', (req, res) => res.json({ status: 'ok', rooms: Object.keys(rooms).length }));
 
-/**
- * Main socket connection handler
- */
+// ============ SOCKETS ============
 io.on('connection', (socket) => {
-    console.log('Client connected:', socket.id);
     broadcastRooms();
-
-    /**
-     * SESSION RECONNECTION
-     */
+    
     socket.on('checkSession', ({ userID }) => {
-        if (!userID) return;
-        
         for (let rid in rooms) {
-            let pIdx = rooms[rid].players.findIndex(p => p.userID === userID);
-            if (pIdx !== -1) {
-                rooms[rid].players[pIdx].id = socket.id;
+            const idx = rooms[rid].players.findIndex(p => p.userID === userID);
+            if (idx !== -1) {
+                rooms[rid].players[idx].id = socket.id;
                 socket.join(rid);
-                socket.emit('reconnectSuccess', { 
-                    roomID: rid, 
-                    players: rooms[rid].players, 
-                    turn: rooms[rid].turn, 
-                    table: rooms[rid].table,
-                    fateAces: rooms[rid].fateAces || [],
-                    gameStarted: rooms[rid].gameStarted,
-                    isFirstMove: rooms[rid].isFirstMove,
-                    currentSuit: rooms[rid].currentSuit,
-                    resolving: rooms[rid].resolving || false,
-                    gameNumber: rooms[rid].gameNumber || 1
-                });
-                console.log(`User ${userID} reconnected to room ${rid}`);
+                socket.emit('reconnectSuccess', { roomID: rid, players: rooms[rid].players, turn: rooms[rid].turn, table: rooms[rid].table, fateAces: rooms[rid].fateAces||[], gameStarted: rooms[rid].gameStarted, isFirstMove: rooms[rid].isFirstMove, currentSuit: rooms[rid].currentSuit, gameNumber: rooms[rid].gameNumber||1 });
                 return;
             }
         }
     });
-
-    /**
-     * CLOSE ROOM
-     */
-    socket.on('requestCloseRoom', ({ roomID }) => {
-        if (!roomID || !rooms[roomID]) return;
-        
-        io.to(roomID).emit('roomClosed');
-        io.in(roomID).socketsLeave(roomID);
-        delete rooms[roomID];
-        broadcastRooms();
-        console.log(`Room ${roomID} disbanded.`);
-    });
-
-    /**
-     * CREATE ROOM
-     */
-    socket.on('createRoom', ({ roomID, playerName, maxPlayers, userID, equippedTitle, level, isGM, isBetaTester, botCount }) => {
-        if (!roomID || !playerName || !userID) {
-            return socket.emit('errorMsg', 'Missing required fields');
-        }
-        
-        if (rooms[roomID]) {
-            return socket.emit('errorMsg', 'Room ID already exists!');
-        }
-        
-        const max = parseInt(maxPlayers);
-        if (isNaN(max) || max < MIN_PLAYERS || max > MAX_PLAYERS) {
-            return socket.emit('errorMsg', `Max players must be ${MIN_PLAYERS}-${MAX_PLAYERS}`);
-        }
-        
-        // Validate bot count (0, 1, 2, or 3)
-        const numBots = Math.min(Math.max(parseInt(botCount) || 0, 0), 3);
-        
-        // Create room with host player
-        rooms[roomID] = {
-            id: roomID, 
-            maxPlayers: max,
-            players: [{ 
-                id: socket.id, 
-                name: playerName, 
-                userID: userID, 
-                hand: [],
-                equippedTitle: equippedTitle || null,
-                level: level || 1,
-                isGM: isGM || false,
-                isBetaTester: isBetaTester || false,
-                isBot: false,
-                gameStats: null,
-                rematchReady: false
-            }],
-            turn: 0, 
-            table: [], 
-            currentSuit: null, 
-            isFirstMove: true, 
-            discarded: [],
-            fateAces: [],
-            gameStarted: false,
-            resolving: false,
-            gameNumber: 0,
-            finishOrder: [],
-            botCount: numBots
-        };
-        
-        // Add bots
-        const existingNames = [playerName];
-        for (let i = 0; i < numBots; i++) {
-            const bot = createBot(existingNames);
-            existingNames.push(bot.name);
-            rooms[roomID].players.push(bot);
-        }
-        
+    
+    socket.on('requestCloseRoom', ({ roomID }) => { if(rooms[roomID]){io.to(roomID).emit('roomClosed');delete rooms[roomID];broadcastRooms();} });
+    
+    socket.on('createRoom', async ({ roomID, playerName, maxPlayers, userID, equippedTitle, level, isGM, botCount }) => {
+        if (!roomID || !playerName || !userID) return socket.emit('errorMsg', 'Missing fields');
+        if (rooms[roomID]) return socket.emit('errorMsg', 'Room exists');
+        const max = parseInt(maxPlayers); if (isNaN(max) || max < MIN_PLAYERS || max > MAX_PLAYERS) return socket.emit('errorMsg', 'Invalid max');
+        let db = await Player.findOne({ userID }); if(!db) { db = new Player({ userID, displayName: playerName }); await db.save(); }
+        const bots = Math.min(Math.max(parseInt(botCount)||0, 0), 3);
+        rooms[roomID] = { id: roomID, maxPlayers: max, players: [{ id: socket.id, name: playerName, userID, hand: [], equippedTitle, level: getLevel(db.xp), isGM, isBetaTester: db.isBetaTester, isBot: false, gameStats: null, rematchReady: false }], turn: 0, table: [], currentSuit: null, isFirstMove: true, discarded: [], fateAces: [], gameStarted: false, resolving: false, gameNumber: 0, finishOrder: [], hostUserID: userID, pangkahDealer: null };
+        for (let i = 0; i < bots; i++) rooms[roomID].players.push({ id: `bot_${roomID}_${i}`, name: generateBotName(), userID: `bot_${roomID}_${i}`, hand: [], level: Math.floor(Math.random()*20)+1, isBot: true, gameStats: null, rematchReady: false });
         socket.join(roomID);
-        io.to(roomID).emit('updatePlayers', rooms[roomID].players, { maxPlayers: rooms[roomID].maxPlayers, botCount: numBots });
-        broadcastRooms();
-        console.log(`Room ${roomID} created by ${playerName}${isGM?' (GM)':''} with ${numBots} bot(s)`);
-    });
-
-    /**
-     * JOIN ROOM
-     */
-    socket.on('joinRoom', ({ roomID, playerName, userID, equippedTitle, level, isGM, isBetaTester }) => {
-        if (!roomID || !playerName || !userID) {
-            return socket.emit('errorMsg', 'Missing required fields');
-        }
-        
-        const room = rooms[roomID];
-        if (!room) {
-            return socket.emit('errorMsg', 'Room not found!');
-        }
-        
-        let existing = room.players.find(p => p.userID === userID);
-        if (existing) {
-            existing.id = socket.id;
-            existing.equippedTitle = equippedTitle || existing.equippedTitle;
-            existing.level = level || existing.level || 1;
-            existing.isGM = isGM || existing.isGM || false;
-            existing.isBetaTester = isBetaTester || existing.isBetaTester || false;
-            socket.join(roomID);
-            console.log(`${playerName} rejoined room ${roomID}${isGM?' (GM)':''}`);
-        } else {
-            if (room.players.length >= room.maxPlayers) {
-                return socket.emit('errorMsg', 'Room full!');
-            }
-            
-            if (room.gameStarted) {
-                return socket.emit('errorMsg', 'Game already in progress!');
-            }
-            
-            room.players.push({ 
-                id: socket.id, 
-                name: playerName, 
-                userID: userID, 
-                hand: [],
-                equippedTitle: equippedTitle || null,
-                level: level || 1,
-                isGM: isGM || false,
-                isBetaTester: isBetaTester || false,
-                isBot: false,
-                gameStats: null,
-                rematchReady: false
-            });
-            socket.join(roomID);
-            console.log(`${playerName} joined room ${roomID}${isGM?' (GM)':''}`);
-        }
-        
-        io.to(roomID).emit('updatePlayers', room.players, { maxPlayers: room.maxPlayers });
+        socket.emit('roomJoined', { roomID, players: rooms[roomID].players, isHost: true, maxPlayers: max });
         broadcastRooms();
     });
-
-    /**
-     * UPDATE EQUIPPED TITLE
-     */
-    socket.on('updateTitle', ({ roomID, userID, title }) => {
-        const room = rooms[roomID];
-        if (!room) return;
-        
-        const player = room.players.find(p => p.userID === userID);
-        if (player) {
-            player.equippedTitle = title;
-            io.to(roomID).emit('updatePlayers', room.players);
-        }
+    
+    socket.on('joinRoom', async ({ roomID, playerName, userID, equippedTitle, level, isGM }) => {
+        if (!roomID || !playerName || !userID) return socket.emit('errorMsg', 'Missing fields');
+        const room = rooms[roomID]; if (!room) return socket.emit('errorMsg', 'Not found');
+        if (room.players.length >= room.maxPlayers) return socket.emit('errorMsg', 'Full');
+        if (room.gameStarted) return socket.emit('errorMsg', 'In progress');
+        let db = await Player.findOne({ userID }); if(!db) { db = new Player({ userID, displayName: playerName }); await db.save(); }
+        room.players.push({ id: socket.id, name: playerName, userID, hand: [], equippedTitle, level: getLevel(db.xp), isGM, isBetaTester: db.isBetaTester, isBot: false, gameStats: null, rematchReady: false });
+        socket.join(roomID);
+        io.to(roomID).emit('playerJoined', { players: room.players, maxPlayers: room.maxPlayers });
+        socket.emit('roomJoined', { roomID, players: room.players, isHost: room.hostUserID === userID, maxPlayers: room.maxPlayers });
+        broadcastRooms();
     });
-
-    /**
-     * START GAME - Core Logic
-     */
-    function startGameForRoom(roomID) {
-        const room = rooms[roomID];
-        if (!room) return false;
-        
-        const playerCount = room.players.length;
-        
-        if (playerCount < MIN_PLAYERS) {
-            return false;
-        }
-        
-        // Check if player count is valid (has a fate config)
-        if (FATE_CONFIG[playerCount] === undefined) {
-            return false;
-        }
-        
-        room.gameStarted = true;
-        room.resolving = false;
-        room.table = [];
-        room.currentSuit = null;
-        room.gameNumber = (room.gameNumber || 0) + 1;
-        room.finishOrder = [];
-        
-        // Initialize AI Brain for new game (fresh memory)
-        PangkahAI.init(room);
-        
-        // Reset rematch flags
-        room.players.forEach(p => {
-            p.rematchReady = false;
-            initPlayerGameStats(p);
-        });
-        
-        // BALANCE: Shuffle player positions (including bots) for fairness
-        shuffle(room.players);
-        console.log(`Shuffled player order: ${room.players.map(p => p.name).join(' → ')}`);
-        
-        let deck = generateDeck();
-        room.discarded = [];
-        room.fateAces = []; // Separate array for initial discarded aces
-
-        // Fate Rule: Remove Aces based on player count
-        const discardCount = FATE_CONFIG[playerCount];
-        if (discardCount > 0) {
-            let aceIndices = [];
-            deck.forEach((card, idx) => { 
-                if (card.rank === 'A') aceIndices.push(idx); 
-            });
-            
-            shuffle(aceIndices);
-            let toRemove = aceIndices.slice(0, discardCount).sort((a, b) => b - a);
-            toRemove.forEach(idx => { 
-                room.fateAces.push(deck.splice(idx, 1)[0]); 
-            });
-        }
-
-        // Deal cards evenly
-        let cardsPerPlayer = Math.floor(deck.length / playerCount);
-        room.players.forEach(p => { 
-            p.hand = deck.splice(0, cardsPerPlayer); 
-        });
-
-        // Find player with King of Spades
-        let starterIdx = room.players.findIndex(p => 
-            p.hand.some(c => c.suit === 'Spades' && c.rank === 'K')
-        );
-        
-        room.turn = starterIdx !== -1 ? starterIdx : 0;
-        room.isFirstMove = true;
-        
-        io.to(roomID).emit('gameInit', { 
-            players: room.players, 
-            turn: room.turn, 
-            fateAces: room.fateAces,
-            isFirstMove: room.isFirstMove,
-            gameNumber: room.gameNumber
-        });
-        
-        // Check if first player is a bot - they are LEADING first round
-        const firstPlayer = room.players[room.turn];
-        setTimeout(() => {
-            if (firstPlayer && firstPlayer.isBot) {
-                checkBotTurn(roomID, true); // true = leading new round, use longer delay
-            } else {
-                startTurnTimer(roomID);
-            }
-        }, 1000);
-        
-        console.log(`Game #${room.gameNumber} started in room ${roomID} with ${playerCount} players. ${room.players[room.turn].name} has K♠`);
-        return true;
-    }
-
-    /**
-     * START GAME - Socket Handler
-     */
+    
     socket.on('startGame', (roomID) => {
-        const room = rooms[roomID];
-        if (!room) return;
-        
-        const playerCount = room.players.length;
-        
-        if (playerCount < MIN_PLAYERS) {
-            return socket.emit('errorMsg', `Need at least ${MIN_PLAYERS} players to start`);
-        }
-        
-        if (FATE_CONFIG[playerCount] === undefined) {
-            return socket.emit('errorMsg', `Cannot start with ${playerCount} players. Valid: 4, 5, 6, 7, 8, or 10 players.`);
-        }
-        
-        startGameForRoom(roomID);
+        const room = rooms[roomID]; if (!room) return;
+        if (room.players.filter(p=>!p.isBot).length < 1) return socket.emit('errorMsg', 'Need human');
+        if (room.players.length < MIN_PLAYERS) return socket.emit('errorMsg', 'Need more');
+        room.gameNumber++; room.gameStarted = true; room.finishOrder = []; room.fateAces = []; room.discarded = []; room.pangkahDealer = null;
+        room.players.forEach(p => { p.rematchReady = false; initStats(p); });
+        deal(room);
+        io.to(roomID).emit('gameStarted', { players: room.players, turn: room.turn, gameNumber: room.gameNumber });
+        broadcastRooms();
+        if (room.players[room.turn].isBot) botTurn(roomID, true); else startTimer(roomID);
     });
-
-    /**
-     * REMATCH - Player ready
-     */
-    socket.on('rematchReady', ({ roomID, userID }) => {
-        const room = rooms[roomID];
-        if (!room) return;
-        
-        const player = room.players.find(p => p.userID === userID);
-        if (player) {
-            player.rematchReady = true;
-            
-            // Check if all players are ready
-            const allReady = room.players.every(p => p.rematchReady);
-            
-            io.to(roomID).emit('rematchStatus', {
-                readyCount: room.players.filter(p => p.rematchReady).length,
-                totalCount: room.players.length,
-                allReady
-            });
-            
-            // Auto-start if all ready
-            if (allReady) {
-                setTimeout(() => {
-                    startGameForRoom(roomID);
-                }, 1500);
-            }
-        }
-    });
-
-    /**
-     * HAND SWAP - Send Request (only allowed on your turn)
-     */
-    socket.on('sendSwapRequest', ({ roomID, fromUserID }) => {
-        const room = rooms[roomID];
-        if (!room) return;
-        
-        const myIdx = room.players.findIndex(p => p.userID === fromUserID);
-        if (myIdx === -1) {
-            return socket.emit('errorMsg', 'Player not found');
-        }
-        
-        // Check if it's the requester's turn
-        if (room.turn !== myIdx) {
-            return socket.emit('errorMsg', 'Wait for your turn!');
-        }
-        
-        let targetIdx = (myIdx + 1) % room.players.length;
-        let attempts = 0;
-        
-        while (room.players[targetIdx].hand.length === 0 && attempts < room.players.length) {
-            targetIdx = (targetIdx + 1) % room.players.length;
-            attempts++;
-        }
-        
-        if (attempts >= room.players.length) {
-            return socket.emit('errorMsg', 'No valid target for hand absorption');
-        }
-        
-        const targetPlayer = room.players[targetIdx];
-        
-        // If target is a bot, auto-accept after 5 seconds
-        if (targetPlayer.isBot) {
-            console.log(`${room.players[myIdx].name} requests to absorb ${targetPlayer.name}'s hand (Bot will auto-accept)`);
-            
-            // Notify all players that bot received request
-            io.to(roomID).emit('botSwapPending', {
-                fromName: room.players[myIdx].name,
-                botName: targetPlayer.name,
-                countdown: 5
-            });
-            
-            // Bot auto-accepts after 5 seconds
-            setTimeout(() => {
-                if (!rooms[roomID]) return;
-                const currentRoom = rooms[roomID];
-                const requester = currentRoom.players.find(p => p.userID === fromUserID);
-                const bot = currentRoom.players[targetIdx];
-                
-                if (!requester || !bot || bot.hand.length === 0) return;
-                
-                // Track human absorbing bot's hand (shame stat)
-                if (!requester.isBot && requester.gameStats) {
-                    requester.gameStats.handsAbsorbedFromBot = (requester.gameStats.handsAbsorbedFromBot || 0) + 1;
-                    console.log(`${requester.name} absorbed BOT ${bot.name}'s hand!`);
-                }
-                
-                requester.hand.push(...bot.hand);
-                bot.hand = [];
-                
-                // Track finish order for bot
-                if (currentRoom.finishOrder && !currentRoom.finishOrder.includes(bot.userID)) {
-                    currentRoom.finishOrder.push(bot.userID);
-                    if (bot.gameStats) {
-                        bot.gameStats.finishPosition = currentRoom.finishOrder.length;
-                    }
-                }
-                
-                io.to(roomID).emit('swapOccurred', { 
-                    msg: `${requester.name} absorbed ${bot.name}'s hand!`,
-                    requesterUserID: requester.userID,
-                    accepterUserID: bot.userID,
-                    requesterName: requester.name,
-                    accepterName: bot.name,
-                    players: currentRoom.players,
-                    turn: currentRoom.turn,
-                    table: currentRoom.table,
-                    finishOrder: currentRoom.finishOrder
-                });
-                
-                // Check if game should end
-                let survivors = currentRoom.players.filter(p => p.hand.length > 0);
-                if (survivors.length <= 1 && currentRoom.gameStarted) {
-                    clearTurnTimer(roomID);
-                    
-                    if (survivors[0]) {
-                        currentRoom.finishOrder.push(survivors[0].userID);
-                        survivors[0].gameStats.finishPosition = currentRoom.players.length;
-                    }
-                    
-                    const performanceData = currentRoom.players.map(p => ({
-                        userID: p.userID,
-                        name: p.name,
-                        position: p.gameStats?.finishPosition || 0,
-                        stats: p.gameStats,
-                        equippedTitle: p.equippedTitle
-                    }));
-                    
-                    io.to(roomID).emit('gameOver', { 
-                        loser: survivors[0]?.name || 'None',
-                        loserUserID: survivors[0]?.userID || null,
-                        finishOrder: currentRoom.finishOrder,
-                        gameNumber: currentRoom.gameNumber,
-                        performanceData
-                    });
-                    
-                    currentRoom.gameStarted = false;
-                    currentRoom.players.forEach(p => {
-                        if (p.isBot) p.rematchReady = true;
-                    });
-                    broadcastRooms();
-                }
-                
-                console.log(`Bot ${bot.name} auto-accepted hand swap from ${requester.name}`);
-            }, 5000);
-            
-            return;
-        }
-        
-        io.to(room.players[targetIdx].id).emit('receiveSwapRequest', { 
-            fromName: room.players[myIdx].name, 
-            fromUserID 
-        });
-        
-        console.log(`${room.players[myIdx].name} requests to absorb ${room.players[targetIdx].name}'s hand`);
-    });
-
-    /**
-     * HAND SWAP - Accept Request
-     */
-    socket.on('acceptSwap', ({ roomID, fromUserID, myUserID }) => {
-        const room = rooms[roomID];
-        if (!room) return;
-        
-        const requester = room.players.find(p => p.userID === fromUserID);
-        const accepter = room.players.find(p => p.userID === myUserID);
-        
-        if (!requester || !accepter) {
-            return socket.emit('errorMsg', 'Invalid swap participants');
-        }
-        
-        requester.hand.push(...accepter.hand);
-        accepter.hand = [];
-        
-        // IMPORTANT: Track finish order when player gives away their hand!
-        // The accepter just emptied their hand, so they should be added to finishOrder
-        if (room.finishOrder && !room.finishOrder.includes(accepter.userID)) {
-            room.finishOrder.push(accepter.userID);
-            if (accepter.gameStats) {
-                accepter.gameStats.finishPosition = room.finishOrder.length;
-            }
-            console.log(`${accepter.name} finished in position ${room.finishOrder.length} (gave hand away)`);
-        }
-        
-        io.to(roomID).emit('swapOccurred', { 
-            msg: `${requester.name} absorbed ${accepter.name}'s hand!`,
-            requesterUserID: requester.userID,
-            accepterUserID: accepter.userID,
-            requesterName: requester.name,
-            accepterName: accepter.name,
-            players: room.players,
-            turn: room.turn,
-            table: room.table,
-            finishOrder: room.finishOrder // Send updated finish order
-        });
-        
-        // Check if game should end (only 1 player left with cards)
-        let survivors = room.players.filter(p => p.hand.length > 0);
-        if (survivors.length <= 1 && room.gameStarted) {
-            // Game over - the last survivor is the LOSER
-            clearTurnTimer(roomID);
-            
-            if (survivors[0]) {
-                room.finishOrder.push(survivors[0].userID);
-                survivors[0].gameStats.finishPosition = room.players.length;
-            }
-            
-            const performanceData = room.players.map(p => ({
-                userID: p.userID,
-                name: p.name,
-                position: p.gameStats ? p.gameStats.finishPosition : 0,
-                stats: p.gameStats,
-                equippedTitle: p.equippedTitle
-            }));
-            
-            io.to(roomID).emit('gameOver', { 
-                loser: survivors[0]?.name || 'None',
-                loserUserID: survivors[0]?.userID || null,
-                finishOrder: room.finishOrder,
-                gameNumber: room.gameNumber,
-                performanceData
-            });
-            
-            room.gameStarted = false;
-            broadcastRooms();
-            
-            console.log(`Game #${room.gameNumber} ended in room ${roomID} (via hand swap). Loser: ${survivors[0]?.name || 'None'}`);
-        } else {
-            // Game continues - reset turn timer back to 15 seconds
-            startTurnTimer(roomID);
-        }
-        
-        console.log(`${requester.name} absorbed ${accepter.name}'s hand`);
-    });
-
-    /**
-     * PLAY CARD - Core game logic
-     */
+    
     socket.on('playCard', ({ roomID, cardObject }) => {
-        const room = rooms[roomID];
-        if (!room) return;
-        
-        if (room.resolving) {
-            return socket.emit('errorMsg', 'Round is being resolved, please wait...');
-        }
-        
-        if (room.players[room.turn].id !== socket.id) {
-            return socket.emit('errorMsg', 'Not your turn!');
-        }
-
-        const player = room.players[room.turn];
-        const cardIndex = player.hand.findIndex(c => 
-            c.suit === cardObject.suit && c.rank === cardObject.rank
-        );
-        
-        if (cardIndex === -1) {
-            return socket.emit('errorMsg', 'Card not found in hand');
-        }
-        
-        const playedCard = player.hand[cardIndex];
-
-        // RULE 1: First move MUST be King of Spades
-        if (room.isFirstMove) {
-            if (playedCard.suit !== 'Spades' || playedCard.rank !== 'K') {
-                return socket.emit('errorMsg', "First move MUST be King of Spades!");
-            }
-        }
-
-        // RULE 2: Must follow suit if possible
-        if (room.table.length > 0 && playedCard.suit !== room.currentSuit) {
-            if (player.hand.some(c => c.suit === room.currentSuit)) {
-                return socket.emit('errorMsg', `Must follow suit: ${room.currentSuit}`);
-            }
-        }
-
-        // Process the card play
-        processCardPlay(roomID, room.turn, cardObject);
+        const room = rooms[roomID]; if (!room || room.resolving) return;
+        if (room.players[room.turn].id !== socket.id) return socket.emit('errorMsg', 'Not your turn');
+        const p = room.players[room.turn];
+        const ci = p.hand.findIndex(c => c.suit===cardObject.suit && c.rank===cardObject.rank);
+        if (ci === -1) return socket.emit('errorMsg', 'Card not found');
+        const card = p.hand[ci];
+        if (room.isFirstMove && (card.suit !== 'Spades' || card.rank !== 'K')) return socket.emit('errorMsg', 'Must play K♠');
+        if (room.table.length > 0 && card.suit !== room.currentSuit && p.hand.some(c => c.suit === room.currentSuit)) return socket.emit('errorMsg', 'Must follow suit');
+        processCard(roomID, room.turn, cardObject);
     });
-
-    /**
-     * EMOTE HANDLER
-     */
-    socket.on('sendEmote', ({ roomID, userID, playerName, emoji }) => {
-        if (!roomID) return;
-        // Broadcast emote to all players in room except sender
-        socket.to(roomID).emit('receiveEmote', { userID, playerName, emoji });
+    
+    socket.on('sendSwapRequest', async ({ roomID, fromUserID }) => {
+        const room = rooms[roomID]; if (!room?.gameStarted) return;
+        const myIdx = room.players.findIndex(p => p.userID === fromUserID);
+        if (myIdx === -1 || room.turn !== myIdx) return;
+        let tgt = (myIdx + 1) % room.players.length, att = 0;
+        while (room.players[tgt].hand.length === 0 && att < room.players.length) { tgt = (tgt + 1) % room.players.length; att++; }
+        if (tgt === myIdx || !room.players[tgt].hand.length) return;
+        const target = room.players[tgt];
+        if (target.isBot) {
+            setTimeout(async () => {
+                if (!rooms[roomID]) return;
+                const req = room.players[myIdx];
+                req.hand.push(...target.hand); target.hand = [];
+                await trackHandAbsorb(req.userID, target.userID, true);
+                if (!room.finishOrder.includes(target.userID)) { room.finishOrder.push(target.userID); if(target.gameStats) target.gameStats.finishPosition = room.finishOrder.length; }
+                io.to(roomID).emit('swapOccurred', { msg: `${req.name} absorbed ${target.name}'s hand!`, requesterUserID: req.userID, accepterUserID: target.userID, players: room.players, turn: room.turn, table: room.table, finishOrder: room.finishOrder });
+                const surv = room.players.filter(p => p.hand.length > 0);
+                if (surv.length <= 1) {
+                    clearTimer(roomID);
+                    if (surv[0]) { room.finishOrder.push(surv[0].userID); if(surv[0].gameStats) surv[0].gameStats.finishPosition = room.players.length; }
+                    io.to(roomID).emit('gameOver', { loser: surv[0]?.name||'None', loserUserID: surv[0]?.userID, finishOrder: room.finishOrder, gameNumber: room.gameNumber, performanceData: room.players.map(x=>({userID:x.userID,name:x.name,position:x.gameStats?.finishPosition||0,stats:x.gameStats,equippedTitle:x.equippedTitle})) });
+                    processGameResults(room); room.gameStarted = false; broadcastRooms();
+                }
+            }, 3000);
+        } else io.to(target.id).emit('receiveSwapRequest', { fromName: room.players[myIdx].name, fromUserID });
     });
-
-    /**
-     * LEAVE ROOM HANDLER - Player voluntarily leaves room
-     */
-    socket.on('leaveRoom', ({ roomID, userID }) => {
-        const room = rooms[roomID];
-        if (!room) return;
-        
-        // Remove player from room
-        const playerIndex = room.players.findIndex(p => p.userID === userID);
-        if (playerIndex !== -1) {
-            const player = room.players[playerIndex];
-            console.log(`[LEAVE] ${player.name} left room ${roomID}`);
-            room.players.splice(playerIndex, 1);
-            socket.leave(roomID);
-            
-            // If room is empty or game is over, clean up
-            const humanPlayers = room.players.filter(p => !p.isBot);
-            if (humanPlayers.length === 0) {
-                // No human players left, close room
-                delete rooms[roomID];
-                console.log(`[ROOM] Room ${roomID} closed - no players left`);
-            } else {
-                // Notify remaining players
-                io.to(roomID).emit('playerLeft', { name: player.name, playersCount: humanPlayers.length });
-            }
-        }
+    
+    socket.on('acceptSwap', async ({ roomID, fromUserID, myUserID }) => {
+        const room = rooms[roomID]; if (!room) return;
+        const req = room.players.find(p => p.userID === fromUserID);
+        const acc = room.players.find(p => p.userID === myUserID);
+        if (!req || !acc) return;
+        req.hand.push(...acc.hand); acc.hand = [];
+        await trackHandAbsorb(req.userID, acc.userID, false);
+        if (!room.finishOrder.includes(acc.userID)) { room.finishOrder.push(acc.userID); if(acc.gameStats) acc.gameStats.finishPosition = room.finishOrder.length; }
+        io.to(roomID).emit('swapOccurred', { msg: `${req.name} absorbed ${acc.name}'s hand!`, requesterUserID: req.userID, accepterUserID: acc.userID, players: room.players, turn: room.turn, table: room.table, finishOrder: room.finishOrder });
+        const surv = room.players.filter(p => p.hand.length > 0);
+        if (surv.length <= 1) {
+            clearTimer(roomID);
+            if (surv[0]) { room.finishOrder.push(surv[0].userID); if(surv[0].gameStats) surv[0].gameStats.finishPosition = room.players.length; }
+            io.to(roomID).emit('gameOver', { loser: surv[0]?.name||'None', loserUserID: surv[0]?.userID, finishOrder: room.finishOrder, gameNumber: room.gameNumber, performanceData: room.players.map(x=>({userID:x.userID,name:x.name,position:x.gameStats?.finishPosition||0,stats:x.gameStats,equippedTitle:x.equippedTitle})) });
+            processGameResults(room); room.gameStarted = false; broadcastRooms();
+        } else startTimer(roomID);
     });
-
-    /**
-     * DISCONNECT HANDLER
-     */
-    socket.on('disconnect', () => {
-        console.log('Client disconnected:', socket.id);
-    });
+    
+    socket.on('declineSwap', ({ roomID, fromUserID }) => { const room = rooms[roomID]; const req = room?.players.find(p=>p.userID===fromUserID); if(req) io.to(req.id).emit('swapDeclined'); });
+    socket.on('updateTitle', ({ roomID, userID, title }) => { const room = rooms[roomID]; const p = room?.players.find(x=>x.userID===userID); if(p){p.equippedTitle=title;io.to(roomID).emit('playerTitleUpdated',{userID,title,players:room.players});} });
+    socket.on('requestRematch', ({ roomID, userID }) => { const room = rooms[roomID]; if(!room||room.gameStarted) return; const p = room.players.find(x=>x.userID===userID); if(p){p.rematchReady=true;io.to(roomID).emit('rematchStatus',{readyCount:room.players.filter(x=>x.rematchReady).length,totalCount:room.players.length,allReady:room.players.every(x=>x.rematchReady)});} });
+    socket.on('sendEmote', ({ roomID, userID, playerName, emoji }) => { if(roomID) socket.to(roomID).emit('receiveEmote', { userID, playerName, emoji }); });
+    socket.on('leaveRoom', ({ roomID, userID }) => { const room = rooms[roomID]; if(!room) return; const idx = room.players.findIndex(p=>p.userID===userID); if(idx!==-1){const p=room.players.splice(idx,1)[0];socket.leave(roomID);if(!room.players.filter(x=>!x.isBot).length)delete rooms[roomID];else io.to(roomID).emit('playerLeft',{name:p.name,playersCount:room.players.filter(x=>!x.isBot).length});}broadcastRooms(); });
+    socket.on('disconnect', () => {});
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🎴 Pangkah Server v2 active on port ${PORT}`));
+server.listen(PORT, () => console.log('🎴 Pangkah Server v3 (MongoDB) on port ' + PORT));

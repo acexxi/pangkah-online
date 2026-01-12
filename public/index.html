@@ -869,11 +869,15 @@ function getStatValue(t){switch(t){case'level':return getLevel();case'pangkahs':
 function checkAllTitles(){TITLES.forEach(t=>{if(!stats.unlockedTitles.includes(t.id)&&getStatValue(t.req.t)>=t.req.v){stats.unlockedTitles.push(t.id);showAchievement(t);}});saveStats();}
 function showAchievement(t){const p=document.getElementById('achievement-popup');p.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:24px">${t.icon}</span><div><div style="font-size:10px;color:var(--gold);font-weight:800">TITLE UNLOCKED!</div><div style="font-size:16px;font-weight:800">${t.name}</div></div></div><div style="font-size:11px;opacity:0.7">${t.desc}</div><div class="title-rarity ${t.rarity}" style="margin-top:10px">${t.rarity.toUpperCase()}</div>`;p.style.display='block';setTimeout(()=>p.style.display='none',4000);}
 function equipTitle(id){
-    // Check if title is unlocked (regular titles) or special titles (GM only)
-    const allTitles=[...TITLES,...GM_TITLES];
+    // Check if title is unlocked (regular titles) or special titles (GM/Beta)
+    const allTitles=[...TITLES,...GM_TITLES,...BETA_TITLES];
     const title=allTitles.find(t=>t.id===id);
-    const isGMTitle=title&&title.req.t==='gm';
-    const canEquip=stats.unlockedTitles.includes(id)||(isGMTitle&&isGameMaster);
+    if(!title) return;
+    
+    const isGMTitle=title.req.t==='gm';
+    const isBetaTitle=title.req.t==='beta';
+    const canEquip=stats.unlockedTitles.includes(id)||(isGMTitle&&isGameMaster)||(isBetaTitle&&stats.isBetaTester);
+    
     if(canEquip){
         equipTitleOnServer(id).then(success => {
             if(success){
@@ -1045,6 +1049,30 @@ function getLevel(){return Math.floor((stats.xp||0)/XP_PER_LEVEL)+1;}
 function getLevelDisplay(){return isGameMaster?'∞':getLevel();}
 function getRankTitle(l){return isGameMaster?'GAME MASTER':l<=5?'APPRENTICE':l<=10?'WARRIOR':l<=15?'MASTER':l<=20?'GRANDMASTER':l<=30?'ELDER':l<=50?'SECT LEADER':'ANCIENT ANCESTOR';}
 function getBadgeImage(l,isGM=false){return isGM?'/badge/gm-badge.png':l<=5?'/badge/apprentice-badge.png':l<=10?'/badge/warrior-badge.png':l<=15?'/badge/master-badge.png':l<=20?'/badge/grandmaster-badge.png':l<=30?'/badge/elder-badge.png':l<=50?'/badge/sectleader-badge.png':'/badge/ancientancestor-badge.png';}
+
+// Title color based on rarity
+function getTitleColor(rarity){
+    switch(rarity){
+        case 'legendary': return 'var(--legendary)';
+        case 'epic': return 'var(--epic)';
+        case 'rare': return 'var(--rare)';
+        case 'common': return 'var(--common)';
+        case 'special': return '#f472b6';
+        default: return 'var(--text-tertiary)';
+    }
+}
+
+// Title glow effect based on rarity
+function getTitleGlow(rarity){
+    switch(rarity){
+        case 'legendary': return '0 0 15px rgba(251, 191, 36, 0.6), 0 0 30px rgba(251, 191, 36, 0.3)';
+        case 'epic': return '0 0 12px rgba(168, 85, 247, 0.5), 0 0 25px rgba(168, 85, 247, 0.25)';
+        case 'rare': return '0 0 10px rgba(59, 130, 246, 0.4), 0 0 20px rgba(59, 130, 246, 0.2)';
+        case 'special': return '0 0 15px rgba(244, 114, 182, 0.6), 0 0 30px rgba(251, 191, 36, 0.3)';
+        case 'common': return '0 0 8px rgba(156, 163, 175, 0.3)';
+        default: return 'none';
+    }
+}
 
 // GM Functions
 async function gmLogin(){
@@ -1946,12 +1974,17 @@ function render(players,turn,table=[]){
         
         const playerLevel=p.level||1;
         const playerIsGM=p.isGM||false;
-        const titleText=isBot?'🤖 Bot':p.equippedTitle?`${p.equippedTitle.name}`:'';
+        const titleData=p.equippedTitle;
+        const titleText=isBot?'🤖 Bot':titleData?`${titleData.icon||''} ${titleData.name}`:'';
+        const titleColor=titleData?getTitleColor(titleData.rarity):'var(--text-tertiary)';
         const badgeImg=getBadgeImage(playerLevel,playerIsGM);
         const displayLevel=isBot?'BOT':playerIsGM?'∞':playerLevel;
         const nameColor=p.userID===userID?'var(--ui-blue)':isBot?'var(--accent-purple)':'#fff';
         const hofFrame=getPlayerFrame(p.userID, playerIsGM);
         const frameClass=hofFrame?`av ${hofFrame}`:'av';
+        
+        // Title frame glow based on rarity
+        const titleGlow=titleData?getTitleGlow(titleData.rarity):'none';
         
         const div=document.createElement('div');
         div.className=`player ${i===turn?'active':''} ${p.hand.length===0?'eliminated':''}`;
@@ -1960,13 +1993,13 @@ function render(players,turn,table=[]){
         div.style.top=`${y}px`;
         div.style.transform='translateX(-50%)';
         const thClass=canSwap?'visible':canSwapGreyed?'visible greyed':'';
-        div.innerHTML=`<div class="${frameClass}">
+        div.innerHTML=`<div class="${frameClass}" style="box-shadow:${titleGlow}">
 <div class="av-take-hand ${thClass}" onclick="event.stopPropagation();socket.emit('sendSwapRequest',{roomID:'${myRoom}',fromUserID:'${userID}'})" title="Take Hand"></div>
 <div class="av-avatar"><img src="${badgeImg}" alt="badge" style="width:100%;height:100%;object-fit:contain"></div>
 <div class="av-info">
 <div class="av-level" ${isBot?'style="color:var(--accent-purple)"':''}>LVL ${displayLevel}</div>
 <div class="av-name" style="color:${nameColor}">${p.name}</div>
-<div class="av-title">${titleText}</div>
+<div class="av-title" style="color:${titleColor}">${titleText}</div>
 </div>
 <div class="av-cards">${p.hand.length}</div>
 </div>`;

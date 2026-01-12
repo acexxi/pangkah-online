@@ -884,8 +884,9 @@ function resolveRound(rid, isPangkah) {
         room.players.forEach(p => { if(p.isBot) p.rematchReady = true; });
         broadcastRooms();
     } else {
+        const finalTable = [...room.table]; // Save table before clearing
         room.table = []; room.currentSuit = null; room.turn = winIdx; room.resolving = false;
-        io.to(rid).emit('clearTable', { msg: isPangkah?'Pangkah!':'Clean!', winner: winner.name, winnerUserID: winner.userID, pangkahDealerUserID: isPangkah?room.pangkahDealer:null, turn: room.turn, players: room.players, fateAces: room.fateAces });
+        io.to(rid).emit('clearTable', { msg: isPangkah?'Pangkah!':'Clean!', winner: winner.name, winnerUserID: winner.userID, pangkahDealerUserID: isPangkah?room.pangkahDealer:null, turn: room.turn, players: room.players, fateAces: room.fateAces, finalTable: finalTable });
         setTimeout(() => { if(room.players[room.turn]?.isBot) botTurn(rid, true); else startTimer(rid); }, 500);
     }
 }

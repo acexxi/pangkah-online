@@ -103,6 +103,12 @@ app.get('/api/player/:userID', async (req, res) => {
             console.log('[API] Created new player:', player.displayName);
         } else {
             console.log('[API] Found player:', player.displayName, '- XP:', player.xp, 'Wins:', player.wins);
+            // Check and unlock any titles the player has earned
+            const newTitles = await checkAndUnlockTitles(player);
+            if (newTitles.length > 0) {
+                await player.save();
+                console.log('[API] Unlocked new titles for', player.displayName, ':', newTitles);
+            }
         }
         res.json(player);
     } catch (err) { 
@@ -128,7 +134,27 @@ app.post('/api/player/equip-title', async (req, res) => {
         const { userID, titleId } = req.body;
         const player = await Player.findOne({ userID });
         if (!player) return res.status(404).json({ error: 'Player not found' });
-        if (titleId && !player.unlockedTitles.includes(titleId)) return res.status(400).json({ error: 'Title not unlocked' });
+        
+        // Check if title can be equipped
+        if (titleId) {
+            // GM titles (celestial_marshal, shadow_magistrate) - check if player is GM (handled by client, server trusts)
+            const gmTitleIds = ['celestial_marshal', 'shadow_magistrate'];
+            // Beta titles - check if player is beta tester
+            const betaTitleIds = ['dragon_vanguard', 'founders_circle', 'supreme_leader'];
+            
+            const isGMTitle = gmTitleIds.includes(titleId);
+            const isBetaTitle = betaTitleIds.includes(titleId);
+            
+            // Allow if: unlocked, OR beta tester equipping beta title
+            const canEquip = player.unlockedTitles.includes(titleId) || 
+                            (isBetaTitle && player.isBetaTester) ||
+                            isGMTitle; // GM status checked client-side
+            
+            if (!canEquip) {
+                return res.status(400).json({ error: 'Title not unlocked' });
+            }
+        }
+        
         player.equippedTitle = titleId || null;
         await player.save();
         res.json({ success: true, equippedTitle: player.equippedTitle });

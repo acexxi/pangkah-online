@@ -1705,12 +1705,62 @@ startBtn.style.color=isFull?'#000':'rgba(255,255,255,0.7)';
 startBtn.style.cursor=isFull?'pointer':'not-allowed';
 startBtn.style.border=isFull?'none':'2px solid rgba(255,255,255,0.3)';
 p.forEach(pl=>{if(pl.userID!==userID&&!stats.uniquePlayers.includes(pl.userID))stats.uniquePlayers.push(pl.userID);});saveStats();render(p,-1);});
-socket.on('gameInit',d=>{showLoading(false);document.getElementById('round-popup').style.display='none';document.getElementById('gameover-modal').style.display='none';document.getElementById('start-btn').style.display='none';isProcessingTurn=false;isFirstMove=d.isFirstMove!==undefined?d.isFirstMove:true;currentLeadSuit=null;document.getElementById('close-room-btn').style.display=isHost?'block':'none';const h=new Date().getHours();if(h>=0&&h<6){stats.nightGames=(stats.nightGames||0)+1;saveStats();}update(d);});
-socket.on('clearTable',d=>{if(d.msg.toLowerCase()==='pangkah!'){flashScreen('pangkah');playSound('strike');
-// Track pangkah received (the one who took the cards)
-if(d.winnerUserID===userID){stats.pangkahsReceived=(stats.pangkahsReceived||0)+1;addXP(0,"Got Pangkah'd",false);}
-// Track pangkah dealt (the one who broke suit)
-if(d.pangkahDealerUserID===userID){addXP(3,"Pangkah Dealt!",true);}flashScreen('pangkah');playSound('strike');}else{flashScreen('clean');playSound('sweep');if(d.winnerUserID===userID){addXP(1,"Clean Round",true);}}currentLeadSuit=null;const pop=document.getElementById('round-popup');document.getElementById('pop-title').className=d.msg==='Pangkah!'?'pangkah-text':'clean-text';document.getElementById('pop-title').innerText=d.msg.toUpperCase();document.getElementById('pop-desc').innerText=d.winner+" has the lead.";pop.style.display='block';setTimeout(()=>{pop.style.display='none';update(d);},2000);});
+socket.on('gameStarted',d=>{showLoading(false);document.getElementById('round-popup').style.display='none';document.getElementById('gameover-modal').style.display='none';document.getElementById('start-btn').style.display='none';isProcessingTurn=false;isFirstMove=true;currentLeadSuit=null;document.getElementById('close-room-btn').style.display=isHost?'block':'none';update({players:d.players,turn:d.turn,table:[]});showToast(`Game #${d.gameNumber} started!`,true);});
+socket.on('clearTable',d=>{
+    // First, render the final table so players can see all cards
+    if(d.finalTable && d.finalTable.length > 0){
+        const tLayer=document.getElementById('t-layer');
+        tLayer.innerHTML="";
+        const rowDiv=document.createElement('div');
+        rowDiv.className='table-cards-row';
+        d.finalTable.forEach((tc)=>{
+            const el=createCardUI(tc.card);
+            el.className=`card table-card ${['Hearts','Diamonds'].includes(tc.card.suit)?'red':''}`;
+            rowDiv.appendChild(el);
+        });
+        tLayer.appendChild(rowDiv);
+    }
+    
+    if(d.msg.toLowerCase()==='pangkah!'){
+        flashScreen('pangkah');playSound('strike');
+        // Track pangkah received (the one who took the cards)
+        if(d.winnerUserID===userID){addXP(0,"Got Pangkah'd",false);}
+        // Track pangkah dealt (the one who broke suit)
+        if(d.pangkahDealerUserID===userID){addXP(3,"Pangkah Dealt!",true);}
+    }else{
+        flashScreen('clean');playSound('sweep');
+        if(d.winnerUserID===userID){addXP(1,"Clean Round",true);}
+    }
+    
+    currentLeadSuit=null;
+    const pop=document.getElementById('round-popup');
+    document.getElementById('pop-title').className=d.msg==='Pangkah!'?'pangkah-text':'clean-text';
+    document.getElementById('pop-title').innerText=d.msg.toUpperCase();
+    document.getElementById('pop-desc').innerText=d.winner+" has the lead.";
+    pop.style.display='block';
+    
+    // Show popup for 2 seconds, then clear table and update
+    setTimeout(()=>{
+        pop.style.display='none';
+        update({players:d.players,turn:d.turn,table:[],fateAces:d.fateAces});
+    },2000);
+});
+
+// Handle card played - shows card on table immediately
+socket.on('cardPlayed',d=>{
+    playSound('place');
+    if(d.leadSuit)currentLeadSuit=d.leadSuit;
+    if(d.table?.length>0)isFirstMove=false;
+    
+    // Update the game state
+    update(d);
+    
+    // If pangkah, show indicator
+    if(d.isPangkah){
+        showToast(`💥 ${d.playerName} PANGKAH!`,false);
+    }
+});
+
 socket.on('updateTable',d=>{playSound('place');if(d.currentSuit)currentLeadSuit=d.currentSuit;if(d.table?.length>0)isFirstMove=false;update(d);});
 socket.on('nextTurn',d=>{if(d.currentSuit)currentLeadSuit=d.currentSuit;update(d);});
 socket.on('errorMsg',m=>{showLoading(false);isProcessingTurn=false;showToast(m);});

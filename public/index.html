@@ -703,14 +703,12 @@ const TITLES=[
 ];
 const socket=io(),icons={Spades:'♠',Hearts:'♥',Diamonds:'♦',Clubs:'♣'},XP_PER_LEVEL=100;
 
-// ============ VERSION RESET SYSTEM ============
-// Change this number to force all players to reset their stats
-const STATS_VERSION = 3;
-// =============================================
-
+// User ID - stored locally but all stats come from server
 let userID=localStorage.getItem('pUserID')||'uid_'+Math.random().toString(36).substr(2,9);localStorage.setItem('pUserID',userID);
 let myName=localStorage.getItem('pName')||'Disciple'+Math.floor(Math.random()*999);
-const DEFAULT_STATS={version:STATS_VERSION,xp:0,pangkahs:0,wins:0,losses:0,games:0,currentStreak:0,bestStreak:0,handsAbsorbed:0,cardsPlayed:0,secondPlace:0,thirdPlace:0,fourthToTenth:0,topTwo:0,nightGames:0,uniquePlayers:[],unlockedTitles:[],equippedTitle:null,pangkahsReceivedFromBot:0,lossesToBot:0,handsAbsorbedFromBot:0};
+
+// Stats object - populated from MongoDB server
+let stats={xp:0,pangkahs:0,pangkahsReceived:0,wins:0,losses:0,games:0,currentStreak:0,bestStreak:0,handsAbsorbed:0,handsGiven:0,cleanWins:0,maxCardsHeld:0,autoPlays:0,cardsPlayed:0,secondPlace:0,thirdPlace:0,fourthToTenth:0,topTwo:0,nightGames:0,unlockedTitles:[],equippedTitle:null};
 
 // GM System
 let isGameMaster = localStorage.getItem('pGM') === 'true';
@@ -720,7 +718,7 @@ const GM_TITLES = [
 ];
 
 // Hall of Fame Frame System
-let hofFrameHolders = {}; // { frameType: userID }
+let hofFrameHolders = {};
 const HOF_FRAMES = [
     { id: 'winrate', record: 'winrate', class: 'frame-winrate', name: 'Win Rate Champion' },
     { id: 'streak', record: 'streak', class: 'frame-streak', name: 'Streak Master' },
@@ -735,115 +733,119 @@ async function fetchHofFrameHolders() {
         if (res.ok) {
             const data = await res.json();
             hofFrameHolders = data.holders || {};
-            console.log('🖼️ HOF Frame holders:', hofFrameHolders);
         }
-    } catch (e) {
-        console.log('Failed to fetch HOF frames:', e.message);
-    }
+    } catch (e) { console.log('Failed to fetch HOF frames'); }
 }
 
 function getPlayerFrame(playerUserID, playerIsGM) {
-    // Priority: GM > HOF frames > Default
-    // 1. GM gets special frame (highest priority)
-    if (playerIsGM) {
-        return 'frame-gm';
-    }
-    // 2. Check HOF frame holders
+    if (playerIsGM) return 'frame-gm';
     for (const frame of HOF_FRAMES) {
-        if (hofFrameHolders[frame.id] === playerUserID) {
-            return frame.class;
-        }
+        if (hofFrameHolders[frame.id] === playerUserID) return frame.class;
     }
-    return ''; // Default frame
+    return '';
 }
 
-// Load stats and check version
-let savedStats=JSON.parse(localStorage.getItem('pStats')||'{}');
-if(!savedStats.version||savedStats.version<STATS_VERSION){
-    console.log(`Stats reset: version ${savedStats.version||'none'} → ${STATS_VERSION}`);
-    savedStats={...DEFAULT_STATS};
-    localStorage.setItem('pStats',JSON.stringify(savedStats));
-}
-let stats={...DEFAULT_STATS,...savedStats};
 let myRoom='',myCurrentHand=[],pendingSwapRequest=null,swapTimeoutId=null,isProcessingTurn=false,isHost=false,isFirstMove=true,currentLeadSuit=null,currentFilter='all',currentMaxPlayers=4;
 
-// Auto-sync from MongoDB on page load - ALWAYS sync to ensure GM changes are reflected
-async function syncFromServer(){
+// Load player data from MongoDB on page load
+async function loadPlayerData(){
     try{
-        console.log('🔄 Syncing from server for userID:', userID);
-        const res=await fetch(`/api/stats/${userID}`);
-        console.log('📡 Server response status:', res.status);
-        
+        console.log('🔄 Loading player data from MongoDB for userID:', userID);
+        const res=await fetch(`/api/player/${userID}`);
+        console.log('📡 Response status:', res.status);
         if(res.ok){
-            const serverData=await res.json();
-            console.log('📥 Server data received:', JSON.stringify(serverData));
-            if(serverData&&serverData.userID){
-                // FORCE override local stats with server data (server is source of truth)
-                const newStats={
-                    ...DEFAULT_STATS,
-                    version:STATS_VERSION,
-                    xp:serverData.xp||0,
-                    wins:serverData.wins||0,
-                    losses:serverData.losses||0,
-                    games:serverData.games||0,
-                    pangkahs:serverData.pangkahs||0,
-                    pangkahsReceived:serverData.pangkahsReceived||0,
-                    bestStreak:serverData.bestStreak||0,
-                    currentStreak:serverData.currentStreak||0,
-                    handsAbsorbed:serverData.handsAbsorbed||0,
-                    handsGiven:serverData.handsGiven||0,
-                    cleanWins:serverData.cleanWins||0,
-                    maxCardsHeld:serverData.maxCardsHeld||0,
-                    autoPlays:serverData.autoPlays||0,
-                    cardsPlayed:serverData.cardsPlayed||0,
-                    secondPlace:serverData.secondPlace||0,
-                    thirdPlace:serverData.thirdPlace||0,
-                    fourthToTenth:serverData.fourthToTenth||0,
-                    topTwo:serverData.topTwo||0,
-                    nightGames:serverData.nightGames||0,
-                    pangkahsReceivedFromBot:serverData.pangkahsReceivedFromBot||0,
-                    lossesToBot:serverData.lossesToBot||0,
-                    handsAbsorbedFromBot:serverData.handsAbsorbedFromBot||0,
-                    unlockedTitles:serverData.unlockedTitles||[],
-                    equippedTitle:serverData.equippedTitle||null,
-                    uniquePlayers:[]
-                };
-                
-                // Log the difference between old and new
-                console.log('📊 Old stats XP:', stats.xp, '→ New XP:', newStats.xp);
-                console.log('📊 Old stats Wins:', stats.wins, '→ New Wins:', newStats.wins);
-                
-                stats = newStats;
-                
-                // Update display name if server has it
-                if(serverData.displayName && serverData.displayName !== myName){
-                    myName = serverData.displayName;
-                    localStorage.setItem('pName', myName);
-                    console.log('📝 Display name updated from server:', myName);
-                }
-                localStorage.setItem('pStats',JSON.stringify(stats));
-                console.log('✅ Stats synced & saved to localStorage - XP:', stats.xp, 'Wins:', stats.wins, 'Games:', stats.games);
-                updateStatsUI();
-            }else{
-                console.log('⚠️ Server data missing userID field');
+            const data=await res.json();
+            console.log('📥 Full player data received:', JSON.stringify(data));
+            
+            // Update stats from server
+            stats={
+                xp:data.xp||0,
+                wins:data.wins||0,
+                losses:data.losses||0,
+                games:data.games||0,
+                pangkahs:data.pangkahs||0,
+                pangkahsReceived:data.pangkahsReceived||0,
+                bestStreak:data.bestStreak||0,
+                currentStreak:data.currentStreak||0,
+                handsAbsorbed:data.handsAbsorbed||0,
+                handsGiven:data.handsGiven||0,
+                cleanWins:data.cleanWins||0,
+                maxCardsHeld:data.maxCardsHeld||0,
+                autoPlays:data.autoPlays||0,
+                cardsPlayed:data.cardsPlayed||0,
+                secondPlace:data.secondPlace||0,
+                thirdPlace:data.thirdPlace||0,
+                fourthToTenth:data.fourthToTenth||0,
+                topTwo:data.topTwo||0,
+                nightGames:data.nightGames||0,
+                unlockedTitles:data.unlockedTitles||[],
+                equippedTitle:data.equippedTitle||null
+            };
+            
+            console.log('📊 Stats loaded - XP:', stats.xp, 'Wins:', stats.wins, 'Games:', stats.games);
+            
+            // Sync display name
+            if(data.displayName && data.displayName !== myName){
+                myName = data.displayName;
+                localStorage.setItem('pName', myName);
             }
+            
+            updateStatsUI();
+            checkAllTitles();
         }else{
-            const errorData = await res.json().catch(()=>({}));
-            console.log('⚠️ Server returned error:', res.status, errorData);
+            console.log('❌ Server returned error status:', res.status);
         }
     }catch(e){
-        console.log('❌ Server sync error:', e.message);
-        console.error(e);
+        console.log('❌ Failed to load player data:', e.message);
     }
 }
 
-// Call sync on EVERY page load - server is always source of truth
+// Listen for server-side stats updates after games
+socket.on('statsUpdated', (data) => {
+    console.log('📊 Stats updated from server:', data);
+    
+    // Update local stats
+    stats.xp = data.xp;
+    stats.wins = data.wins;
+    stats.losses = data.losses;
+    stats.games = data.games;
+    stats.pangkahs = data.pangkahs;
+    stats.bestStreak = data.bestStreak;
+    stats.currentStreak = data.currentStreak;
+    stats.unlockedTitles = data.unlockedTitles;
+    
+    // Show XP popup
+    if(data.xpGain){
+        const p=document.createElement('div');
+        p.className='xp-popup';
+        p.style.color=data.xpGain>0?'var(--primary-action)':'var(--danger)';
+        p.innerText=`${data.xpGain>0?'+':''}${data.xpGain} XP`;
+        document.body.appendChild(p);
+        setTimeout(()=>p.remove(),1500);
+    }
+    
+    // Show new title notifications
+    if(data.newTitles && data.newTitles.length > 0){
+        data.newTitles.forEach(titleId => {
+            const t = TITLES.find(x => x.id === titleId);
+            if(t) showAchievement(t);
+        });
+    }
+    
+    // Check for level up
+    const oldLevel = Math.floor((stats.xp - data.xpGain) / XP_PER_LEVEL) + 1;
+    const newLevel = getLevel();
+    if(newLevel > oldLevel){
+        showToast(`⚡ LEVEL UP! Lv.${newLevel}`, true);
+    }
+    
+    updateStatsUI();
+});
+
+// Call on page load
 document.addEventListener('DOMContentLoaded',()=>{
-    // Always sync from server to get latest data (including GM edits)
-    syncFromServer();
-    // Fetch Hall of Fame frame holders
+    loadPlayerData();
     fetchHofFrameHolders();
-    // Show GM Admin buttons if already logged in as GM
     if(isGameMaster){
         document.getElementById('gm-admin-btn').style.display='block';
         document.getElementById('gm-admin-header-btn').style.display='flex';
@@ -859,9 +861,24 @@ function equipTitle(id){
     const title=allTitles.find(t=>t.id===id);
     const isGMTitle=title&&title.req.t==='gm';
     const canEquip=stats.unlockedTitles.includes(id)||(isGMTitle&&isGameMaster);
-    if(canEquip){stats.equippedTitle=id;saveStats();updateStatsUI();renderTitleGrid();if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:getEquippedTitleData()});showToast('Equipped!',true);}
+    if(canEquip){
+        equipTitleOnServer(id).then(success => {
+            if(success){
+                renderTitleGrid();
+                if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:getEquippedTitleData()});
+                showToast('Equipped!',true);
+            }
+        });
+    }
 }
-function unequipTitle(){stats.equippedTitle=null;saveStats();updateStatsUI();renderTitleGrid();if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:null});}
+function unequipTitle(){
+    equipTitleOnServer(null).then(success => {
+        if(success){
+            renderTitleGrid();
+            if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:null});
+        }
+    });
+}
 function getEquippedTitleData(){if(!stats.equippedTitle)return null;const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[])];const t=allTitles.find(x=>x.id===stats.equippedTitle);return t?{id:t.id,name:t.name,rarity:t.rarity,icon:t.icon}:null;}
 
 // Title Pagination
@@ -1320,6 +1337,8 @@ async function gmSavePlayer(){
         bestStreak:parseInt(document.getElementById('gm-stat-bestStreak').value)||0
     };
     
+    console.log('[GM] Saving player:', gmCurrentPlayer.userID, 'Updates:', updates);
+    
     try{
         const res=await fetch('/api/gm/update-player',{
             method:'POST',
@@ -1327,8 +1346,11 @@ async function gmSavePlayer(){
             body:JSON.stringify({targetUserID:gmCurrentPlayer.userID,updates})
         });
         const data=await res.json();
+        console.log('[GM] Save response:', data);
         if(data.success){
             showToast('Player updated!',true);
+            // Refresh the search to show updated values
+            gmSearchPlayer();
         }else{
             showToast(data.error||'Update failed');
         }
@@ -1412,21 +1434,42 @@ async function gmToggleBetaTester(){
 }
 // ============ END GM ADMIN PANEL ============
 
+// Stats are now managed server-side - no local saving needed
 function saveStats(){
-    localStorage.setItem('pStats',JSON.stringify(stats));
-    // Sync to MongoDB (non-blocking)
-    syncStatsToServer();
+    // Stats are saved on server after each game
+    // This function is kept for compatibility but does nothing
 }
-async function syncStatsToServer(){
-    try {
-        await fetch('/api/stats/save', {
+
+// Equip title via server API
+async function equipTitleOnServer(titleId){
+    try{
+        const res = await fetch('/api/player/equip-title', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userID, displayName: myName, stats })
+            body: JSON.stringify({ userID, titleId })
         });
-    } catch(e) { console.log('Sync failed:', e); }
+        if(res.ok){
+            const data = await res.json();
+            stats.equippedTitle = data.equippedTitle;
+            updateStatsUI();
+            return true;
+        }
+    }catch(e){ console.log('Failed to equip title'); }
+    return false;
 }
-function addXP(amt,reason,popup=true){const old=getLevel();stats.xp=Math.max(0,(stats.xp||0)+amt);saveStats();if(getLevel()>old)showToast(`⚡ LEVEL UP! Lv.${getLevel()}`,true);if(popup&&amt){const p=document.createElement('div');p.className='xp-popup';p.style.color=amt>0?'var(--primary-action)':'var(--danger)';p.innerText=`${amt>0?'+':''}${amt} XP`;document.body.appendChild(p);setTimeout(()=>p.remove(),1500);}updateStatsUI();checkAllTitles();}
+
+function addXP(amt,reason,popup=true){
+    // XP is now added server-side after games
+    // This function is kept for compatibility but XP comes from server
+    if(popup&&amt){
+        const p=document.createElement('div');
+        p.className='xp-popup';
+        p.style.color=amt>0?'var(--primary-action)':'var(--danger)';
+        p.innerText=`${amt>0?'+':''}${amt} XP`;
+        document.body.appendChild(p);
+        setTimeout(()=>p.remove(),1500);
+    }
+}
 function updateStatsUI(){const lv=getLevel(),lvDisplay=getLevelDisplay(),rt=getRankTitle(lv),xp=(stats.xp||0)%XP_PER_LEVEL,wr=stats.games>0?((stats.wins/stats.games)*100).toFixed(1):0,eq=getEquippedTitleData();const mn=document.getElementById('menu-name');if(mn)mn.innerText=myName;const mb=document.getElementById('menu-badge');if(mb)mb.src=getBadgeImage(lv,isGameMaster);const mtitle=document.getElementById('menu-title');if(mtitle)mtitle.innerHTML=eq?`<span class="title-rarity ${eq.rarity}" style="font-size:9px;padding:1px 5px">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.6">No title equipped</span>';document.getElementById('prof-name').innerText=myName;document.getElementById('prof-level').innerText=isGameMaster?'∞':`LEVEL ${lvDisplay}`;document.getElementById('prof-rank-title').innerText=rt;document.getElementById('prof-xp').innerText=stats.xp||0;document.getElementById('prof-wins').innerText=stats.wins||0;document.getElementById('prof-pangkahs').innerText=stats.pangkahs||0;document.getElementById('prof-games').innerText=stats.games||0;document.getElementById('prof-streak').innerText=stats.bestStreak||0;document.getElementById('prof-winrate').innerText=wr+'%';document.getElementById('prof-progress-text').innerText=isGameMaster?'∞ XP':`XP: ${xp}/${XP_PER_LEVEL}`;document.getElementById('prof-bar-fill').style.width=isGameMaster?'100%':(xp/XP_PER_LEVEL*100)+'%';document.getElementById('prof-equipped-title').innerHTML=eq?`<span class="title-rarity ${eq.rarity}">${eq.icon} ${eq.name}</span>`:'<span style="opacity:0.5;font-size:11px">No title equipped</span>';document.getElementById('streak-indicator').style.display=stats.currentStreak>=3?'block':'none';document.getElementById('streak-count').innerText=stats.currentStreak||0;document.getElementById('gm-logout-btn').style.display=isGameMaster?'block':'none';}
 function editName(){const n=prompt("Enter Name:",myName);if(n?.trim()&&n.trim().length<=20){myName=n.trim();localStorage.setItem('pName',myName);updateStatsUI();}}
 async function editNamePrompt(){
@@ -1579,15 +1622,55 @@ socket.on('clearTable',d=>{if(d.msg.toLowerCase()==='pangkah!'){flashScreen('pan
 // Track pangkah received (the one who took the cards)
 if(d.winnerUserID===userID){stats.pangkahsReceived=(stats.pangkahsReceived||0)+1;addXP(0,"Got Pangkah'd",false);}
 // Track pangkah dealt (the one who broke suit)
-if(d.pangkahDealerUserID===userID){stats.pangkahs=(stats.pangkahs||0)+1;addXP(3,"Pangkah Dealt!");}}else{flashScreen('clean');playSound('sweep');if(d.winnerUserID===userID){stats.cleanWins=(stats.cleanWins||0)+1;addXP(1,"Clean Round");}}saveStats();checkAllTitles();currentLeadSuit=null;const pop=document.getElementById('round-popup');document.getElementById('pop-title').className=d.msg==='Pangkah!'?'pangkah-text':'clean-text';document.getElementById('pop-title').innerText=d.msg.toUpperCase();document.getElementById('pop-desc').innerText=d.winner+" has the lead.";pop.style.display='block';setTimeout(()=>{pop.style.display='none';update(d);},2000);});
-socket.on('updateTable',d=>{playSound('place');if(d.currentSuit)currentLeadSuit=d.currentSuit;if(d.table?.length>0)isFirstMove=false;stats.cardsPlayed=(stats.cardsPlayed||0)+1;saveStats();update(d);});
+if(d.pangkahDealerUserID===userID){addXP(3,"Pangkah Dealt!",true);}flashScreen('pangkah');playSound('strike');}else{flashScreen('clean');playSound('sweep');if(d.winnerUserID===userID){addXP(1,"Clean Round",true);}}currentLeadSuit=null;const pop=document.getElementById('round-popup');document.getElementById('pop-title').className=d.msg==='Pangkah!'?'pangkah-text':'clean-text';document.getElementById('pop-title').innerText=d.msg.toUpperCase();document.getElementById('pop-desc').innerText=d.winner+" has the lead.";pop.style.display='block';setTimeout(()=>{pop.style.display='none';update(d);},2000);});
+socket.on('updateTable',d=>{playSound('place');if(d.currentSuit)currentLeadSuit=d.currentSuit;if(d.table?.length>0)isFirstMove=false;update(d);});
 socket.on('nextTurn',d=>{if(d.currentSuit)currentLeadSuit=d.currentSuit;update(d);});
 socket.on('errorMsg',m=>{showLoading(false);isProcessingTurn=false;showToast(m);});
 socket.on('roomClosed',()=>{showToast("Sect disbanded");setTimeout(()=>location.reload(),2000);});
 
-socket.on('gameOver',data=>{setTurnIndicator(false);document.getElementById('close-room-btn').style.display='none';stats.games=(stats.games||0)+1;const myPos=data.finishOrder.indexOf(userID)+1;const myData=data.performanceData.find(p=>p.userID===userID);if(myPos===1){stats.wins=(stats.wins||0)+1;stats.currentStreak=(stats.currentStreak||0)+1;if(stats.currentStreak>(stats.bestStreak||0))stats.bestStreak=stats.currentStreak;addXP(15+stats.currentStreak*2,`1st! Streak:${stats.currentStreak}`,false);launchConfetti();}else if(myPos===2){stats.secondPlace=(stats.secondPlace||0)+1;stats.topTwo=(stats.topTwo||0)+1;stats.currentStreak=0;addXP(8,"2nd Place",false);}else if(myPos===3){stats.thirdPlace=(stats.thirdPlace||0)+1;stats.currentStreak=0;addXP(5,"3rd Place",false);}else if(data.loserUserID===userID){stats.losses=(stats.losses||0)+1;stats.currentStreak=0;addXP(-2,"Defeated",false);}else{stats.fourthToTenth=(stats.fourthToTenth||0)+1;stats.currentStreak=0;addXP(3,`${myPos}th`,false);}if(myPos<=2)stats.topTwo=(stats.topTwo||0)+1;if(myData?.stats?.pangkahsReceivedFromBot){stats.pangkahsReceivedFromBot=(stats.pangkahsReceivedFromBot||0)+myData.stats.pangkahsReceivedFromBot;}if(myData?.stats?.lossesToBot){stats.lossesToBot=(stats.lossesToBot||0)+myData.stats.lossesToBot;}if(myData?.stats?.handsAbsorbedFromBot){stats.handsAbsorbedFromBot=(stats.handsAbsorbedFromBot||0)+myData.stats.handsAbsorbedFromBot;}saveStats();checkAllTitles();updateStatsUI();document.getElementById('game-number').innerText=`Game #${data.gameNumber}`;document.getElementById('finish-list').innerHTML=data.performanceData.sort((a,b)=>a.position-b.position).map(p=>{const isW=p.position===1,isL=p.position===data.performanceData.length,isMe=p.userID===userID;let xp=isW?15:p.position===2?8:p.position===3?5:isL?-2:3;const tHtml=p.equippedTitle?`<span class="title-rarity ${p.equippedTitle.rarity}" style="font-size:8px;margin-left:5px">${p.equippedTitle.icon}</span>`:'';return`<div class="finish-item ${isW?'winner':''} ${isL?'loser':''}" style="${isMe?'border-width:2px':''}"><div style="font-size:18px;font-weight:800;width:30px">${isW?'👑':isL?'💀':'#'+p.position}</div><div style="flex:1;text-align:left;margin-left:10px;font-weight:600">${p.name}${tHtml}${isMe?' (You)':''}</div><div style="font-size:12px;color:var(--primary-action);font-weight:800">${xp>0?'+':''}${xp} XP</div></div>`;}).join('');let bonuses=[];if(myPos===1){bonuses.push({n:'🏆 Victory',x:15});if(stats.currentStreak>1)bonuses.push({n:`🔥 Streak x${stats.currentStreak}`,x:stats.currentStreak*2});}else if(myPos===2)bonuses.push({n:'🥈 2nd',x:8});else if(myPos===3)bonuses.push({n:'🥉 3rd',x:5});else if(data.loserUserID===userID)bonuses.push({n:'💀 Defeated',x:-2});if(myData?.stats?.pangkahsDealt)bonuses.push({n:`⚡ Pangkahs (${myData.stats.pangkahsDealt})`,x:myData.stats.pangkahsDealt*3});if(myData?.stats?.cleanWins)bonuses.push({n:`✨ Clean (${myData.stats.cleanWins})`,x:myData.stats.cleanWins});const total=bonuses.reduce((s,b)=>s+b.x,0);document.getElementById('bonus-list').innerHTML=`<div style="font-weight:800;margin-bottom:10px;color:var(--gold)">🎁 YOUR BONUSES</div>${bonuses.map(b=>`<div class="bonus-item"><span>${b.n}</span><span style="color:${b.x>=0?'var(--primary-action)':'var(--danger)'};font-weight:800">${b.x>0?'+':''}${b.x} XP</span></div>`).join('')}<div class="bonus-item" style="border-top:2px solid var(--gold);margin-top:10px;padding-top:10px"><span style="font-weight:800">TOTAL</span><span style="color:var(--gold);font-weight:800;font-size:16px">${total>0?'+':''}${total} XP</span></div>`;document.getElementById('gameover-modal').style.display='flex';});
+socket.on('gameOver',data=>{
+    setTurnIndicator(false);
+    document.getElementById('close-room-btn').style.display='none';
+    
+    // Stats are now handled server-side - we just display the results
+    const myPos=data.finishOrder.indexOf(userID)+1;
+    const myData=data.performanceData.find(p=>p.userID===userID);
+    
+    // Visual effects only
+    if(myPos===1){
+        launchConfetti();
+    }
+    
+    // Display game results UI
+    document.getElementById('game-number').innerText=`Game #${data.gameNumber}`;
+    document.getElementById('finish-list').innerHTML=data.performanceData.sort((a,b)=>a.position-b.position).map(p=>{
+        const isW=p.position===1,isL=p.position===data.performanceData.length,isMe=p.userID===userID;
+        let xp=isW?15:p.position===2?8:p.position===3?5:isL?-2:3;
+        const tHtml=p.equippedTitle?`<span class="title-rarity ${p.equippedTitle.rarity}" style="font-size:8px;margin-left:5px">${p.equippedTitle.icon}</span>`:'';
+        return`<div class="finish-item ${isW?'winner':''} ${isL?'loser':''}" style="${isMe?'border-width:2px':''}"><div style="font-size:18px;font-weight:800;width:30px">${isW?'👑':isL?'💀':'#'+p.position}</div><div style="flex:1;text-align:left;margin-left:10px;font-weight:600">${p.name}${tHtml}${isMe?' (You)':''}</div><div style="font-size:12px;color:var(--primary-action);font-weight:800">${xp>0?'+':''}${xp} XP</div></div>`;
+    }).join('');
+    
+    // Build bonus list for display (actual XP handled server-side)
+    let bonuses=[];
+    if(myPos===1){
+        bonuses.push({n:'🏆 Victory',x:15});
+    }else if(myPos===2){
+        bonuses.push({n:'🥈 2nd',x:8});
+    }else if(myPos===3){
+        bonuses.push({n:'🥉 3rd',x:5});
+    }else if(data.loserUserID===userID){
+        bonuses.push({n:'💀 Defeated',x:-2});
+    }
+    if(myData?.stats?.pangkahsDealt)bonuses.push({n:`⚡ Pangkahs (${myData.stats.pangkahsDealt})`,x:myData.stats.pangkahsDealt*3});
+    if(myData?.stats?.cleanWins)bonuses.push({n:`✨ Clean (${myData.stats.cleanWins})`,x:myData.stats.cleanWins});
+    const total=bonuses.reduce((s,b)=>s+b.x,0);
+    
+    document.getElementById('bonus-list').innerHTML=`<div style="font-weight:800;margin-bottom:10px;color:var(--gold)">🎁 YOUR BONUSES</div>${bonuses.map(b=>`<div class="bonus-item"><span>${b.n}</span><span style="color:${b.x>=0?'var(--primary-action)':'var(--danger)'};font-weight:800">${b.x>0?'+':''}${b.x} XP</span></div>`).join('')}<div class="bonus-item" style="border-top:2px solid var(--gold);margin-top:10px;padding-top:10px"><span style="font-weight:800">TOTAL</span><span style="color:var(--gold);font-weight:800;font-size:16px">${total>0?'+':''}${total} XP</span></div>`;
+    
+    document.getElementById('gameover-modal').style.display='flex';
+});
 socket.on('receiveSwapRequest',d=>{pendingSwapRequest=d.fromUserID;document.getElementById('swap-txt').innerText=d.fromName+" wants your hand!";document.getElementById('swap-modal').style.display='block';let t=15;const timer=document.getElementById('swap-timer');timer.innerText=`${t}s`;const cd=setInterval(()=>{t--;timer.innerText=`${t}s`;if(t<=0)clearInterval(cd);},1000);swapTimeoutId=setTimeout(()=>{clearInterval(cd);if(pendingSwapRequest===d.fromUserID){answerSwap(false);showToast("Swap expired");}},15000);});
-socket.on('swapOccurred',d=>{playSound('absorb');showToast(d.msg,true);if(d.requesterUserID===userID){stats.handsAbsorbed=(stats.handsAbsorbed||0)+1;addXP(5,"Hand Absorbed!");if(d.accepterName&&d.accepterName.startsWith('[BOT]')){stats.handsAbsorbedFromBot=(stats.handsAbsorbedFromBot||0)+1;}}if(d.accepterUserID===userID){stats.handsGiven=(stats.handsGiven||0)+1;addXP(3,"Hand Given!");}saveStats();checkAllTitles();update(d);});
+socket.on('swapOccurred',d=>{playSound('absorb');showToast(d.msg,true);update(d);});
 socket.on('botSwapPending',d=>{showToast(`${d.botName} will accept in ${d.countdown}s...`,true);});
 
 // Turn Timer
@@ -1605,13 +1688,12 @@ socket.on('turnTimer',d=>{
 socket.on('autoPlayed',d=>{
     showToast(`⏱️ ${d.playerName} auto-played: ${d.card.rank}${icons[d.card.suit]}`,false);
     playSound('place');
-    if(d.playerUserID===userID){stats.autoPlays=(stats.autoPlays||0)+1;saveStats();}
     if(d.currentSuit)currentLeadSuit=d.currentSuit;
     if(d.table?.length>0)isFirstMove=false;
     update(d);
 });
 
-function update(d){isProcessingTurn=false;showLoading(false);const me=d.players.find(p=>p.userID===userID);if(me){myCurrentHand=me.hand;if(me.hand.length>(stats.maxCardsHeld||0)){stats.maxCardsHeld=me.hand.length;saveStats();checkAllTitles();}}const active=d.players[d.turn];const isMyTurn=active?.userID===userID;setTurnIndicator(isMyTurn);const sInd=document.getElementById('suit-indicator');if(d.table?.length>0){sInd.style.display='flex';currentLeadSuit=d.table[0].card.suit;document.getElementById('suit-symbol').innerText=icons[currentLeadSuit];document.getElementById('suit-symbol').style.color=['Hearts','Diamonds'].includes(currentLeadSuit)?'var(--danger)':'white';}else{sInd.style.display='none';currentLeadSuit=null;}render(d.players,d.turn,d.table||[]);if(d.fateAces)showFateInHeader(d.fateAces);}
+function update(d){isProcessingTurn=false;showLoading(false);const me=d.players.find(p=>p.userID===userID);if(me){myCurrentHand=me.hand;}const active=d.players[d.turn];const isMyTurn=active?.userID===userID;setTurnIndicator(isMyTurn);const sInd=document.getElementById('suit-indicator');if(d.table?.length>0){sInd.style.display='flex';currentLeadSuit=d.table[0].card.suit;document.getElementById('suit-symbol').innerText=icons[currentLeadSuit];document.getElementById('suit-symbol').style.color=['Hearts','Diamonds'].includes(currentLeadSuit)?'var(--danger)':'white';}else{sInd.style.display='none';currentLeadSuit=null;}render(d.players,d.turn,d.table||[]);if(d.fateAces)showFateInHeader(d.fateAces);}
 
 // 2-Row Layout Configuration
 function getRowConfig(playerCount){
@@ -1726,7 +1808,7 @@ function showFateInHeader(list){
 function renderHand(){const hDiv=document.getElementById('my-cards');hDiv.innerHTML="";const isMyTurn=document.getElementById('turn-glow').classList.contains('active');const hasLead=currentLeadSuit&&myCurrentHand.some(c=>c.suit===currentLeadSuit);myCurrentHand.forEach(c=>{const el=createCardUI(c);let canPlay=true,highlight=false;if(!isMyTurn||isProcessingTurn)canPlay=false;else if(isFirstMove){canPlay=c.suit==='Spades'&&c.rank==='K';highlight=canPlay;}else if(currentLeadSuit&&hasLead){canPlay=c.suit===currentLeadSuit;highlight=canPlay;}else highlight=isMyTurn;if(!canPlay)el.classList.add('disabled');else if(highlight)el.classList.add('highlight');el.onclick=e=>{if(!isProcessingTurn&&isMyTurn&&canPlay){e.currentTarget.classList.add('disabled');e.currentTarget.classList.remove('highlight');isProcessingTurn=true;showLoading(true);socket.emit('playCard',{roomID:myRoom,cardObject:c});}};hDiv.appendChild(el);});}
 function createCardUI(c){const d=document.createElement('div');d.className=`card ${['Hearts','Diamonds'].includes(c.suit)?'red':''}`;d.innerHTML=`<div style="font-size:10px">${c.rank}</div><div style="font-size:28px;text-align:center">${icons[c.suit]}</div><div style="font-size:10px;transform:rotate(180deg)">${c.rank}</div>`;return d;}
 function showDiscarded(list){showFateInHeader(list);}
-updateStatsUI();checkAllTitles();
+// Stats are loaded from server via loadPlayerData() in DOMContentLoaded
 window.addEventListener('beforeunload',e=>{if(myRoom&&document.getElementById('lobby').style.display==='none'){e.preventDefault();e.returnValue='';}});
 </script>
 </body>

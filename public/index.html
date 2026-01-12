@@ -524,10 +524,11 @@
                 </div>
             </div>
             
-            <div style="display:flex;gap:10px">
+            <div style="display:flex;gap:10px;margin-bottom:10px">
                 <button class="btn btn-p" onclick="gmSavePlayer()" style="flex:1;font-size:11px">💾 SAVE CHANGES</button>
-                <button class="btn" onclick="gmResetPlayer()" style="flex:1;font-size:11px;background:var(--accent-red);color:#fff">🗑️ RESET ALL STATS</button>
+                <button class="btn" onclick="gmResetPlayer()" style="flex:1;font-size:11px;background:var(--accent-red);color:#fff">🔄 RESET STATS</button>
             </div>
+            <button class="btn" onclick="gmDeletePlayer()" style="width:100%;font-size:11px;background:#8B0000;color:#fff;border:2px solid #FF0000">☠️ DELETE PLAYER (PERMANENT)</button>
         </div>
         
         <div id="gm-no-result" style="display:none;text-align:center;padding:20px;color:var(--text-tertiary)">
@@ -1430,6 +1431,46 @@ async function gmToggleBetaTester(){
         showToast('Toggle failed');
         // Revert toggle state
         document.getElementById('gm-beta-toggle').checked=!isBetaTester;
+    }
+}
+
+async function gmDeletePlayer(){
+    if(!gmCurrentPlayer){showToast('No player selected');return;}
+    
+    // Double confirmation for delete
+    if(!confirm(`⚠️ WARNING: Delete player "${gmCurrentPlayer.displayName}"?\n\nThis will PERMANENTLY remove all their data from the database.\nThey will start fresh on next login.\n\nThis cannot be undone!`)){
+        return;
+    }
+    
+    if(!confirm(`🚨 FINAL CONFIRMATION 🚨\n\nType "DELETE" in the next prompt to confirm deletion of:\n${gmCurrentPlayer.displayName} (${gmCurrentPlayer.userID})`)){
+        return;
+    }
+    
+    const confirmText = prompt('Type DELETE to confirm:');
+    if(confirmText !== 'DELETE'){
+        showToast('Deletion cancelled');
+        return;
+    }
+    
+    try{
+        const res=await fetch('/api/gm/delete-player',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({targetUserID:gmCurrentPlayer.userID})
+        });
+        const data=await res.json();
+        if(data.success){
+            showToast(`☠️ Player ${gmCurrentPlayer.displayName} deleted!`,true);
+            // Hide the player result panel
+            document.getElementById('gm-player-result').style.display='none';
+            document.getElementById('gm-search-input').value='';
+            gmCurrentPlayer=null;
+        }else{
+            showToast(data.error||'Delete failed');
+        }
+    }catch(e){
+        console.error('GM delete error:',e);
+        showToast('Delete failed');
     }
 }
 // ============ END GM ADMIN PANEL ============

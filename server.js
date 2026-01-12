@@ -125,6 +125,64 @@ app.get('/api/leaderboard/:type', async (req, res) => {
     }
 });
 
+// HOF Frames API - Get frame holders (for avatar frames)
+app.get('/api/hof-frames', async (req, res) => {
+    try {
+        const minGames = 10; // Minimum games to qualify for a frame
+        
+        // Get all players with enough games
+        const players = await Player.find({ games: { $gte: minGames } })
+            .select('userID displayName wins losses games pangkahs pangkahsReceived bestStreak autoPlays');
+        
+        if (players.length === 0) {
+            return res.json({ holders: {} });
+        }
+        
+        const holders = {};
+        
+        // Calculate rates
+        const playersWithRates = players.map(p => ({
+            userID: p.userID,
+            name: p.displayName,
+            games: p.games || 1,
+            winRate: ((p.wins || 0) / (p.games || 1) * 100),
+            loseRate: ((p.losses || 0) / (p.games || 1) * 100),
+            bestStreak: p.bestStreak || 0,
+            pangkahs: p.pangkahs || 0,
+            pangkahsReceived: p.pangkahsReceived || 0,
+            autoPlays: p.autoPlays || 0
+        }));
+        
+        // Glory Frames
+        // 1. Win Rate Champion - Highest win rate
+        const winRateChamp = playersWithRates.reduce((best, p) => p.winRate > (best?.winRate || 0) ? p : best, null);
+        if (winRateChamp) holders.winrate = winRateChamp.userID;
+        
+        // 2. Streak Master - Best win streak
+        const streakMaster = playersWithRates.reduce((best, p) => p.bestStreak > (best?.bestStreak || 0) ? p : best, null);
+        if (streakMaster && !Object.values(holders).includes(streakMaster.userID)) holders.streak = streakMaster.userID;
+        
+        // 3. Pangkah King - Most pangkahs dealt
+        const pangkahKing = playersWithRates.reduce((best, p) => p.pangkahs > (best?.pangkahs || 0) ? p : best, null);
+        if (pangkahKing && !Object.values(holders).includes(pangkahKing.userID)) holders.pangkah = pangkahKing.userID;
+        
+        // Shame Frames
+        // 4. Lose Rate Champion - Highest lose rate
+        const loseRateChamp = playersWithRates.reduce((best, p) => p.loseRate > (best?.loseRate || 0) ? p : best, null);
+        if (loseRateChamp && !Object.values(holders).includes(loseRateChamp.userID)) holders.loserate = loseRateChamp.userID;
+        
+        // 5. Pangkah Magnet - Most pangkahs received
+        const pangkahMagnet = playersWithRates.reduce((best, p) => p.pangkahsReceived > (best?.pangkahsReceived || 0) ? p : best, null);
+        if (pangkahMagnet && !Object.values(holders).includes(pangkahMagnet.userID)) holders.magnet = pangkahMagnet.userID;
+        
+        console.log('[HOF Frames]', holders);
+        res.json({ holders });
+    } catch (err) {
+        console.error('HOF frames error:', err);
+        res.status(500).json({ error: 'Failed to get HOF frames' });
+    }
+});
+
 // Hall of Fame API - Get record holders
 app.get('/api/hall-of-fame', async (req, res) => {
     try {
@@ -750,7 +808,7 @@ app.post('/api/gm/update-player', async (req, res) => {
         const { targetUserID, updates } = req.body;
         if (!targetUserID) return res.status(400).json({ error: 'userID required' });
         
-        const allowedFields = ['xp', 'wins', 'losses', 'games', 'pangkahs', 'bestStreak', 'isBetaTester'];
+        const allowedFields = ['xp', 'wins', 'losses', 'games', 'pangkahs', 'bestStreak'];
         const safeUpdates = {};
         for (const key of allowedFields) {
             if (updates[key] !== undefined) {

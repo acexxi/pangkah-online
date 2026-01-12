@@ -165,20 +165,279 @@ app.get('/api/hall-of-fame', async (req, res) => {
     try {
         const players = await Player.find({ games: { $gt: 0 } });
         if (players.length === 0) return res.json({ records: [] });
+        
         const records = [];
-        const rates = players.map(p => ({ name: p.displayName, xp: p.xp||0, wins: p.wins||0, losses: p.losses||0, games: p.games||1, pangkahs: p.pangkahs||0, pangkahsReceived: p.pangkahsReceived||0, bestStreak: p.bestStreak||0, cleanWins: p.cleanWins||0, handsAbsorbed: p.handsAbsorbed||0, autoPlays: p.autoPlays||0, maxCardsHeld: p.maxCardsHeld||0, handsGiven: p.handsGiven||0, winRate: ((p.wins||0)/(p.games||1)*100).toFixed(1), loseRate: ((p.losses||0)/(p.games||1)*100).toFixed(1) }));
-        const best = (arr, key) => arr.reduce((a,b) => (parseFloat(a[key])||0) > (parseFloat(b[key])||0) ? a : b, rates[0]);
-        const eligible = rates.filter(p => p.games >= 5);
-        if (eligible.length) { const b = best(eligible,'winRate'); records.push({id:'winrate',category:'glory',icon:'👑',title:'The Chosen One',player:b.name,value:b.winRate+'% win rate',description:'Highest win rate!'}); }
-        const w = best(rates,'wins'); if(w.wins>0) records.push({id:'wins',category:'glory',icon:'🏆',title:'Victory Addict',player:w.name,value:w.wins+' wins',description:'Most wins!'});
-        const s = best(rates,'bestStreak'); if(s.bestStreak>0) records.push({id:'streak',category:'glory',icon:'🔥',title:'Unstoppable',player:s.name,value:s.bestStreak+' streak',description:'Best streak!'});
-        const x = best(rates,'xp'); if(x.xp>0) records.push({id:'xp',category:'glory',icon:'✨',title:'XP Goblin',player:x.name,value:x.xp+' XP',description:'Most XP!'});
-        const pk = best(rates,'pangkahs'); if(pk.pangkahs>0) records.push({id:'pangkahs',category:'glory',icon:'⚡',title:'Pangkah King',player:pk.name,value:pk.pangkahs+' dealt',description:'Most pangkahs!'});
-        if (eligible.length) { const l = best(eligible,'loseRate'); records.push({id:'loserate',category:'shame',icon:'🤡',title:'Professional Clown',player:l.name,value:l.loseRate+'% lose rate',description:'Highest lose rate!'}); }
-        const lo = best(rates,'losses'); if(lo.losses>0) records.push({id:'losses',category:'shame',icon:'💀',title:'L Collector',player:lo.name,value:lo.losses+' losses',description:'Most losses!'});
-        const pv = best(rates,'pangkahsReceived'); if(pv.pangkahsReceived>0) records.push({id:'gotpangkah',category:'shame',icon:'🎯',title:'Human Dartboard',player:pv.name,value:pv.pangkahsReceived+' received',description:'Most pangkahs received!'});
+        const playersWithRates = players.map(p => {
+            const games = p.games || 1;
+            return {
+                name: p.displayName || 'Unknown',
+                xp: p.xp || 0,
+                wins: p.wins || 0,
+                losses: p.losses || 0,
+                games: games,
+                pangkahs: p.pangkahs || 0,
+                pangkahsReceived: p.pangkahsReceived || 0,
+                bestStreak: p.bestStreak || 0,
+                cleanWins: p.cleanWins || 0,
+                handsAbsorbed: p.handsAbsorbed || 0,
+                handsGiven: p.handsGiven || 0,
+                autoPlays: p.autoPlays || 0,
+                maxCardsHeld: p.maxCardsHeld || 0,
+                secondPlace: p.secondPlace || 0,
+                thirdPlace: p.thirdPlace || 0,
+                nightGames: p.nightGames || 0,
+                comebacks: p.comebacks || 0,
+                lossesToBot: p.lossesToBot || 0,
+                cardsPlayed: p.cardsPlayed || 0,
+                winRate: ((p.wins || 0) / games * 100).toFixed(1),
+                loseRate: ((p.losses || 0) / games * 100).toFixed(1)
+            };
+        });
+        
+        const minGamesForRates = 5;
+        const rateEligible = playersWithRates.filter(p => p.games >= minGamesForRates);
+        
+        // Helper to find best player for a stat
+        const findBest = (arr, key) => {
+            if (!arr.length) return null;
+            return arr.reduce((best, p) => (parseFloat(p[key]) || 0) > (parseFloat(best[key]) || 0) ? p : best, arr[0]);
+        };
+        
+        // ===== GLORY RECORDS =====
+        
+        // Win Rate Champion
+        if (rateEligible.length > 0) {
+            const best = findBest(rateEligible, 'winRate');
+            if (parseFloat(best.winRate) > 0) {
+                records.push({
+                    id: 'winrate', category: 'glory', icon: '👑',
+                    title: 'The Chosen One', player: best.name,
+                    value: `${best.winRate}% win rate`,
+                    description: `${best.name} was probably born under a lucky star. With ${best.winRate}% win rate, they're living proof that some people just have it all! 🌟`
+                });
+            }
+        }
+        
+        // Most Wins
+        const winKing = findBest(playersWithRates, 'wins');
+        if (winKing && winKing.wins > 0) {
+            records.push({
+                id: 'wins', category: 'glory', icon: '🏆',
+                title: 'Victory Addict', player: winKing.name,
+                value: `${winKing.wins} wins`,
+                description: `${winKing.name} has won ${winKing.wins} times. At this point, winning isn't a hobby - it's a lifestyle. Touch grass? Never heard of it. 💪`
+            });
+        }
+        
+        // Best Streak
+        const streakKing = findBest(playersWithRates, 'bestStreak');
+        if (streakKing && streakKing.bestStreak > 0) {
+            records.push({
+                id: 'streak', category: 'glory', icon: '🔥',
+                title: 'Unstoppable Menace', player: streakKing.name,
+                value: `${streakKing.bestStreak} streak`,
+                description: `${streakKing.name} went absolutely DEMON MODE with ${streakKing.bestStreak} consecutive victories! Were they cheating? No. Are they just built different? Absolutely. 😈`
+            });
+        }
+        
+        // Most XP
+        const xpKing = findBest(playersWithRates, 'xp');
+        if (xpKing && xpKing.xp > 0) {
+            records.push({
+                id: 'xp', category: 'glory', icon: '✨',
+                title: 'XP Goblin', player: xpKing.name,
+                value: `${xpKing.xp.toLocaleString()} XP`,
+                description: `${xpKing.name} has hoarded ${xpKing.xp.toLocaleString()} XP like a dragon hoards gold. Sleep? That's for people with less XP. 🐉`
+            });
+        }
+        
+        // Most Pangkahs Dealt
+        const pangkahDealer = findBest(playersWithRates, 'pangkahs');
+        if (pangkahDealer && pangkahDealer.pangkahs > 0) {
+            records.push({
+                id: 'pangkahs', category: 'glory', icon: '⚡',
+                title: 'Pangkah Terrorist', player: pangkahDealer.name,
+                value: `${pangkahDealer.pangkahs} dealt`,
+                description: `${pangkahDealer.name} has dealt ${pangkahDealer.pangkahs} pangkahs. This player woke up and chose violence. Every. Single. Game. 💀`
+            });
+        }
+        
+        // Most Clean Wins
+        const cleanMaster = findBest(playersWithRates, 'cleanWins');
+        if (cleanMaster && cleanMaster.cleanWins > 0) {
+            records.push({
+                id: 'cleanwins', category: 'glory', icon: '🧼',
+                title: 'Mr. Clean', player: cleanMaster.name,
+                value: `${cleanMaster.cleanWins} clean rounds`,
+                description: `${cleanMaster.name} has won ${cleanMaster.cleanWins} clean rounds. So fresh, so clean! Marie Kondo would be proud. ✨`
+            });
+        }
+        
+        // Most Games Played
+        const grinder = findBest(playersWithRates, 'games');
+        if (grinder && grinder.games > 0) {
+            records.push({
+                id: 'games', category: 'glory', icon: '🎮',
+                title: 'No-Life Achievement', player: grinder.name,
+                value: `${grinder.games} games`,
+                description: `${grinder.name} has played ${grinder.games} games. What is grass? What is sunlight? These are questions they stopped asking long ago. 🌿❌`
+            });
+        }
+        
+        // ===== SHAME RECORDS =====
+        
+        // Highest Lose Rate
+        if (rateEligible.length > 0) {
+            const worst = findBest(rateEligible, 'loseRate');
+            if (parseFloat(worst.loseRate) > 0) {
+                records.push({
+                    id: 'loserate', category: 'shame', icon: '🤡',
+                    title: 'Professional Clown', player: worst.name,
+                    value: `${worst.loseRate}% lose rate`,
+                    description: `${worst.name} loses ${worst.loseRate}% of their games. At this point, losing isn't bad luck - it's a talent. Consider joining a circus! 🎪`
+                });
+            }
+        }
+        
+        // Most Losses
+        const loseKing = findBest(playersWithRates, 'losses');
+        if (loseKing && loseKing.losses > 0) {
+            records.push({
+                id: 'losses', category: 'shame', icon: '💀',
+                title: 'L Collector', player: loseKing.name,
+                value: `${loseKing.losses} losses`,
+                description: `${loseKing.name} has collected ${loseKing.losses} L's like they're Pokemon cards. Gotta catch 'em all! At least they're #1 at something... 😭`
+            });
+        }
+        
+        // Most Pangkahs Received
+        const pangkahVictim = findBest(playersWithRates, 'pangkahsReceived');
+        if (pangkahVictim && pangkahVictim.pangkahsReceived > 0) {
+            records.push({
+                id: 'gotpangkah', category: 'shame', icon: '🎯',
+                title: 'Human Dartboard', player: pangkahVictim.name,
+                value: `${pangkahVictim.pangkahsReceived} received`,
+                description: `${pangkahVictim.name} has eaten ${pangkahVictim.pangkahsReceived} pangkahs to the face. If getting pangkah'd was an Olympic sport, they'd have gold! 🥊`
+            });
+        }
+        
+        // Most Auto-Plays (AFK)
+        const afkKing = findBest(playersWithRates, 'autoPlays');
+        if (afkKing && afkKing.autoPlays > 0) {
+            records.push({
+                id: 'afk', category: 'shame', icon: '😴',
+                title: 'AFK Speedrunner', player: afkKing.name,
+                value: `${afkKing.autoPlays} auto-plays`,
+                description: `${afkKing.name} has ${afkKing.autoPlays} auto-plays. Are they playing the game or is the game playing them? We'll never know because they're probably asleep. 💤`
+            });
+        }
+        
+        // Most Cards Held
+        const cardHoarder = findBest(playersWithRates, 'maxCardsHeld');
+        if (cardHoarder && cardHoarder.maxCardsHeld > 0) {
+            records.push({
+                id: 'maxcards', category: 'shame', icon: '🐿️',
+                title: 'Card Hoarder', player: cardHoarder.name,
+                value: `${cardHoarder.maxCardsHeld} cards`,
+                description: `${cardHoarder.name} once held ${cardHoarder.maxCardsHeld} cards in their hand. Were they playing cards or building a house? This isn't UNO, bestie! 🃏`
+            });
+        }
+        
+        // Most Hands Given Away
+        const handGiver = findBest(playersWithRates, 'handsGiven');
+        if (handGiver && handGiver.handsGiven > 0) {
+            records.push({
+                id: 'given', category: 'shame', icon: '🎅',
+                title: 'Santa Claus', player: handGiver.name,
+                value: `${handGiver.handsGiven} hands given`,
+                description: `${handGiver.name} has generously donated ${handGiver.handsGiven} hands to other players. So giving! So charitable! So... wait, that's a bad thing here. 🎁`
+            });
+        }
+        
+        // ===== MISC RECORDS =====
+        
+        // Most Hands Absorbed (Soul Stealer)
+        const handAbsorber = findBest(playersWithRates, 'handsAbsorbed');
+        if (handAbsorber && handAbsorber.handsAbsorbed > 0) {
+            records.push({
+                id: 'absorbed', category: 'misc', icon: '🦑',
+                title: 'Soul Stealer', player: handAbsorber.name,
+                value: `${handAbsorber.handsAbsorbed} hands absorbed`,
+                description: `${handAbsorber.name} has absorbed ${handAbsorber.handsAbsorbed} hands from other players. "Your cards... will make a fine addition to my collection." 🫴`
+            });
+        }
+        
+        // Most Second Places (Always Bridesmaid)
+        const silverCollector = findBest(playersWithRates, 'secondPlace');
+        if (silverCollector && silverCollector.secondPlace > 0) {
+            records.push({
+                id: 'second', category: 'misc', icon: '🥈',
+                title: 'Always Bridesmaid', player: silverCollector.name,
+                value: `${silverCollector.secondPlace} second places`,
+                description: `${silverCollector.name} has finished 2nd place ${silverCollector.secondPlace} times. So close yet so far! Maybe next time, champ. Maybe next time... 😢`
+            });
+        }
+        
+        // Most Third Places (Bronze Collector)
+        const bronzeCollector = findBest(playersWithRates, 'thirdPlace');
+        if (bronzeCollector && bronzeCollector.thirdPlace > 0) {
+            records.push({
+                id: 'third', category: 'misc', icon: '🥉',
+                title: 'Bronze Enthusiast', player: bronzeCollector.name,
+                value: `${bronzeCollector.thirdPlace} third places`,
+                description: `${bronzeCollector.name} has claimed ${bronzeCollector.thirdPlace} bronze medals. Not quite podium, not quite loser. The Switzerland of Pangkah. 🇨🇭`
+            });
+        }
+        
+        // Night Owl (Most Night Games)
+        const nightOwl = findBest(playersWithRates, 'nightGames');
+        if (nightOwl && nightOwl.nightGames > 0) {
+            records.push({
+                id: 'night', category: 'misc', icon: '🦉',
+                title: 'Night Owl', player: nightOwl.name,
+                value: `${nightOwl.nightGames} night games`,
+                description: `${nightOwl.name} has played ${nightOwl.nightGames} games between 10PM-6AM. Sleep is for the weak! (Please get some rest though) 🌙`
+            });
+        }
+        
+        // Most Comebacks
+        const comebackKing = findBest(playersWithRates, 'comebacks');
+        if (comebackKing && comebackKing.comebacks > 0) {
+            records.push({
+                id: 'comeback', category: 'misc', icon: '🔄',
+                title: 'Comeback Kid', player: comebackKing.name,
+                value: `${comebackKing.comebacks} comebacks`,
+                description: `${comebackKing.name} has pulled off ${comebackKing.comebacks} epic comebacks from 15+ cards! "Call an ambulance... but not for me!" 💪`
+            });
+        }
+        
+        // Bot Victim (Lost to Bots)
+        const botVictim = findBest(playersWithRates, 'lossesToBot');
+        if (botVictim && botVictim.lossesToBot > 0) {
+            records.push({
+                id: 'botvictim', category: 'misc', icon: '🤖',
+                title: 'Bot Food', player: botVictim.name,
+                value: `${botVictim.lossesToBot} losses to bots`,
+                description: `${botVictim.name} has lost to BOTS ${botVictim.lossesToBot} times. The AI uprising has already begun... for them at least. Beep boop! 🤖`
+            });
+        }
+        
+        // Most Cards Played
+        const cardSpammer = findBest(playersWithRates, 'cardsPlayed');
+        if (cardSpammer && cardSpammer.cardsPlayed > 0) {
+            records.push({
+                id: 'cardsplayed', category: 'misc', icon: '🃏',
+                title: 'Card Slinger', player: cardSpammer.name,
+                value: `${cardSpammer.cardsPlayed.toLocaleString()} cards played`,
+                description: `${cardSpammer.name} has played ${cardSpammer.cardsPlayed.toLocaleString()} cards total. That's a LOT of clicking. RIP their mouse. 🖱️💀`
+            });
+        }
+        
         res.json({ records });
-    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+    } catch (err) {
+        console.error('Hall of Fame error:', err);
+        res.status(500).json({ error: 'Failed to get hall of fame' });
+    }
 });
 
 // ============ GM API ============

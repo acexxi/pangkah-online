@@ -174,8 +174,13 @@
         .safe-wrap { position: relative; width: 100%; height: 100%; }
         #t-layer { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; pointer-events: none; }
         .player { position: absolute; text-align: center; z-index: 100; transition: all 0.3s ease; }
-        .av { position: relative; width: 205px; height: 70px; background: url('/avatar-frame.png') center/contain no-repeat; display: flex; align-items: center; }
-        .av.beta-frame { background-image: url('/beta-frame.png'); }
+        .av { position: relative; width: 205px; height: 70px; background: url('/frame/avatar-frame.png') center/contain no-repeat; display: flex; align-items: center; }
+        .av.frame-winrate { background-image: url('/frame/frame-winrate.png'); }
+        .av.frame-streak { background-image: url('/frame/frame-streak.png'); }
+        .av.frame-pangkah { background-image: url('/frame/frame-pangkah.png'); }
+        .av.frame-loserate { background-image: url('/frame/frame-loserate.png'); }
+        .av.frame-magnet { background-image: url('/frame/frame-magnet.png'); }
+        .av.frame-gm { background-image: url('/frame/frame-gm.png'); }
         .av-take-hand { position: absolute; left: 0px; top: 50%; transform: translateY(-50%); width: 36px; height: 55px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 0.2s; border-radius: 4px; }
         .av-take-hand.visible { opacity: 1; pointer-events: auto; }
         .av-take-hand.visible.greyed { opacity: 0.5; cursor: not-allowed; }
@@ -505,14 +510,6 @@
                 </div>
             </div>
             
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;background:rgba(255,255,255,0.05);padding:10px;border-radius:8px">
-                <label style="font-size:11px;color:var(--text-secondary);flex:1">BETA TESTER STATUS</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="gm-beta-toggle">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-            
             <div style="display:flex;gap:10px">
                 <button class="btn btn-p" onclick="gmSavePlayer()" style="flex:1;font-size:11px">💾 SAVE CHANGES</button>
                 <button class="btn" onclick="gmResetPlayer()" style="flex:1;font-size:11px;background:var(--accent-red);color:#fff">🗑️ RESET ALL STATS</button>
@@ -708,13 +705,43 @@ const GM_TITLES = [
     {id:'shadow_magistrate',name:'Shadow Magistrate',desc:'Game Master Exclusive',rarity:'legendary',icon:'🐺',req:{t:'gm',v:1}}
 ];
 
-// Beta Tester System (set from server, not localStorage)
-let isBetaTester = false;
-const BETA_TESTER_TITLES = [
-    {id:'dragon_vanguard',name:'Dragon Vanguard',desc:'Beta Tester Exclusive - The First Warriors',rarity:'legendary',icon:'🐉',req:{t:'beta',v:1}},
-    {id:'founders_circle',name:'Founders\' Circle',desc:'Beta Tester Exclusive - The Original Four',rarity:'legendary',icon:'👑',req:{t:'beta',v:1}},
-    {id:'supreme_leader',name:'Supreme Leader',desc:'Beta Tester Exclusive - Path Blazers',rarity:'legendary',icon:'🗡️',req:{t:'beta',v:1}}
+// Hall of Fame Frame System
+let hofFrameHolders = {}; // { frameType: userID }
+const HOF_FRAMES = [
+    { id: 'winrate', record: 'winrate', class: 'frame-winrate', name: 'Win Rate Champion' },
+    { id: 'streak', record: 'streak', class: 'frame-streak', name: 'Streak Master' },
+    { id: 'pangkah', record: 'pangkah', class: 'frame-pangkah', name: 'Pangkah King' },
+    { id: 'loserate', record: 'loserate', class: 'frame-loserate', name: 'Lose Rate Champion' },
+    { id: 'magnet', record: 'magnet', class: 'frame-magnet', name: 'Pangkah Magnet' }
 ];
+
+async function fetchHofFrameHolders() {
+    try {
+        const res = await fetch('/api/hof-frames');
+        if (res.ok) {
+            const data = await res.json();
+            hofFrameHolders = data.holders || {};
+            console.log('🖼️ HOF Frame holders:', hofFrameHolders);
+        }
+    } catch (e) {
+        console.log('Failed to fetch HOF frames:', e.message);
+    }
+}
+
+function getPlayerFrame(playerUserID, playerIsGM) {
+    // Priority: GM > HOF frames > Default
+    // 1. GM gets special frame (highest priority)
+    if (playerIsGM) {
+        return 'frame-gm';
+    }
+    // 2. Check HOF frame holders
+    for (const frame of HOF_FRAMES) {
+        if (hofFrameHolders[frame.id] === playerUserID) {
+            return frame.class;
+        }
+    }
+    return ''; // Default frame
+}
 
 // Load stats and check version
 let savedStats=JSON.parse(localStorage.getItem('pStats')||'{}');
@@ -737,12 +764,6 @@ async function syncFromServer(){
             const serverData=await res.json();
             console.log('📥 Server data received:', JSON.stringify(serverData));
             if(serverData&&serverData.userID){
-                // Check Beta Tester status from server
-                isBetaTester = serverData.isBetaTester || false;
-                if(isBetaTester){
-                    console.log('🐉 Beta Tester detected!');
-                }
-                
                 // FORCE override local stats with server data (server is source of truth)
                 const newStats={
                     ...DEFAULT_STATS,
@@ -806,6 +827,8 @@ async function syncFromServer(){
 document.addEventListener('DOMContentLoaded',()=>{
     // Always sync from server to get latest data (including GM edits)
     syncFromServer();
+    // Fetch Hall of Fame frame holders
+    fetchHofFrameHolders();
     // Show GM Admin buttons if already logged in as GM
     if(isGameMaster){
         document.getElementById('gm-admin-btn').style.display='block';
@@ -817,16 +840,15 @@ function getStatValue(t){switch(t){case'level':return getLevel();case'pangkahs':
 function checkAllTitles(){TITLES.forEach(t=>{if(!stats.unlockedTitles.includes(t.id)&&getStatValue(t.req.t)>=t.req.v){stats.unlockedTitles.push(t.id);showAchievement(t);}});saveStats();}
 function showAchievement(t){const p=document.getElementById('achievement-popup');p.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:24px">${t.icon}</span><div><div style="font-size:10px;color:var(--gold);font-weight:800">TITLE UNLOCKED!</div><div style="font-size:16px;font-weight:800">${t.name}</div></div></div><div style="font-size:11px;opacity:0.7">${t.desc}</div><div class="title-rarity ${t.rarity}" style="margin-top:10px">${t.rarity.toUpperCase()}</div>`;p.style.display='block';setTimeout(()=>p.style.display='none',4000);}
 function equipTitle(id){
-    // Check if title is unlocked (regular titles) or special titles (GM/Beta)
-    const allTitles=[...TITLES,...GM_TITLES,...BETA_TESTER_TITLES];
+    // Check if title is unlocked (regular titles) or special titles (GM only)
+    const allTitles=[...TITLES,...GM_TITLES];
     const title=allTitles.find(t=>t.id===id);
     const isGMTitle=title&&title.req.t==='gm';
-    const isBetaTitle=title&&title.req.t==='beta';
-    const canEquip=stats.unlockedTitles.includes(id)||(isGMTitle&&isGameMaster)||(isBetaTitle&&isBetaTester);
+    const canEquip=stats.unlockedTitles.includes(id)||(isGMTitle&&isGameMaster);
     if(canEquip){stats.equippedTitle=id;saveStats();updateStatsUI();renderTitleGrid();if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:getEquippedTitleData()});showToast('Equipped!',true);}
 }
 function unequipTitle(){stats.equippedTitle=null;saveStats();updateStatsUI();renderTitleGrid();if(myRoom)socket.emit('updateTitle',{roomID:myRoom,userID,title:null});}
-function getEquippedTitleData(){if(!stats.equippedTitle)return null;const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[]),...(isBetaTester?BETA_TESTER_TITLES:[])];const t=allTitles.find(x=>x.id===stats.equippedTitle);return t?{id:t.id,name:t.name,rarity:t.rarity,icon:t.icon}:null;}
+function getEquippedTitleData(){if(!stats.equippedTitle)return null;const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[])];const t=allTitles.find(x=>x.id===stats.equippedTitle);return t?{id:t.id,name:t.name,rarity:t.rarity,icon:t.icon}:null;}
 
 // Title Pagination
 let titlePage=0;
@@ -834,25 +856,24 @@ const TITLES_PER_PAGE=6;
 function renderTitleGrid(){
     const grid=document.getElementById('title-grid'),filters=document.getElementById('title-filters');
     filters.innerHTML=['all','legendary','epic','rare','common'].map(r=>`<div class="filter-tab ${currentFilter===r?'active':''}" onclick="currentFilter='${r}';titlePage=0;renderTitleGrid()">${r==='all'?'ALL':r.toUpperCase()}</div>`).join('');
-    const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[]),...(isBetaTester?BETA_TESTER_TITLES:[])];
+    const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[])];
     const filtered=currentFilter==='all'?allTitles:allTitles.filter(t=>t.rarity===currentFilter);
     const totalPages=Math.ceil(filtered.length/TITLES_PER_PAGE)||1;
     const start=titlePage*TITLES_PER_PAGE;
     const pageItems=filtered.slice(start,start+TITLES_PER_PAGE);
     grid.innerHTML=pageItems.map(t=>{
         const isGMTitle=t.req.t==='gm';
-        const isBetaTitle=t.req.t==='beta';
-        const isSpecialTitle=isGMTitle||isBetaTitle;
-        // Auto-unlock: GM titles for GMs, Beta titles for Beta Testers
-        const unlocked=stats.unlockedTitles.includes(t.id)||(isGMTitle&&isGameMaster)||(isBetaTitle&&isBetaTester);
+        const isSpecialTitle=isGMTitle;
+        // Auto-unlock: GM titles for GMs
+        const unlocked=stats.unlockedTitles.includes(t.id)||(isGMTitle&&isGameMaster);
         const equipped=stats.equippedTitle===t.id,prog=isSpecialTitle?1:getStatValue(t.req.t),max=t.req.v,pct=Math.min(prog/max*100,100).toFixed(0);
-        const labelText=isGMTitle?'GM':isBetaTitle?'BETA':t.rarity.toUpperCase();
-        return`<div class="title-item ${unlocked?'':'locked'} ${equipped?'equipped':''} ${isGMTitle?'gm-title':''} ${isBetaTitle?'beta-title':''}" onclick="${unlocked?(equipped?'unequipTitle()':`equipTitle('${t.id}')`):''}">${equipped?'<span style="position:absolute;top:8px;right:8px">✓</span>':''}<span class="title-rarity ${t.rarity}">${labelText}</span><div class="title-name">${t.icon} ${t.name}</div><div class="title-desc">${t.desc}</div>${!unlocked&&!isSpecialTitle?`<div class="title-progress">${Math.min(prog,max)}/${max} (${pct}%)</div>`:''}</div>`;
+        const labelText=isGMTitle?'GM':t.rarity.toUpperCase();
+        return`<div class="title-item ${unlocked?'':'locked'} ${equipped?'equipped':''} ${isGMTitle?'gm-title':''}" onclick="${unlocked?(equipped?'unequipTitle()':`equipTitle('${t.id}')`):''}">${equipped?'<span style="position:absolute;top:8px;right:8px">✓</span>':''}<span class="title-rarity ${t.rarity}">${labelText}</span><div class="title-name">${t.icon} ${t.name}</div><div class="title-desc">${t.desc}</div>${!unlocked&&!isSpecialTitle?`<div class="title-progress">${Math.min(prog,max)}/${max} (${pct}%)</div>`:''}</div>`;
     }).join('');
     document.getElementById('title-page-indicator').innerText=`${titlePage+1} / ${totalPages}`;
 }
 function titleNav(dir){
-    const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[]),...(isBetaTester?BETA_TESTER_TITLES:[])];
+    const allTitles=[...TITLES,...(isGameMaster?GM_TITLES:[])];
     const filtered=currentFilter==='all'?allTitles:allTitles.filter(t=>t.rarity===currentFilter);
     const totalPages=Math.ceil(filtered.length/TITLES_PER_PAGE)||1;
     titlePage=Math.max(0,Math.min(totalPages-1,titlePage+dir));
@@ -1235,10 +1256,13 @@ async function gmSearchPlayer(){
             document.getElementById('gm-player-name').innerText=data.player.displayName||'Unknown';
             document.getElementById('gm-player-id').innerText=data.player.userID;
             
+            // Check if player holds any HOF frame or is GM
             const statusEl=document.getElementById('gm-player-status');
-            if(data.player.isBetaTester){
-                statusEl.innerText='BETA TESTER';
-                statusEl.style.background='#22c55e';
+            const playerFrame = getPlayerFrame(data.player.userID, false);
+            if(playerFrame){
+                const frameName = HOF_FRAMES.find(f=>f.class===playerFrame)?.name || 'Frame Holder';
+                statusEl.innerText=frameName.toUpperCase();
+                statusEl.style.background='var(--accent-gold)';
                 statusEl.style.color='#000';
             }else{
                 statusEl.innerText='NORMAL';
@@ -1252,7 +1276,6 @@ async function gmSearchPlayer(){
             document.getElementById('gm-stat-games').value=data.player.games||0;
             document.getElementById('gm-stat-pangkahs').value=data.player.pangkahs||0;
             document.getElementById('gm-stat-bestStreak').value=data.player.bestStreak||0;
-            document.getElementById('gm-beta-toggle').checked=data.player.isBetaTester||false;
         }else{
             document.getElementById('gm-player-result').style.display='none';
             document.getElementById('gm-no-result').style.display='block';
@@ -1273,8 +1296,7 @@ async function gmSavePlayer(){
         losses:parseInt(document.getElementById('gm-stat-losses').value)||0,
         games:parseInt(document.getElementById('gm-stat-games').value)||0,
         pangkahs:parseInt(document.getElementById('gm-stat-pangkahs').value)||0,
-        bestStreak:parseInt(document.getElementById('gm-stat-bestStreak').value)||0,
-        isBetaTester:document.getElementById('gm-beta-toggle').checked
+        bestStreak:parseInt(document.getElementById('gm-stat-bestStreak').value)||0
     };
     
     try{
@@ -1286,17 +1308,6 @@ async function gmSavePlayer(){
         const data=await res.json();
         if(data.success){
             showToast('Player updated!',true);
-            // Update status display
-            const statusEl=document.getElementById('gm-player-status');
-            if(updates.isBetaTester){
-                statusEl.innerText='BETA TESTER';
-                statusEl.style.background='#22c55e';
-                statusEl.style.color='#000';
-            }else{
-                statusEl.innerText='NORMAL';
-                statusEl.style.background='rgba(255,255,255,0.1)';
-                statusEl.style.color='#fff';
-            }
         }else{
             showToast(data.error||'Update failed');
         }
@@ -1455,7 +1466,7 @@ function launchConfetti(){
     }
 }
 
-function enter(type){myRoom=document.getElementById('rid').value.trim();if(!myRoom)return showToast("Sect ID Required");showLoading(true);const data={roomID:myRoom,playerName:myName,userID,equippedTitle:getEquippedTitleData(),level:getLevel(),isGM:isGameMaster,isBetaTester:isBetaTester};if(type==='create'){data.maxPlayers=document.getElementById('maxp').value;data.botCount=document.getElementById('botcount').value;currentMaxPlayers=parseInt(data.maxPlayers);isHost=true;}socket.emit(type==='create'?'createRoom':'joinRoom',data);}
+function enter(type){myRoom=document.getElementById('rid').value.trim();if(!myRoom)return showToast("Sect ID Required");showLoading(true);const data={roomID:myRoom,playerName:myName,userID,equippedTitle:getEquippedTitleData(),level:getLevel(),isGM:isGameMaster};if(type==='create'){data.maxPlayers=document.getElementById('maxp').value;data.botCount=document.getElementById('botcount').value;currentMaxPlayers=parseInt(data.maxPlayers);isHost=true;}socket.emit(type==='create'?'createRoom':'joinRoom',data);}
 function start(){const btn=document.getElementById('start-btn');if(btn.disabled)return;showLoading(true);socket.emit('startGame',myRoom);}
 function closeRoom(){if(myRoom&&confirm("Disband this sect?"))socket.emit('requestCloseRoom',{roomID:myRoom});}
 function backToLobby(){
@@ -1588,12 +1599,12 @@ function render(players,turn,table=[]){
         
         const playerLevel=p.level||1;
         const playerIsGM=p.isGM||false;
-        const playerIsBeta=p.isBetaTester||false;
         const titleText=isBot?'🤖 Bot':p.equippedTitle?`${p.equippedTitle.name}`:'';
         const badgeImg=getBadgeImage(playerLevel,playerIsGM);
         const displayLevel=isBot?'BOT':playerIsGM?'∞':playerLevel;
         const nameColor=p.userID===userID?'var(--ui-blue)':isBot?'var(--accent-purple)':'#fff';
-        const frameClass=playerIsBeta?'av beta-frame':'av';
+        const hofFrame=getPlayerFrame(p.userID, playerIsGM);
+        const frameClass=hofFrame?`av ${hofFrame}`:'av';
         
         const div=document.createElement('div');
         div.className=`player ${i===turn?'active':''} ${p.hand.length===0?'eliminated':''}`;

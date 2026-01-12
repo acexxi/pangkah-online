@@ -1824,6 +1824,11 @@ socket.on('receiveSwapRequest',d=>{pendingSwapRequest=d.fromUserID;document.getE
 socket.on('swapOccurred',d=>{playSound('absorb');showToast(d.msg,true);update(d);});
 socket.on('botSwapPending',d=>{showToast(`${d.botName} will accept in ${d.countdown}s...`,true);});
 
+// Bot Emotes
+socket.on('botEmote',d=>{
+    showToast(`🤖 ${d.botName}: ${d.emote}`,true);
+});
+
 // Turn Timer
 socket.on('turnTimer',d=>{
     const timerEl=document.getElementById('turn-timer');

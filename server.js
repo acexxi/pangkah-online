@@ -60,10 +60,33 @@ function getLevel(xp) { return Math.floor((xp || 0) / XP_PER_LEVEL) + 1; }
 
 // Title requirements for server-side validation
 const TITLE_REQS = {
+    // LEGENDARY
     'ancient_ancestor': {t:'level',v:50}, 'pangkah_god': {t:'pangkahs',v:500}, 'unbreakable': {t:'streak',v:10},
     'thousand_victories': {t:'wins',v:1000}, 'sect_master': {t:'games',v:2000}, 'immortal': {t:'xp',v:100000},
+    'card_billionaire': {t:'maxCardsHeld',v:30}, 'comeback_king': {t:'comebacks',v:5}, 'perfect_game': {t:'perfectWins',v:10},
+    'no_life': {t:'games',v:5000}, 'ultimate_loser': {t:'losses',v:500}, 'clean_legend': {t:'cleanWins',v:500},
+    'hand_emperor': {t:'handsAbsorbed',v:200},
+    // EPIC
+    'grandmaster': {t:'level',v:30}, 'pangkah_master': {t:'pangkahs',v:200}, 'untouchable': {t:'streak',v:7},
+    'champion': {t:'wins',v:500}, 'veteran': {t:'games',v:1000}, 'enlightened': {t:'xp',v:50000},
+    'absorber': {t:'handsAbsorbed',v:100}, 'night_owl': {t:'nightGames',v:100}, 'card_hoarder': {t:'maxCardsHeld',v:25},
+    'serial_loser': {t:'losses',v:100}, 'survivor': {t:'comebacks',v:50}, 'sleepwalker': {t:'autoPlays',v:100},
+    'punching_bag': {t:'pangkahsReceived',v:200}, 'santa_claus': {t:'handsGiven',v:50}, 'clean_master': {t:'cleanWins',v:200},
+    'bronze_collector': {t:'thirdPlace',v:50},
+    // RARE
+    'master': {t:'level',v:15}, 'pangkah_adept': {t:'pangkahs',v:50}, 'hot_streak': {t:'streak',v:5},
+    'conqueror': {t:'wins',v:100}, 'dedicated': {t:'games',v:500}, 'cultivator': {t:'xp',v:10000},
+    'hand_collector': {t:'handsAbsorbed',v:30}, 'consistent': {t:'topTwo',v:50}, 'second_best': {t:'secondPlace',v:25},
+    'card_magnet': {t:'maxCardsHeld',v:20}, 'generous_soul': {t:'handsGiven',v:20}, 'afk_master': {t:'autoPlays',v:50},
+    'clean_player': {t:'cleanWins',v:100}, 'pangkah_victim': {t:'pangkahsReceived',v:100}, 'elder': {t:'level',v:20},
+    // COMMON
     'warrior': {t:'level',v:5}, 'first_pangkah': {t:'pangkahs',v:1}, 'first_blood': {t:'wins',v:1},
-    'newcomer': {t:'games',v:10}, 'learner': {t:'xp',v:1000}, 'victor': {t:'wins',v:10}
+    'newcomer': {t:'games',v:10}, 'regular': {t:'games',v:50}, 'learner': {t:'xp',v:1000},
+    'pangkah_novice': {t:'pangkahs',v:10}, 'victor': {t:'wins',v:10}, 'determined': {t:'wins',v:25},
+    'hand_taker': {t:'handsAbsorbed',v:5}, 'streak_starter': {t:'streak',v:3}, 'persistent': {t:'games',v:100},
+    'collector': {t:'cardsPlayed',v:1000}, 'runner_up': {t:'secondPlace',v:5}, 'third_wheel': {t:'thirdPlace',v:5},
+    'first_loser': {t:'losses',v:1}, 'unlucky': {t:'losses',v:10}, 'sleepy': {t:'autoPlays',v:10},
+    'give_hand': {t:'handsGiven',v:1}, 'heavy_hand': {t:'maxCardsHeld',v:15}, 'clean_start': {t:'cleanWins',v:10}
 };
 
 function getStatValue(player, type) {
@@ -77,6 +100,17 @@ function getStatValue(player, type) {
         case 'losses': return player.losses || 0;
         case 'cleanWins': return player.cleanWins || 0;
         case 'handsAbsorbed': return player.handsAbsorbed || 0;
+        case 'handsGiven': return player.handsGiven || 0;
+        case 'maxCardsHeld': return player.maxCardsHeld || 0;
+        case 'autoPlays': return player.autoPlays || 0;
+        case 'cardsPlayed': return player.cardsPlayed || 0;
+        case 'secondPlace': return player.secondPlace || 0;
+        case 'thirdPlace': return player.thirdPlace || 0;
+        case 'topTwo': return player.topTwo || 0;
+        case 'nightGames': return player.nightGames || 0;
+        case 'comebacks': return player.comebacks || 0;
+        case 'perfectWins': return player.perfectWins || 0;
+        case 'pangkahsReceived': return player.pangkahsReceived || 0;
         default: return 0;
     }
 }

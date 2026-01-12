@@ -169,14 +169,19 @@ app.get('/api/hall-of-fame', async (req, res) => {
         const records = [];
         const playersWithRates = players.map(p => {
             const games = p.games || 1;
+            const wins = p.wins || 0;
+            const losses = p.losses || 0;
+            const pangkahs = p.pangkahs || 0;
+            const pangkahsReceived = p.pangkahsReceived || 0;
+            
             return {
                 name: p.displayName || 'Unknown',
                 xp: p.xp || 0,
-                wins: p.wins || 0,
-                losses: p.losses || 0,
+                wins: wins,
+                losses: losses,
                 games: games,
-                pangkahs: p.pangkahs || 0,
-                pangkahsReceived: p.pangkahsReceived || 0,
+                pangkahs: pangkahs,
+                pangkahsReceived: pangkahsReceived,
                 bestStreak: p.bestStreak || 0,
                 cleanWins: p.cleanWins || 0,
                 handsAbsorbed: p.handsAbsorbed || 0,
@@ -185,12 +190,23 @@ app.get('/api/hall-of-fame', async (req, res) => {
                 maxCardsHeld: p.maxCardsHeld || 0,
                 secondPlace: p.secondPlace || 0,
                 thirdPlace: p.thirdPlace || 0,
+                fourthToTenth: p.fourthToTenth || 0,
+                topTwo: p.topTwo || 0,
                 nightGames: p.nightGames || 0,
                 comebacks: p.comebacks || 0,
+                perfectWins: p.perfectWins || 0,
                 lossesToBot: p.lossesToBot || 0,
+                pangkahsReceivedFromBot: p.pangkahsReceivedFromBot || 0,
+                handsAbsorbedFromBot: p.handsAbsorbedFromBot || 0,
                 cardsPlayed: p.cardsPlayed || 0,
-                winRate: ((p.wins || 0) / games * 100).toFixed(1),
-                loseRate: ((p.losses || 0) / games * 100).toFixed(1)
+                // Calculated stats
+                winRate: ((wins) / games * 100).toFixed(1),
+                loseRate: ((losses) / games * 100).toFixed(1),
+                pangkahRatio: pangkahsReceived > 0 ? (pangkahs / pangkahsReceived).toFixed(2) : pangkahs,
+                avgPangkahsPerGame: (pangkahs / games).toFixed(2),
+                avgPangkahsReceivedPerGame: (pangkahsReceived / games).toFixed(2),
+                notTopTwo: games - (p.topTwo || 0),
+                totalPodium: wins + (p.secondPlace || 0) + (p.thirdPlace || 0)
             };
         });
         
@@ -430,6 +446,150 @@ app.get('/api/hall-of-fame', async (req, res) => {
                 title: 'Card Slinger', player: cardSpammer.name,
                 value: `${cardSpammer.cardsPlayed.toLocaleString()} cards played`,
                 description: `${cardSpammer.name} has played ${cardSpammer.cardsPlayed.toLocaleString()} cards total. That's a LOT of clicking. RIP their mouse. 🖱️💀`
+            });
+        }
+        
+        // ===== 12 NEW RECORDS =====
+        
+        // Perfect Wins (won without receiving any pangkah)
+        const perfectionist = findBest(playersWithRates, 'perfectWins');
+        if (perfectionist && perfectionist.perfectWins > 0) {
+            records.push({
+                id: 'perfect', category: 'glory', icon: '💎',
+                title: 'Flawless Victory', player: perfectionist.name,
+                value: `${perfectionist.perfectWins} perfect wins`,
+                description: `${perfectionist.name} has won ${perfectionist.perfectWins} games WITHOUT receiving a single pangkah. Are they Neo from The Matrix? Is this even legal?! 🕶️`
+            });
+        }
+        
+        // Pangkah Ratio (dealt vs received) - Glory if positive
+        const ratioEligible = playersWithRates.filter(p => p.pangkahs >= 10 && p.pangkahsReceived >= 10);
+        if (ratioEligible.length > 0) {
+            const bestRatio = findBest(ratioEligible, 'pangkahRatio');
+            if (bestRatio && parseFloat(bestRatio.pangkahRatio) > 1) {
+                records.push({
+                    id: 'ratio', category: 'glory', icon: '⚖️',
+                    title: 'Karma Dealer', player: bestRatio.name,
+                    value: `${bestRatio.pangkahRatio}x ratio`,
+                    description: `${bestRatio.name} dishes out ${bestRatio.pangkahRatio}x more pangkahs than they receive. They don't get mad, they get even... and then some! 😏`
+                });
+            }
+        }
+        
+        // Top Two Consistency (wins + 2nd places)
+        const consistent = findBest(playersWithRates.filter(p => p.games >= 10), 'topTwo');
+        if (consistent && consistent.topTwo > 0) {
+            const topTwoRate = ((consistent.topTwo / consistent.games) * 100).toFixed(1);
+            records.push({
+                id: 'toptwo', category: 'glory', icon: '🎖️',
+                title: 'Consistent King', player: consistent.name,
+                value: `${consistent.topTwo} top-2 finishes`,
+                description: `${consistent.name} finishes in top 2 like it's their job (${topTwoRate}% of games). Reliable? More like UNSHAKEABLE! 📈`
+            });
+        }
+        
+        // Bot Bully (absorbed hands from bots)
+        const botBully = findBest(playersWithRates, 'handsAbsorbedFromBot');
+        if (botBully && botBully.handsAbsorbedFromBot > 0) {
+            records.push({
+                id: 'botbully', category: 'misc', icon: '🔨',
+                title: 'Bot Bully', player: botBully.name,
+                value: `${botBully.handsAbsorbedFromBot} bot hands stolen`,
+                description: `${botBully.name} has stolen ${botBully.handsAbsorbedFromBot} hands from helpless bots. They can't fight back! This is basically cyber-bullying! 🤖😢`
+            });
+        }
+        
+        // Pangkah Magnet from Bots
+        const botTarget = findBest(playersWithRates, 'pangkahsReceivedFromBot');
+        if (botTarget && botTarget.pangkahsReceivedFromBot > 0) {
+            records.push({
+                id: 'bottarget', category: 'shame', icon: '🎪',
+                title: 'Bot\'s Favorite Target', player: botTarget.name,
+                value: `${botTarget.pangkahsReceivedFromBot} from bots`,
+                description: `${botTarget.name} has been pangkah'd by BOTS ${botTarget.pangkahsReceivedFromBot} times. Even the AI knows an easy target when it sees one! 🎯🤖`
+            });
+        }
+        
+        // Middle Child (most 4th-10th place finishes)
+        const middleChild = findBest(playersWithRates, 'fourthToTenth');
+        if (middleChild && middleChild.fourthToTenth > 0) {
+            records.push({
+                id: 'middle', category: 'shame', icon: '😐',
+                title: 'Painfully Average', player: middleChild.name,
+                value: `${middleChild.fourthToTenth} mid finishes`,
+                description: `${middleChild.name} has finished 4th-10th place ${middleChild.fourthToTenth} times. Not good, not bad, just... there. The human equivalent of room temperature water. 🚿`
+            });
+        }
+        
+        // Podium Collector (total 1st + 2nd + 3rd)
+        const podiumKing = findBest(playersWithRates, 'totalPodium');
+        if (podiumKing && podiumKing.totalPodium > 0) {
+            records.push({
+                id: 'podium', category: 'glory', icon: '🏅',
+                title: 'Podium Addict', player: podiumKing.name,
+                value: `${podiumKing.totalPodium} podium finishes`,
+                description: `${podiumKing.name} has stood on the podium ${podiumKing.totalPodium} times. Their trophy shelf is crying for mercy! 🏆🏆🏆`
+            });
+        }
+        
+        // Highest Average Pangkahs per Game (aggression)
+        const aggressor = findBest(playersWithRates.filter(p => p.games >= 10), 'avgPangkahsPerGame');
+        if (aggressor && parseFloat(aggressor.avgPangkahsPerGame) > 0) {
+            records.push({
+                id: 'aggro', category: 'misc', icon: '😈',
+                title: 'Agent of Chaos', player: aggressor.name,
+                value: `${aggressor.avgPangkahsPerGame} pangkahs/game`,
+                description: `${aggressor.name} averages ${aggressor.avgPangkahsPerGame} pangkahs per game. They don't play to win, they play to watch the world BURN! 🔥`
+            });
+        }
+        
+        // Highest Average Pangkahs RECEIVED per Game (unlucky)
+        const unlucky = findBest(playersWithRates.filter(p => p.games >= 10), 'avgPangkahsReceivedPerGame');
+        if (unlucky && parseFloat(unlucky.avgPangkahsReceivedPerGame) > 0) {
+            records.push({
+                id: 'unlucky', category: 'shame', icon: '🍀',
+                title: 'Reverse Lucky Charm', player: unlucky.name,
+                value: `${unlucky.avgPangkahsReceivedPerGame} received/game`,
+                description: `${unlucky.name} receives ${unlucky.avgPangkahsReceivedPerGame} pangkahs per game on average. If bad luck was a person, it would be them. 🪬❌`
+            });
+        }
+        
+        // Worst Pangkah Ratio (received more than dealt)
+        if (ratioEligible.length > 0) {
+            const worstRatio = ratioEligible.reduce((worst, p) => 
+                parseFloat(p.pangkahRatio) < parseFloat(worst.pangkahRatio) ? p : worst, ratioEligible[0]);
+            if (worstRatio && parseFloat(worstRatio.pangkahRatio) < 1) {
+                records.push({
+                    id: 'badratio', category: 'shame', icon: '📉',
+                    title: 'Karma\'s Punching Bag', player: worstRatio.name,
+                    value: `${worstRatio.pangkahRatio}x ratio`,
+                    description: `${worstRatio.name} receives ${(1/worstRatio.pangkahRatio).toFixed(1)}x more pangkahs than they deal. The universe said "no" and meant it! 💫`
+                });
+            }
+        }
+        
+        // Never Top Two (most games without reaching top 2)
+        const neverShines = findBest(playersWithRates.filter(p => p.games >= 10), 'notTopTwo');
+        if (neverShines && neverShines.notTopTwo > 0) {
+            const failRate = ((neverShines.notTopTwo / neverShines.games) * 100).toFixed(1);
+            records.push({
+                id: 'nevertop', category: 'shame', icon: '🌑',
+                title: 'Never Their Day', player: neverShines.name,
+                value: `${neverShines.notTopTwo} non-top-2`,
+                description: `${neverShines.name} has failed to reach top 2 in ${neverShines.notTopTwo} games (${failRate}%). Tomorrow is another day... to disappoint! 🌅`
+            });
+        }
+        
+        // The Veteran (oldest player by createdAt) - need to fetch from original
+        const veteran = players.reduce((oldest, p) => 
+            new Date(p.createdAt) < new Date(oldest.createdAt) ? p : oldest, players[0]);
+        if (veteran && veteran.games >= 1) {
+            const daysSince = Math.floor((new Date() - new Date(veteran.createdAt)) / (1000 * 60 * 60 * 24));
+            records.push({
+                id: 'veteran', category: 'misc', icon: '👴',
+                title: 'Elder of the Sect', player: veteran.displayName,
+                value: `${daysSince} days`,
+                description: `${veteran.displayName} has been here for ${daysSince} days. They remember when this game had bugs. Oh wait, it still does. But they stayed anyway! 🏛️`
             });
         }
         

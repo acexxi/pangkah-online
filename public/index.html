@@ -395,6 +395,13 @@
         
         <!-- Hall of Fame Records -->
         <div class="hof-container" id="hof-container">
+            <!-- Category Filter Tabs -->
+            <div class="filter-tabs" id="hof-filter-tabs" style="margin-bottom:16px">
+                <div class="filter-tab active" data-category="all" onclick="filterHofCategory('all')">All</div>
+                <div class="filter-tab" data-category="glory" onclick="filterHofCategory('glory')" style="border-color:var(--accent-gold);color:var(--accent-gold)">👑 Glory</div>
+                <div class="filter-tab" data-category="shame" onclick="filterHofCategory('shame')" style="border-color:var(--accent-red);color:var(--accent-red)">💀 Shame</div>
+                <div class="filter-tab" data-category="misc" onclick="filterHofCategory('misc')" style="border-color:var(--accent-blue);color:var(--accent-blue)">🎲 Misc</div>
+            </div>
             <div class="hof-grid" id="hof-grid"></div>
             <div id="hof-pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;margin:15px 0">
                 <button class="btn" onclick="hofNav(-1)" style="width:44px;padding:8px 0;background:rgba(255,255,255,0.1);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center"><img src="/icon/chevron-left.svg" alt="Prev" style="width:16px;height:16px;filter:brightness(0) invert(1)"></button>
@@ -1153,6 +1160,7 @@ let showingFullTable=false;
 let hofData=[];
 let hofPage=0;
 const HOF_PER_PAGE=6;
+let hofCategoryFilter='all';
 
 async function loadHallOfFame(){
     try{
@@ -1160,9 +1168,40 @@ async function loadHallOfFame(){
         if(res.ok){
             hofData=await res.json();
             hofPage=0;
+            hofCategoryFilter='all';
+            updateHofFilterTabs();
             renderHallOfFame();
         }
     }catch(e){console.log('Failed to load hall of fame');}
+}
+
+function filterHofCategory(category){
+    hofCategoryFilter=category;
+    hofPage=0;
+    updateHofFilterTabs();
+    renderHallOfFame();
+}
+
+function updateHofFilterTabs(){
+    document.querySelectorAll('#hof-filter-tabs .filter-tab').forEach(tab=>{
+        const cat=tab.getAttribute('data-category');
+        if(cat===hofCategoryFilter){
+            tab.classList.add('active');
+            if(cat==='glory') tab.style.background='var(--accent-gold)';
+            else if(cat==='shame') tab.style.background='var(--accent-red)';
+            else if(cat==='misc') tab.style.background='var(--accent-blue)';
+            else tab.style.background='var(--accent-blue)';
+            tab.style.color='#fff';
+            tab.style.borderColor='transparent';
+        }else{
+            tab.classList.remove('active');
+            tab.style.background='var(--bg-tertiary)';
+            if(cat==='glory'){ tab.style.color='var(--accent-gold)'; tab.style.borderColor='var(--accent-gold)'; }
+            else if(cat==='shame'){ tab.style.color='var(--accent-red)'; tab.style.borderColor='var(--accent-red)'; }
+            else if(cat==='misc'){ tab.style.color='var(--accent-blue)'; tab.style.borderColor='var(--accent-blue)'; }
+            else{ tab.style.color='var(--text-secondary)'; tab.style.borderColor='var(--border-subtle)'; }
+        }
+    });
 }
 
 function renderHallOfFame(){
@@ -1173,24 +1212,42 @@ function renderHallOfFame(){
         return;
     }
     
-    const totalPages=Math.ceil(hofData.records.length/HOF_PER_PAGE)||1;
+    // Filter by category
+    const filteredRecords=hofCategoryFilter==='all'
+        ? hofData.records
+        : hofData.records.filter(r=>r.category===hofCategoryFilter);
+    
+    if(filteredRecords.length===0){
+        grid.innerHTML='<div style="padding:20px;opacity:0.5;grid-column:1/-1">No records in this category yet!</div>';
+        document.getElementById('hof-pagination').style.display='none';
+        return;
+    }
+    
+    const totalPages=Math.ceil(filteredRecords.length/HOF_PER_PAGE)||1;
     const start=hofPage*HOF_PER_PAGE;
-    const pageRecords=hofData.records.slice(start,start+HOF_PER_PAGE);
+    const pageRecords=filteredRecords.slice(start,start+HOF_PER_PAGE);
     
     grid.innerHTML=pageRecords.map(r=>{
+        const isUnclaimed=!r.player;
         const borderColor = r.category === 'glory' ? 'var(--accent-gold)' : r.category === 'shame' ? 'var(--accent-red)' : 'var(--accent-blue)';
         const titleColor = r.category === 'glory' ? 'var(--accent-gold)' : r.category === 'shame' ? 'var(--accent-red)' : 'var(--accent-blue)';
         const bgTint = r.category === 'glory' ? 'rgba(251,191,36,0.08)' : r.category === 'shame' ? 'rgba(248,113,113,0.08)' : 'rgba(96,165,250,0.08)';
+        
+        // Greyed out styling for unclaimed records
+        const cardOpacity = isUnclaimed ? '0.5' : '1';
+        const playerDisplay = isUnclaimed ? '<span style="color:var(--text-tertiary);font-style:italic">Unclaimed</span>' : r.player;
+        const valueDisplay = isUnclaimed ? '<span style="color:var(--text-tertiary)">---</span>' : r.value;
+        
         return `
-        <div class="hof-card" style="border-left:3px solid ${borderColor};background:${bgTint}">
+        <div class="hof-card" style="border-left:3px solid ${borderColor};background:${bgTint};opacity:${cardOpacity}">
             <div class="hof-card-header">
                 <span class="hof-icon">${r.icon}</span>
                 <div>
                     <div class="hof-card-title" style="color:${titleColor}">${r.title}</div>
-                    <div class="hof-player">${r.player}</div>
+                    <div class="hof-player">${playerDisplay}</div>
                 </div>
             </div>
-            <div class="hof-value">${r.value}</div>
+            <div class="hof-value">${valueDisplay}</div>
             <div class="hof-desc">${r.description}</div>
         </div>
     `}).join('');
@@ -1201,7 +1258,10 @@ function renderHallOfFame(){
 
 function hofNav(dir){
     if(!hofData.records)return;
-    const totalPages=Math.ceil(hofData.records.length/HOF_PER_PAGE)||1;
+    const filteredRecords=hofCategoryFilter==='all'
+        ? hofData.records
+        : hofData.records.filter(r=>r.category===hofCategoryFilter);
+    const totalPages=Math.ceil(filteredRecords.length/HOF_PER_PAGE)||1;
     hofPage=Math.max(0,Math.min(totalPages-1,hofPage+dir));
     renderHallOfFame();
 }

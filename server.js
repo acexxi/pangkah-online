@@ -46,6 +46,8 @@ const playerSchema = new mongoose.Schema({
     pangkahsReceivedFromBot: { type: Number, default: 0 },
     lossesToBot: { type: Number, default: 0 },
     handsAbsorbedFromBot: { type: Number, default: 0 },
+    maxPangkahsInGame: { type: Number, default: 0 },  // Sniper record - most pangkahs in single game
+    thRequestsReceived: { type: Number, default: 0 }, // Most Wanted record - others want to TH you (you're a threat!)
     unlockedTitles: { type: [String], default: [] },
     equippedTitle: { type: String, default: null },
     isBetaTester: { type: Boolean, default: false },
@@ -400,6 +402,8 @@ app.get('/api/hall-of-fame', async (req, res) => {
                 pangkahsReceivedFromBot: p.pangkahsReceivedFromBot || 0,
                 handsAbsorbedFromBot: p.handsAbsorbedFromBot || 0,
                 cardsPlayed: p.cardsPlayed || 0,
+                maxPangkahsInGame: p.maxPangkahsInGame || 0,
+                thRequestsReceived: p.thRequestsReceived || 0,
                 winRate: winRate.toFixed(1),
                 loseRate: loseRate.toFixed(1),
                 weightedWinRate: getWeightedScore(winRate, games),
@@ -578,11 +582,35 @@ app.get('/api/hall-of-fame', async (req, res) => {
                 : 'Win after having 15+ cards to claim!'
         });
         
+        // 13. Sniper - Most pangkahs dealt in a single game
+        const sniper = findBest(playersWithRates, 'maxPangkahsInGame');
+        records.push({
+            id: 'sniper', category: 'glory', icon: '🎯',
+            title: 'Sniper',
+            player: sniper?.name || null,
+            value: sniper ? `${sniper.maxPangkahsInGame} pangkahs in 1 game` : '---',
+            description: sniper 
+                ? `${sniper.name} dealt ${sniper.maxPangkahsInGame} pangkahs in a single game! Absolute menace! 🔫`
+                : 'Deal lots of pangkahs in one game to claim!'
+        });
+        
+        // 14. Most Wanted - Most TH requests received (others fear you!)
+        const mostWanted = findBest(playersWithRates, 'thRequestsReceived');
+        records.push({
+            id: 'mostwanted', category: 'glory', icon: '🎪',
+            title: 'Most Wanted',
+            player: mostWanted?.name || null,
+            value: mostWanted ? `${mostWanted.thRequestsReceived} TH requests` : '---',
+            description: mostWanted 
+                ? `${mostWanted.name} received ${mostWanted.thRequestsReceived} TH requests. Everyone wants to take them down! 👑`
+                : 'Be so threatening that others want to TH you!'
+        });
+        
         // ===========================
         // SHAME RECORDS (raw values - give everyone a chance!)
         // ===========================
         
-        // 13. Highest Lose Rate (RAW - no weighted, anyone can claim)
+        // 15. Highest Lose Rate (RAW - no weighted, anyone can claim)
         const highestLoseRate = findBest(playersWithRates.filter(p => p.games >= 3), 'loseRate');
         records.push({
             id: 'loserate', category: 'shame', icon: '🤡',
@@ -908,7 +936,7 @@ app.post('/api/gm/reset-player', async (req, res) => {
     try {
         const { targetUserID } = req.body;
         console.log('[GM] Reset request for:', targetUserID);
-        const player = await Player.findOneAndUpdate({ userID: targetUserID }, { $set: { xp:0,wins:0,losses:0,games:0,pangkahs:0,pangkahsReceived:0,bestStreak:0,currentStreak:0,handsAbsorbed:0,handsGiven:0,cleanWins:0,maxCardsHeld:0,autoPlays:0,secondPlace:0,thirdPlace:0,fourthToTenth:0,topTwo:0,nightGames:0,comebacks:0,perfectWins:0,pangkahsReceivedFromBot:0,lossesToBot:0,handsAbsorbedFromBot:0,unlockedTitles:[],equippedTitle:null,isBetaTester:false }}, { new: true });
+        const player = await Player.findOneAndUpdate({ userID: targetUserID }, { $set: { xp:0,wins:0,losses:0,games:0,pangkahs:0,pangkahsReceived:0,bestStreak:0,currentStreak:0,handsAbsorbed:0,handsGiven:0,cleanWins:0,maxCardsHeld:0,autoPlays:0,secondPlace:0,thirdPlace:0,fourthToTenth:0,topTwo:0,nightGames:0,comebacks:0,perfectWins:0,pangkahsReceivedFromBot:0,lossesToBot:0,handsAbsorbedFromBot:0,maxPangkahsInGame:0,thRequestsReceived:0,unlockedTitles:[],equippedTitle:null,isBetaTester:false }}, { new: true });
         if (!player) {
             console.log('[GM] Player not found for reset:', targetUserID);
             return res.status(404).json({ error: 'Not found' });
@@ -1019,6 +1047,8 @@ async function processGameResults(room) {
                 if (p.gameStats.comebacks) db.comebacks = (db.comebacks||0) + p.gameStats.comebacks;
                 if ((p.gameStats.maxCardsThisGame||0) > (db.maxCardsHeld||0)) db.maxCardsHeld = p.gameStats.maxCardsThisGame;
                 if (p.gameStats.pangkahsReceivedFromBot) db.pangkahsReceivedFromBot = (db.pangkahsReceivedFromBot||0) + p.gameStats.pangkahsReceivedFromBot;
+                // Sniper record - track max pangkahs dealt in a single game
+                if ((p.gameStats.pangkahsDealt||0) > (db.maxPangkahsInGame||0)) db.maxPangkahsInGame = p.gameStats.pangkahsDealt;
             }
             
             if (isNight) db.nightGames = (db.nightGames||0) + 1;
@@ -1184,9 +1214,10 @@ function resolveRound(rid, isPangkah) {
         if (loser) {
             room.finishOrder.push(loser.userID);
             if(loser.gameStats) loser.gameStats.finishPosition = room.players.length;
+            // Bot Food: Human finished LAST, and BOT finished 2nd last (bot beat human)
             if (!loser.isBot && room.finishOrder.length >= 2) {
-                const prev = room.players.find(x => x.userID === room.finishOrder[room.finishOrder.length-2]);
-                if (prev?.isBot && loser.gameStats) loser.gameStats.lossesToBot = 1;
+                const secondLast = room.players.find(x => x.userID === room.finishOrder[room.finishOrder.length-2]);
+                if (secondLast?.isBot && loser.gameStats) loser.gameStats.lossesToBot = 1;
             }
         }
         io.to(rid).emit('gameOver', { loser: loser?.name||'None', loserUserID: loser?.userID, finishOrder: room.finishOrder, gameNumber: room.gameNumber, performanceData: room.players.map(x=>({userID:x.userID,name:x.name,position:x.gameStats?.finishPosition||0,stats:x.gameStats,equippedTitle:x.equippedTitle,isBot:x.isBot})) });
@@ -1628,7 +1659,11 @@ io.on('connection', (socket) => {
                     startTimer(roomID);
                 }
             }, 3000);
-        } else io.to(target.id).emit('receiveSwapRequest', { fromName: room.players[myIdx].name, fromUserID });
+        } else {
+            // Track TH request received - target is being targeted (they're a threat!)
+            Player.findOneAndUpdate({ userID: target.userID }, { $inc: { thRequestsReceived: 1 } }).catch(()=>{});
+            io.to(target.id).emit('receiveSwapRequest', { fromName: room.players[myIdx].name, fromUserID });
+        }
     });
     
     socket.on('acceptSwap', async ({ roomID, fromUserID, myUserID }) => {

@@ -250,8 +250,6 @@ app.get('/api/hof-frames', async (req, res) => {
         const players = await Player.find({ games: { $gte: MIN_GAMES } }).select('userID wins losses games pangkahs pangkahsReceived bestStreak');
         if (players.length === 0) return res.json({ holders: {} });
         
-        const holders = {};
-        
         // Weighted score function - rewards both rate and volume
         const getWeightedScore = (rate, games) => {
             const volumeWeight = 1 - Math.exp(-games / SCALE_FACTOR);
@@ -267,7 +265,6 @@ app.get('/api/hof-frames', async (req, res) => {
                 userID: p.userID, 
                 winRate,
                 loseRate,
-                // Use weighted scores for frame assignment (fair ranking)
                 weightedWinRate: getWeightedScore(winRate, games),
                 weightedLoseRate: getWeightedScore(loseRate, games),
                 bestStreak: p.bestStreak || 0, 
@@ -277,15 +274,70 @@ app.get('/api/hof-frames', async (req, res) => {
             };
         });
         
-        // Use weighted rates for fair comparison
-        const best = (arr, key) => arr.reduce((a, b) => (a[key] || 0) > (b[key] || 0) ? a : b, {});
+        // ============================================================================
+        // FRAME PRIORITY SYSTEM
+        // ============================================================================
+        // Priority order (highest to lowest):
+        // 1. winrate (👑 The Chosen One) - Most prestigious
+        // 2. streak (🔥 Unstoppable Menace) 
+        // 3. pangkah (⚡ Pangkah Terrorist)
+        // 4. loserate (🤡 Professional Clown)
+        // 5. magnet (🎯 Human Dartboard)
+        //
+        // If a player qualifies for multiple frames, they get the highest priority one.
+        // Lower priority frames cascade to the next best player who doesn't have a frame yet.
+        // ============================================================================
         
-        holders.winrate = best(rates, 'weightedWinRate').userID;
-        holders.streak = best(rates.filter(r => r.userID !== holders.winrate), 'bestStreak').userID;
-        holders.pangkah = best(rates.filter(r => !Object.values(holders).includes(r.userID)), 'pangkahs').userID;
-        holders.loserate = best(rates.filter(r => !Object.values(holders).includes(r.userID)), 'weightedLoseRate').userID;
-        holders.magnet = best(rates.filter(r => !Object.values(holders).includes(r.userID)), 'pangkahsReceived').userID;
+        const holders = {};
+        const assignedPlayers = new Set(); // Track who already has a frame
         
+        // Helper to find best player for a stat (excluding already assigned)
+        const findBestAvailable = (arr, key, excludeSet) => {
+            const available = arr.filter(p => !excludeSet.has(p.userID));
+            if (available.length === 0) return null;
+            return available.reduce((best, p) => 
+                (parseFloat(p[key]) || 0) > (parseFloat(best[key]) || 0) ? p : best, 
+                available[0]
+            );
+        };
+        
+        // Assign frames in priority order
+        // Priority 1: Win Rate Champion
+        const winrateHolder = findBestAvailable(rates, 'weightedWinRate', assignedPlayers);
+        if (winrateHolder && winrateHolder.weightedWinRate > 0) {
+            holders.winrate = winrateHolder.userID;
+            assignedPlayers.add(winrateHolder.userID);
+        }
+        
+        // Priority 2: Best Streak
+        const streakHolder = findBestAvailable(rates, 'bestStreak', assignedPlayers);
+        if (streakHolder && streakHolder.bestStreak > 0) {
+            holders.streak = streakHolder.userID;
+            assignedPlayers.add(streakHolder.userID);
+        }
+        
+        // Priority 3: Most Pangkahs Dealt
+        const pangkahHolder = findBestAvailable(rates, 'pangkahs', assignedPlayers);
+        if (pangkahHolder && pangkahHolder.pangkahs > 0) {
+            holders.pangkah = pangkahHolder.userID;
+            assignedPlayers.add(pangkahHolder.userID);
+        }
+        
+        // Priority 4: Highest Lose Rate (shame frame)
+        const loserateHolder = findBestAvailable(rates, 'weightedLoseRate', assignedPlayers);
+        if (loserateHolder && loserateHolder.weightedLoseRate > 0) {
+            holders.loserate = loserateHolder.userID;
+            assignedPlayers.add(loserateHolder.userID);
+        }
+        
+        // Priority 5: Most Pangkahs Received (magnet frame)
+        const magnetHolder = findBestAvailable(rates, 'pangkahsReceived', assignedPlayers);
+        if (magnetHolder && magnetHolder.pangkahsReceived > 0) {
+            holders.magnet = magnetHolder.userID;
+            assignedPlayers.add(magnetHolder.userID);
+        }
+        
+        console.log('[HOF Frames] Assigned:', holders);
         res.json({ holders });
     } catch (err) { 
         console.error('HOF Frames error:', err);

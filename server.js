@@ -198,27 +198,99 @@ app.post('/api/player/equip-title', async (req, res) => {
 app.get('/api/leaderboard/:type', async (req, res) => {
     try {
         const { type } = req.params;
-        let sortField = type === 'wins' ? 'wins' : type === 'losses' ? 'losses' : type === 'pangkahs' ? 'pangkahs' : type === 'streak' ? 'bestStreak' : 'xp';
+        
+        // For rate-based sorting, we need to fetch all and sort in memory
+        if (type === 'winrate' || type === 'loserate') {
+            const players = await Player.find({ games: { $gt: 0 } })
+                .select('displayName userID xp wins losses games pangkahs pangkahsReceived bestStreak secondPlace thirdPlace fourthToTenth');
+            
+            // Calculate rates and sort
+            const withRates = players.map(p => ({
+                ...p.toObject(),
+                winRate: (p.wins || 0) / (p.games || 1),
+                loseRate: (p.losses || 0) / (p.games || 1)
+            }));
+            
+            // Sort by the appropriate rate (descending)
+            if (type === 'winrate') {
+                withRates.sort((a, b) => b.winRate - a.winRate);
+            } else {
+                withRates.sort((a, b) => b.loseRate - a.loseRate);
+            }
+            
+            return res.json(withRates.slice(0, 100));
+        }
+        
+        // For direct field sorting
+        const sortFields = {
+            'wins': 'wins',
+            'losses': 'losses',
+            'pangkahs': 'pangkahs',
+            'pangkahsReceived': 'pangkahsReceived',
+            'streak': 'bestStreak',
+            'xp': 'xp',
+            'games': 'games'
+        };
+        
+        const sortField = sortFields[type] || 'xp';
         const players = await Player.find().sort({ [sortField]: -1 }).limit(100)
             .select('displayName userID xp wins losses games pangkahs pangkahsReceived bestStreak secondPlace thirdPlace fourthToTenth');
         res.json(players);
-    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+    } catch (err) { 
+        console.error('Leaderboard error:', err);
+        res.status(500).json({ error: 'Failed' }); 
+    }
 });
 
 app.get('/api/hof-frames', async (req, res) => {
     try {
-        const players = await Player.find({ games: { $gte: 10 } }).select('userID wins losses games pangkahs pangkahsReceived bestStreak');
+        const MIN_GAMES = 10;
+        const SCALE_FACTOR = 20;
+        
+        const players = await Player.find({ games: { $gte: MIN_GAMES } }).select('userID wins losses games pangkahs pangkahsReceived bestStreak');
         if (players.length === 0) return res.json({ holders: {} });
+        
         const holders = {};
-        const rates = players.map(p => ({ userID: p.userID, winRate: (p.wins||0)/(p.games||1)*100, loseRate: (p.losses||0)/(p.games||1)*100, bestStreak: p.bestStreak||0, pangkahs: p.pangkahs||0, pangkahsReceived: p.pangkahsReceived||0 }));
-        const best = (arr, key) => arr.reduce((a,b) => (a[key]||0) > (b[key]||0) ? a : b, {});
-        holders.winrate = best(rates, 'winRate').userID;
-        holders.streak = best(rates.filter(r=>r.userID!==holders.winrate), 'bestStreak').userID;
-        holders.pangkah = best(rates.filter(r=>!Object.values(holders).includes(r.userID)), 'pangkahs').userID;
-        holders.loserate = best(rates.filter(r=>!Object.values(holders).includes(r.userID)), 'loseRate').userID;
-        holders.magnet = best(rates.filter(r=>!Object.values(holders).includes(r.userID)), 'pangkahsReceived').userID;
+        
+        // Weighted score function - rewards both rate and volume
+        const getWeightedScore = (rate, games) => {
+            const volumeWeight = 1 - Math.exp(-games / SCALE_FACTOR);
+            return rate * volumeWeight;
+        };
+        
+        const rates = players.map(p => {
+            const games = p.games || 1;
+            const winRate = ((p.wins || 0) / games) * 100;
+            const loseRate = ((p.losses || 0) / games) * 100;
+            
+            return { 
+                userID: p.userID, 
+                winRate,
+                loseRate,
+                // Use weighted scores for frame assignment (fair ranking)
+                weightedWinRate: getWeightedScore(winRate, games),
+                weightedLoseRate: getWeightedScore(loseRate, games),
+                bestStreak: p.bestStreak || 0, 
+                pangkahs: p.pangkahs || 0, 
+                pangkahsReceived: p.pangkahsReceived || 0,
+                games
+            };
+        });
+        
+        // Use weighted rates for fair comparison
+        const best = (arr, key) => arr.reduce((a, b) => (a[key] || 0) > (b[key] || 0) ? a : b, {});
+        
+        holders.winrate = best(rates, 'weightedWinRate').userID;
+        holders.streak = best(rates.filter(r => r.userID !== holders.winrate), 'bestStreak').userID;
+        holders.pangkah = best(rates.filter(r => !Object.values(holders).includes(r.userID)), 'pangkahs').userID;
+        holders.loserate = best(rates.filter(r => !Object.values(holders).includes(r.userID)), 'weightedLoseRate').userID;
+        holders.magnet = best(rates.filter(r => !Object.values(holders).includes(r.userID)), 'pangkahsReceived').userID;
+        
         res.json({ holders });
-    } catch (err) { res.status(500).json({ error: 'Failed' }); }
+    } catch (err) { 
+        console.error('HOF Frames error:', err);
+        res.status(500).json({ error: 'Failed' }); 
+    }
 });
 
 app.get('/api/hall-of-fame', async (req, res) => {
@@ -809,7 +881,9 @@ async function processGameResults(room) {
             const db = await Player.findOne({ userID: p.userID });
             if (!db) continue;
             const pos = p.gameStats?.finishPosition || room.players.length;
-            const isWin = pos === 1, isLose = pos === room.players.length;
+            const totalPlayers = room.players.length;
+            const isWin = pos === 1;
+            const isLose = pos === totalPlayers; // Last place = loser
             
             db.games = (db.games||0) + 1;
             db.lastPlayedAt = new Date();
@@ -827,7 +901,8 @@ async function processGameResults(room) {
             } else if (pos === 3) {
                 db.thirdPlace = (db.thirdPlace||0) + 1;
                 db.currentStreak = 0;
-            } else if (pos >= 4) {
+            } else if (pos >= 4 && !isLose) {
+                // 4th-10th place but NOT the loser (last place)
                 db.fourthToTenth = (db.fourthToTenth||0) + 1;
                 db.currentStreak = 0;
             }

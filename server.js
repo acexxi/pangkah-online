@@ -227,12 +227,40 @@ app.get('/api/hall-of-fame', async (req, res) => {
         if (players.length === 0) return res.json({ records: [] });
         
         const records = [];
+        
+        // ============================================================================
+        // FAIR RANKING SYSTEM FOR RATE-BASED RECORDS
+        // ============================================================================
+        // Problem: Player A with 1 win / 1 game (100%) vs Player B with 44 wins / 100 games (44%)
+        // Solution: Use weighted score that rewards BOTH high rate AND volume
+        //
+        // Formula: Adjusted Score = Rate * (1 - e^(-games/k))
+        // Where k = scaling factor (higher k = more games needed for full weight)
+        //
+        // Example with k=20:
+        // - 1 game at 100%: 100 * (1 - e^(-1/20)) = 100 * 0.049 = 4.9 adjusted
+        // - 44 games at 27%: 27 * (1 - e^(-44/20)) = 27 * 0.889 = 24.0 adjusted
+        // Player with 44 games wins despite lower raw rate!
+        // ============================================================================
+        
+        const SCALE_FACTOR = 20; // Games needed for ~86% weight
+        const MIN_GAMES_DISPLAY = 10; // Minimum games to appear in rate-based records
+        
+        // Weighted score function - rewards both rate and volume
+        const getWeightedScore = (rate, games) => {
+            const volumeWeight = 1 - Math.exp(-games / SCALE_FACTOR);
+            return parseFloat(rate) * volumeWeight;
+        };
+        
         const playersWithRates = players.map(p => {
             const games = p.games || 1;
             const wins = p.wins || 0;
             const losses = p.losses || 0;
             const pangkahs = p.pangkahs || 0;
             const pangkahsReceived = p.pangkahsReceived || 0;
+            
+            const winRate = ((wins) / games * 100);
+            const loseRate = ((losses) / games * 100);
             
             return {
                 name: p.displayName || 'Unknown',
@@ -259,9 +287,12 @@ app.get('/api/hall-of-fame', async (req, res) => {
                 pangkahsReceivedFromBot: p.pangkahsReceivedFromBot || 0,
                 handsAbsorbedFromBot: p.handsAbsorbedFromBot || 0,
                 cardsPlayed: p.cardsPlayed || 0,
-                // Calculated stats
-                winRate: ((wins) / games * 100).toFixed(1),
-                loseRate: ((losses) / games * 100).toFixed(1),
+                // Raw rates (for display)
+                winRate: winRate.toFixed(1),
+                loseRate: loseRate.toFixed(1),
+                // Weighted scores (for ranking) - fair comparison!
+                weightedWinRate: getWeightedScore(winRate, games),
+                weightedLoseRate: getWeightedScore(loseRate, games),
                 pangkahRatio: pangkahsReceived > 0 ? (pangkahs / pangkahsReceived).toFixed(2) : pangkahs,
                 avgPangkahsPerGame: (pangkahs / games).toFixed(2),
                 avgPangkahsReceivedPerGame: (pangkahsReceived / games).toFixed(2),
@@ -270,8 +301,8 @@ app.get('/api/hall-of-fame', async (req, res) => {
             };
         });
         
-        const minGamesForRates = 5;
-        const rateEligible = playersWithRates.filter(p => p.games >= minGamesForRates);
+        // Rate-eligible players (minimum games for rate-based records)
+        const rateEligible = playersWithRates.filter(p => p.games >= MIN_GAMES_DISPLAY);
         
         // Helper to find best player for a stat
         const findBest = (arr, key) => {
@@ -281,15 +312,15 @@ app.get('/api/hall-of-fame', async (req, res) => {
         
         // ===== GLORY RECORDS =====
         
-        // Win Rate Champion
+        // Win Rate Champion (using WEIGHTED score for fairness)
         if (rateEligible.length > 0) {
-            const best = findBest(rateEligible, 'winRate');
+            const best = findBest(rateEligible, 'weightedWinRate');
             if (parseFloat(best.winRate) > 0) {
                 records.push({
                     id: 'winrate', category: 'glory', icon: '👑',
                     title: 'The Chosen One', player: best.name,
-                    value: `${best.winRate}% win rate`,
-                    description: `${best.name} was probably born under a lucky star. With ${best.winRate}% win rate, they're living proof that some people just have it all! 🌟`
+                    value: `${best.winRate}% win rate (${best.games} games)`,
+                    description: `${best.name} dominates with ${best.winRate}% win rate across ${best.games} games. The more they play, the more they win! 🌟`
                 });
             }
         }
@@ -362,15 +393,15 @@ app.get('/api/hall-of-fame', async (req, res) => {
         
         // ===== SHAME RECORDS =====
         
-        // Highest Lose Rate
+        // Highest Lose Rate (using WEIGHTED score for fairness)
         if (rateEligible.length > 0) {
-            const worst = findBest(rateEligible, 'loseRate');
+            const worst = findBest(rateEligible, 'weightedLoseRate');
             if (parseFloat(worst.loseRate) > 0) {
                 records.push({
                     id: 'loserate', category: 'shame', icon: '🤡',
                     title: 'Professional Clown', player: worst.name,
-                    value: `${worst.loseRate}% lose rate`,
-                    description: `${worst.name} loses ${worst.loseRate}% of their games. At this point, losing isn't bad luck - it's a talent. Consider joining a circus! 🎪`
+                    value: `${worst.loseRate}% lose rate (${worst.games} games)`,
+                    description: `${worst.name} loses ${worst.loseRate}% of their ${worst.games} games. Consistent at being inconsistent! 🎪`
                 });
             }
         }
@@ -509,7 +540,7 @@ app.get('/api/hall-of-fame', async (req, res) => {
             });
         }
         
-        // ===== 12 NEW RECORDS =====
+        // ===== ADDITIONAL RECORDS =====
         
         // Perfect Wins (won without receiving any pangkah)
         const perfectionist = findBest(playersWithRates, 'perfectWins');
@@ -537,14 +568,14 @@ app.get('/api/hall-of-fame', async (req, res) => {
         }
         
         // Top Two Consistency (wins + 2nd places)
-        const consistent = findBest(playersWithRates.filter(p => p.games >= 10), 'topTwo');
+        const consistent = findBest(playersWithRates.filter(p => p.games >= MIN_GAMES_DISPLAY), 'topTwo');
         if (consistent && consistent.topTwo > 0) {
             const topTwoRate = ((consistent.topTwo / consistent.games) * 100).toFixed(1);
             records.push({
                 id: 'toptwo', category: 'glory', icon: '🎖️',
                 title: 'Consistent King', player: consistent.name,
-                value: `${consistent.topTwo} top-2 finishes`,
-                description: `${consistent.name} finishes in top 2 like it's their job (${topTwoRate}% of games). Reliable? More like UNSHAKEABLE! 📈`
+                value: `${consistent.topTwo} top-2 finishes (${topTwoRate}%)`,
+                description: `${consistent.name} finishes in top 2 like it's their job (${topTwoRate}% of ${consistent.games} games). Reliable? More like UNSHAKEABLE! 📈`
             });
         }
         
@@ -592,26 +623,31 @@ app.get('/api/hall-of-fame', async (req, res) => {
             });
         }
         
-        // Highest Average Pangkahs per Game (aggression)
-        const aggressor = findBest(playersWithRates.filter(p => p.games >= 10), 'avgPangkahsPerGame');
-        if (aggressor && parseFloat(aggressor.avgPangkahsPerGame) > 0) {
-            records.push({
-                id: 'aggro', category: 'misc', icon: '😈',
-                title: 'Agent of Chaos', player: aggressor.name,
-                value: `${aggressor.avgPangkahsPerGame} pangkahs/game`,
-                description: `${aggressor.name} averages ${aggressor.avgPangkahsPerGame} pangkahs per game. They don't play to win, they play to watch the world BURN! 🔥`
-            });
+        // Highest Average Pangkahs per Game (aggression) - weighted
+        const aggroEligible = playersWithRates.filter(p => p.games >= MIN_GAMES_DISPLAY);
+        if (aggroEligible.length > 0) {
+            const aggressor = findBest(aggroEligible, 'avgPangkahsPerGame');
+            if (aggressor && parseFloat(aggressor.avgPangkahsPerGame) > 0) {
+                records.push({
+                    id: 'aggro', category: 'misc', icon: '😈',
+                    title: 'Agent of Chaos', player: aggressor.name,
+                    value: `${aggressor.avgPangkahsPerGame} pangkahs/game`,
+                    description: `${aggressor.name} averages ${aggressor.avgPangkahsPerGame} pangkahs per game across ${aggressor.games} games. They don't play to win, they play to watch the world BURN! 🔥`
+                });
+            }
         }
         
-        // Highest Average Pangkahs RECEIVED per Game (unlucky)
-        const unlucky = findBest(playersWithRates.filter(p => p.games >= 10), 'avgPangkahsReceivedPerGame');
-        if (unlucky && parseFloat(unlucky.avgPangkahsReceivedPerGame) > 0) {
-            records.push({
-                id: 'unlucky', category: 'shame', icon: '🍀',
-                title: 'Reverse Lucky Charm', player: unlucky.name,
-                value: `${unlucky.avgPangkahsReceivedPerGame} received/game`,
-                description: `${unlucky.name} receives ${unlucky.avgPangkahsReceivedPerGame} pangkahs per game on average. If bad luck was a person, it would be them. 🪬❌`
-            });
+        // Highest Average Pangkahs RECEIVED per Game (unlucky) - weighted
+        if (aggroEligible.length > 0) {
+            const unlucky = findBest(aggroEligible, 'avgPangkahsReceivedPerGame');
+            if (unlucky && parseFloat(unlucky.avgPangkahsReceivedPerGame) > 0) {
+                records.push({
+                    id: 'unlucky', category: 'shame', icon: '🍀',
+                    title: 'Reverse Lucky Charm', player: unlucky.name,
+                    value: `${unlucky.avgPangkahsReceivedPerGame} received/game`,
+                    description: `${unlucky.name} receives ${unlucky.avgPangkahsReceivedPerGame} pangkahs per game on average across ${unlucky.games} games. If bad luck was a person, it would be them. 🪬❌`
+                });
+            }
         }
         
         // Worst Pangkah Ratio (received more than dealt)
@@ -629,18 +665,18 @@ app.get('/api/hall-of-fame', async (req, res) => {
         }
         
         // Never Top Two (most games without reaching top 2)
-        const neverShines = findBest(playersWithRates.filter(p => p.games >= 10), 'notTopTwo');
+        const neverShines = findBest(playersWithRates.filter(p => p.games >= MIN_GAMES_DISPLAY), 'notTopTwo');
         if (neverShines && neverShines.notTopTwo > 0) {
             const failRate = ((neverShines.notTopTwo / neverShines.games) * 100).toFixed(1);
             records.push({
                 id: 'nevertop', category: 'shame', icon: '🌑',
                 title: 'Never Their Day', player: neverShines.name,
-                value: `${neverShines.notTopTwo} non-top-2`,
-                description: `${neverShines.name} has failed to reach top 2 in ${neverShines.notTopTwo} games (${failRate}%). Tomorrow is another day... to disappoint! 🌅`
+                value: `${neverShines.notTopTwo} non-top-2 (${failRate}%)`,
+                description: `${neverShines.name} has failed to reach top 2 in ${neverShines.notTopTwo} of ${neverShines.games} games. Tomorrow is another day... to disappoint! 🌅`
             });
         }
         
-        // The Veteran (oldest player by createdAt) - need to fetch from original
+        // The Veteran (oldest player by createdAt)
         const veteran = players.reduce((oldest, p) => 
             new Date(p.createdAt) < new Date(oldest.createdAt) ? p : oldest, players[0]);
         if (veteran && veteran.games >= 1) {

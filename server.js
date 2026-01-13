@@ -854,6 +854,9 @@ function deal(room) {
     deck.forEach((c,i) => room.players[i % room.players.length].hand.push(c));
     room.turn = room.players.findIndex(p => p.hand.some(c => c.suit==='Spades' && c.rank==='K'));
     room.isFirstMove = true;
+    
+    // Reset AI memory for new game
+    resetAIMemory(room.id);
 }
 function generateBotName() {
     const names = [
@@ -947,6 +950,10 @@ function resolveRound(rid, isPangkah) {
     room.table.forEach(t => { if(t.card.suit === room.currentSuit && t.card.val > high) { high = t.card.val; winIdx = t.playerIdx; } });
     if (winIdx === -1) winIdx = room.table[0].playerIdx;
     const winner = room.players[winIdx];
+    
+    // Update AI memory before clearing table
+    updateAIMemory(rid, room, isPangkah);
+    
     if (isPangkah) {
         winner.hand.push(...room.table.map(t => t.card));
         if (winner.gameStats) {
@@ -986,44 +993,321 @@ function resolveRound(rid, isPangkah) {
     }
 }
 
-function botTurn(rid, leading = false) {
-    const room = rooms[rid]; if(!room?.gameStarted) return;
-    const bot = room.players[room.turn]; if(!bot?.isBot || !bot.hand.length) return;
-    setTimeout(() => {
-        if (!rooms[rid]?.gameStarted || rooms[rid].turn !== room.players.indexOf(bot)) return;
-        let card;
-        
-        // PangkahAI Brain Module v2
-        if (room.isFirstMove) {
-            card = bot.hand.find(c=>c.suit==='Spades'&&c.rank==='K');
-        } else {
-            const suitCards = bot.hand.filter(c=>c.suit===room.currentSuit);
-            if (suitCards.length) {
-                // Has matching suit - smart play
-                const high = suitCards.reduce((a,b)=>a.val>b.val?a:b);
-                const low = suitCards.reduce((a,b)=>a.val<b.val?a:b);
-                const curHigh = room.table.filter(t=>t.card.suit===room.currentSuit).reduce((m,t)=>Math.max(m,t.card.val),-1);
-                
-                // If can win cleanly, play high. Otherwise play low to minimize cards taken.
-                if (high.val > curHigh && Math.random() > 0.25) {
-                    card = high;
-                } else {
-                    card = low;
+// ============================================================================
+// PANGKAH AI BRAIN ENGINE v3 - STRATEGIC AI
+// ============================================================================
+// 
+// CORE UNDERSTANDING:
+// - Goal: Empty your hand first (fewer cards = winning)
+// - Receiving pangkah = BAD (you get MORE cards)
+// - Dealing pangkah = GOOD (dump card + punish opponent)
+// - To deal pangkah: Must be VOID in a suit (have no cards of that suit)
+//
+// GAME PHASES:
+// - EARLY GAME (>70% cards remain): 
+//   * AGGRESSIVE! Low risk of receiving pangkah
+//   * Dump high cards freely
+//   * Work on eliminating suits (to gain pangkah ability)
+//   * Observe opponent patterns
+//
+// - MID GAME (35-70% cards remain):
+//   * CAUTIOUS, use early game observations
+//   * Set up baits if you have void suits
+//   * Avoid leading with high cards
+//
+// - LATE GAME (<35% cards remain):
+//   * VERY DANGEROUS to lead rounds
+//   * Many cards discarded = easier to get pangkahed
+//   * Avoid being the highest card at all costs
+//   * Play under the current highest when possible
+//
+// ============================================================================
+
+// Global AI memory per room
+const roomAIMemory = new Map();
+
+function getAIMemory(roomID) {
+    if (!roomAIMemory.has(roomID)) {
+        roomAIMemory.set(roomID, {
+            discardedCards: [],
+            knownVoidSuits: new Map(), // playerIdx -> Set of suits
+            cardsPlayedThisGame: [],
+            roundsPlayed: 0
+        });
+    }
+    return roomAIMemory.get(roomID);
+}
+
+function resetAIMemory(roomID) {
+    roomAIMemory.set(roomID, {
+        discardedCards: [],
+        knownVoidSuits: new Map(),
+        cardsPlayedThisGame: [],
+        roundsPlayed: 0
+    });
+}
+
+function updateAIMemory(roomID, room, isPangkah) {
+    const mem = getAIMemory(roomID);
+    mem.roundsPlayed++;
+    
+    if (room.table) {
+        room.table.forEach(t => mem.cardsPlayedThisGame.push(t.card));
+    }
+    
+    if (isPangkah && room.table && room.currentSuit) {
+        // Track void suits from pangkah events
+        room.table.forEach(t => {
+            if (t.card.suit !== room.currentSuit) {
+                if (!mem.knownVoidSuits.has(t.playerIdx)) {
+                    mem.knownVoidSuits.set(t.playerIdx, new Set());
                 }
-            } else {
-                // No matching suit - PANGKAH! Play strategically
-                // Prefer to dump high value cards to get rid of them
-                const sorted = [...bot.hand].sort((a,b) => b.val - a.val);
-                // 60% chance play highest, 40% play random high card
-                card = Math.random() > 0.4 ? sorted[0] : sorted[Math.floor(Math.random() * Math.min(3, sorted.length))];
+                mem.knownVoidSuits.get(t.playerIdx).add(room.currentSuit);
+            }
+        });
+    } else if (room.table) {
+        // Clean round - track discarded cards
+        room.table.forEach(t => mem.discardedCards.push(t.card));
+    }
+}
+
+function getGamePhase(room) {
+    const totalCards = room.players.reduce((sum, p) => sum + p.hand.length, 0);
+    const pct = totalCards / 52;
+    if (pct > 0.70) return 'early';
+    if (pct > 0.35) return 'mid';
+    return 'late';
+}
+
+function isPlayerVoid(mem, playerIdx, suit) {
+    const voids = mem.knownVoidSuits.get(playerIdx);
+    return voids ? voids.has(suit) : false;
+}
+
+function getPlayersAfterBot(room, botIdx) {
+    const after = [];
+    let idx = (botIdx + 1) % room.players.length;
+    while (idx !== botIdx) {
+        if (room.players[idx].hand.length > 0 && !room.table.some(t => t.playerIdx === idx)) {
+            after.push(idx);
+        }
+        idx = (idx + 1) % room.players.length;
+    }
+    return after;
+}
+
+function getTableHigh(room) {
+    if (!room.table || !room.currentSuit) return -1;
+    return room.table.filter(t => t.card.suit === room.currentSuit)
+        .reduce((max, t) => Math.max(max, t.card.val), -1);
+}
+
+function getHighestInPlayBySuit(mem, botHand) {
+    const highest = { Spades: 12, Hearts: 12, Diamonds: 12, Clubs: 12 };
+    // Remove discarded
+    mem.discardedCards.forEach(c => {
+        if (c.val === highest[c.suit]) highest[c.suit]--;
+    });
+    // Remove bot's own cards
+    botHand.forEach(c => {
+        if (c.val === highest[c.suit]) highest[c.suit]--;
+    });
+    return highest;
+}
+
+// Main AI decision function
+function botDecide(room, botIdx) {
+    const bot = room.players[botIdx];
+    const hand = bot.hand;
+    const mem = getAIMemory(room.id);
+    const phase = getGamePhase(room);
+    const isLeading = room.table.length === 0;
+    
+    // Must play K♠ first
+    if (room.isFirstMove) {
+        return hand.find(c => c.suit === 'Spades' && c.rank === 'K');
+    }
+    
+    // Group by suit
+    const bySuit = { Spades: [], Hearts: [], Diamonds: [], Clubs: [] };
+    hand.forEach(c => bySuit[c.suit].push(c));
+    Object.values(bySuit).forEach(arr => arr.sort((a,b) => a.val - b.val));
+    
+    // ========== LEADING A ROUND ==========
+    if (isLeading) {
+        const playersAfter = getPlayersAfterBot(room, botIdx);
+        const highInPlay = getHighestInPlayBySuit(mem, hand);
+        
+        // EARLY GAME: Aggressive - dump high cards, eliminate suits
+        if (phase === 'early') {
+            // Find singleton suits (one card) - play to eliminate!
+            const singletons = Object.entries(bySuit).filter(([s, arr]) => arr.length === 1);
+            if (singletons.length > 0) {
+                // Dump highest value singleton
+                const best = singletons.reduce((a, b) => a[1][0].val > b[1][0].val ? a : b);
+                console.log(`[AI Early] Eliminating singleton ${best[0]}`);
+                return best[1][0];
+            }
+            
+            // Dump high card from most common suit
+            const mostCommon = Object.entries(bySuit)
+                .filter(([s, arr]) => arr.length > 0)
+                .sort((a, b) => b[1].length - a[1].length)[0];
+            if (mostCommon) {
+                const highCard = mostCommon[1][mostCommon[1].length - 1];
+                console.log(`[AI Early] Dumping high ${highCard.rank}${highCard.suit[0]}`);
+                return highCard;
             }
         }
         
-        // Bot emotes (10% chance)
-        if (Math.random() < 0.1) {
-            const emotes = ['😎', '🤖', '💪', '🔥', '😈', '🎯', '⚡', '🃏', '👀', '😏', '🤔', '😅'];
-            const emote = emotes[Math.floor(Math.random() * emotes.length)];
-            io.to(rid).emit('botEmote', { botName: bot.name, emote });
+        // MID GAME: Look for bait opportunities
+        if (phase === 'mid') {
+            for (const [suit, cards] of Object.entries(bySuit)) {
+                if (cards.length === 0) continue;
+                
+                // Check if someone after us is void in this suit
+                const voidAfter = playersAfter.filter(idx => isPlayerVoid(mem, idx, suit));
+                if (voidAfter.length > 0) {
+                    // Bait! But only if we're not the highest
+                    const myHigh = cards[cards.length - 1].val;
+                    if (myHigh < highInPlay[suit]) {
+                        console.log(`[AI Mid] BAIT: ${cards[0].rank}${suit[0]}, player ${voidAfter[0]} is void!`);
+                        return cards[0]; // Low card bait
+                    }
+                }
+            }
+            
+            // No bait - play low from common suit
+            const safeSuit = Object.entries(bySuit)
+                .filter(([s, arr]) => arr.length > 0)
+                .sort((a, b) => b[1].length - a[1].length)[0];
+            if (safeSuit) return safeSuit[1][0];
+        }
+        
+        // LATE GAME: Very cautious - play safest low card
+        if (phase === 'late') {
+            // Find suit with most cards still in play (safest)
+            let safest = null, safestCount = -1;
+            for (const [suit, cards] of Object.entries(bySuit)) {
+                if (cards.length === 0) continue;
+                // Count cards of this suit NOT in bot's hand or discarded
+                let remaining = 13 - cards.length - mem.discardedCards.filter(c => c.suit === suit).length;
+                if (remaining > safestCount) {
+                    safestCount = remaining;
+                    safest = [suit, cards];
+                }
+            }
+            if (safest) {
+                console.log(`[AI Late] Safest low: ${safest[1][0].rank}${safest[0][0]}`);
+                return safest[1][0];
+            }
+        }
+        
+        // Fallback
+        return hand.sort((a,b) => a.val - b.val)[0];
+    }
+    
+    // ========== FOLLOWING A ROUND ==========
+    const currentSuit = room.currentSuit;
+    const suitCards = bySuit[currentSuit] || [];
+    const tableHigh = getTableHigh(room);
+    const playersAfter = getPlayersAfterBot(room, botIdx);
+    
+    if (suitCards.length > 0) {
+        // We have matching suit cards
+        const canBeat = suitCards.filter(c => c.val > tableHigh);
+        const cantBeat = suitCards.filter(c => c.val <= tableHigh);
+        
+        // Check pangkah risk from players after us
+        const voidAfter = playersAfter.filter(idx => isPlayerVoid(mem, idx, currentSuit));
+        
+        // MID/LATE + PANGKAH RISK = AVOID WINNING!
+        if ((phase === 'mid' || phase === 'late') && voidAfter.length > 0) {
+            if (cantBeat.length > 0) {
+                // Play highest card that WON'T win (play under strategy)
+                const playUnder = cantBeat[cantBeat.length - 1];
+                console.log(`[AI] Pangkah risk! Playing under: ${playUnder.rank}`);
+                return playUnder;
+            }
+            // Must beat - play lowest winner
+            if (canBeat.length > 0) return canBeat[0];
+        }
+        
+        // LAST TO PLAY - Safe to win
+        if (playersAfter.length === 0 && canBeat.length > 0) {
+            console.log(`[AI] Last player, taking win with ${canBeat[0].rank}`);
+            return canBeat[0];
+        }
+        
+        // EARLY GAME - More aggressive
+        if (phase === 'early' && canBeat.length > 0) {
+            console.log(`[AI] Early game, playing high to win`);
+            return canBeat[canBeat.length - 1];
+        }
+        
+        // DEFAULT: Play under if possible
+        if (cantBeat.length > 0) {
+            return cantBeat[cantBeat.length - 1]; // Highest non-winner
+        }
+        
+        return canBeat[0] || suitCards[0];
+    }
+    
+    // ========== PANGKAH TIME! (No matching suit) ==========
+    console.log(`[AI] PANGKAH! Phase: ${phase}`);
+    
+    // Priority 1: Eliminate a suit
+    const singletons = Object.entries(bySuit).filter(([s, arr]) => arr.length === 1);
+    if (singletons.length > 0) {
+        const best = singletons.reduce((a, b) => a[1][0].val > b[1][0].val ? a : b);
+        console.log(`[AI Pangkah] Eliminating suit ${best[0]}`);
+        return best[1][0];
+    }
+    
+    // Priority 2: Dump highest card overall
+    const allSorted = [...hand].sort((a, b) => b.val - a.val);
+    
+    // Late game: dump from most common suit
+    if (phase === 'late') {
+        const mostCommon = Object.entries(bySuit)
+            .filter(([s, arr]) => arr.length > 0)
+            .sort((a, b) => b[1].length - a[1].length)[0];
+        if (mostCommon) {
+            console.log(`[AI Pangkah] Late game dump from ${mostCommon[0]}`);
+            return mostCommon[1][mostCommon[1].length - 1];
+        }
+    }
+    
+    console.log(`[AI Pangkah] Dumping highest: ${allSorted[0].rank}${allSorted[0].suit[0]}`);
+    return allSorted[0];
+}
+
+function botTurn(rid, leading = false) {
+    const room = rooms[rid]; if(!room?.gameStarted) return;
+    const bot = room.players[room.turn]; if(!bot?.isBot || !bot.hand.length) return;
+    
+    setTimeout(() => {
+        if (!rooms[rid]?.gameStarted || rooms[rid].turn !== room.players.indexOf(bot)) return;
+        
+        const botIdx = room.players.indexOf(bot);
+        const card = botDecide(room, botIdx);
+        const phase = getGamePhase(room);
+        
+        console.log(`[AI ${bot.name}] Phase: ${phase}, Cards: ${bot.hand.length}, Play: ${card?.rank}${card?.suit[0]}`);
+        
+        // Contextual emotes
+        if (Math.random() < 0.12) {
+            let emotes;
+            if (card && room.currentSuit && card.suit !== room.currentSuit) {
+                emotes = ['😈', '💀', '🔥', '⚡', '🎯', '💣']; // Pangkah!
+            } else if (bot.hand.length <= 3) {
+                emotes = ['😎', '💪', '🏆', '✨', '🎉']; // Winning
+            } else if (phase === 'late' && bot.hand.length > 10) {
+                emotes = ['😰', '😅', '🥲', '💀', '🙏']; // Struggling
+            } else {
+                emotes = ['🤖', '🃏', '🤔', '👀', '😌'];
+            }
+            io.to(rid).emit('botEmote', { botName: bot.name, emote: emotes[Math.floor(Math.random() * emotes.length)] });
         }
         
         if (card) processCard(rid, room.turn, card);

@@ -348,29 +348,22 @@ app.get('/api/hof-frames', async (req, res) => {
 app.get('/api/hall-of-fame', async (req, res) => {
     try {
         const players = await Player.find({ games: { $gt: 0 } });
-        if (players.length === 0) return res.json({ records: [] });
         
         const records = [];
         
         // ============================================================================
-        // FAIR RANKING SYSTEM FOR RATE-BASED RECORDS
+        // HALL OF FAME RECORDS SYSTEM
         // ============================================================================
-        // Problem: Player A with 1 win / 1 game (100%) vs Player B with 44 wins / 100 games (44%)
-        // Solution: Use weighted score that rewards BOTH high rate AND volume
-        //
-        // Formula: Adjusted Score = Rate * (1 - e^(-games/k))
-        // Where k = scaling factor (higher k = more games needed for full weight)
-        //
-        // Example with k=20:
-        // - 1 game at 100%: 100 * (1 - e^(-1/20)) = 100 * 0.049 = 4.9 adjusted
-        // - 44 games at 27%: 27 * (1 - e^(-44/20)) = 27 * 0.889 = 24.0 adjusted
-        // Player with 44 games wins despite lower raw rate!
+        // 1. Weighted scoring ONLY for GLORY records (rate-based)
+        // 2. SHAME and MISC records use raw values (give new players a chance!)
+        // 3. Records with no holder are still shown but marked as unclaimed
+        // 4. Sorted by category: Glory > Shame > Misc
         // ============================================================================
         
-        const SCALE_FACTOR = 20; // Games needed for ~86% weight
-        const MIN_GAMES_DISPLAY = 10; // Minimum games to appear in rate-based records
+        const SCALE_FACTOR = 20;
+        const MIN_GAMES_FOR_GLORY_RATES = 10;
         
-        // Weighted score function - rewards both rate and volume
+        // Weighted score function - ONLY for glory rate records
         const getWeightedScore = (rate, games) => {
             const volumeWeight = 1 - Math.exp(-games / SCALE_FACTOR);
             return parseFloat(rate) * volumeWeight;
@@ -389,11 +382,7 @@ app.get('/api/hall-of-fame', async (req, res) => {
             return {
                 name: p.displayName || 'Unknown',
                 xp: p.xp || 0,
-                wins: wins,
-                losses: losses,
-                games: games,
-                pangkahs: pangkahs,
-                pangkahsReceived: pangkahsReceived,
+                wins, losses, games, pangkahs, pangkahsReceived,
                 bestStreak: p.bestStreak || 0,
                 cleanWins: p.cleanWins || 0,
                 handsAbsorbed: p.handsAbsorbed || 0,
@@ -411,407 +400,464 @@ app.get('/api/hall-of-fame', async (req, res) => {
                 pangkahsReceivedFromBot: p.pangkahsReceivedFromBot || 0,
                 handsAbsorbedFromBot: p.handsAbsorbedFromBot || 0,
                 cardsPlayed: p.cardsPlayed || 0,
-                // Raw rates (for display)
                 winRate: winRate.toFixed(1),
                 loseRate: loseRate.toFixed(1),
-                // Weighted scores (for ranking) - fair comparison!
                 weightedWinRate: getWeightedScore(winRate, games),
-                weightedLoseRate: getWeightedScore(loseRate, games),
-                pangkahRatio: pangkahsReceived > 0 ? (pangkahs / pangkahsReceived).toFixed(2) : pangkahs,
-                avgPangkahsPerGame: (pangkahs / games).toFixed(2),
-                avgPangkahsReceivedPerGame: (pangkahsReceived / games).toFixed(2),
+                pangkahRatio: pangkahsReceived > 0 ? (pangkahs / pangkahsReceived) : pangkahs,
+                avgPangkahsPerGame: pangkahs / games,
+                avgPangkahsReceivedPerGame: pangkahsReceived / games,
                 notTopTwo: games - (p.topTwo || 0),
                 totalPodium: wins + (p.secondPlace || 0) + (p.thirdPlace || 0)
             };
         });
         
-        // Rate-eligible players (minimum games for rate-based records)
-        const rateEligible = playersWithRates.filter(p => p.games >= MIN_GAMES_DISPLAY);
-        
-        // Helper to find best player for a stat
+        // Helper to find best player
         const findBest = (arr, key) => {
-            if (!arr.length) return null;
-            return arr.reduce((best, p) => (parseFloat(p[key]) || 0) > (parseFloat(best[key]) || 0) ? p : best, arr[0]);
+            if (!arr || !arr.length) return null;
+            const valid = arr.filter(p => (parseFloat(p[key]) || 0) > 0);
+            if (!valid.length) return null;
+            return valid.reduce((best, p) => (parseFloat(p[key]) || 0) > (parseFloat(best[key]) || 0) ? p : best, valid[0]);
         };
         
-        // ===== GLORY RECORDS =====
+        // Helper to find worst (lowest) player
+        const findWorst = (arr, key) => {
+            if (!arr || !arr.length) return null;
+            const valid = arr.filter(p => (parseFloat(p[key]) || 0) > 0);
+            if (!valid.length) return null;
+            return valid.reduce((worst, p) => (parseFloat(p[key]) || 0) < (parseFloat(worst[key]) || 0) ? p : worst, valid[0]);
+        };
         
-        // Win Rate Champion (using WEIGHTED score for fairness)
-        if (rateEligible.length > 0) {
-            const best = findBest(rateEligible, 'weightedWinRate');
-            if (parseFloat(best.winRate) > 0) {
-                records.push({
-                    id: 'winrate', category: 'glory', icon: '👑',
-                    title: 'The Chosen One', player: best.name,
-                    value: `${best.winRate}% win rate (${best.games} games)`,
-                    description: `${best.name} dominates with ${best.winRate}% win rate across ${best.games} games. The more they play, the more they win! 🌟`
-                });
-            }
-        }
-        
-        // Most Wins
-        const winKing = findBest(playersWithRates, 'wins');
-        if (winKing && winKing.wins > 0) {
-            records.push({
-                id: 'wins', category: 'glory', icon: '🏆',
-                title: 'Victory Addict', player: winKing.name,
-                value: `${winKing.wins} wins`,
-                description: `${winKing.name} has won ${winKing.wins} times. At this point, winning isn't a hobby - it's a lifestyle. Touch grass? Never heard of it. 💪`
-            });
-        }
-        
-        // Best Streak
-        const streakKing = findBest(playersWithRates, 'bestStreak');
-        if (streakKing && streakKing.bestStreak > 0) {
-            records.push({
-                id: 'streak', category: 'glory', icon: '🔥',
-                title: 'Unstoppable Menace', player: streakKing.name,
-                value: `${streakKing.bestStreak} streak`,
-                description: `${streakKing.name} went absolutely DEMON MODE with ${streakKing.bestStreak} consecutive victories! Were they cheating? No. Are they just built different? Absolutely. 😈`
-            });
-        }
-        
-        // Most XP
-        const xpKing = findBest(playersWithRates, 'xp');
-        if (xpKing && xpKing.xp > 0) {
-            records.push({
-                id: 'xp', category: 'glory', icon: '✨',
-                title: 'XP Goblin', player: xpKing.name,
-                value: `${xpKing.xp.toLocaleString()} XP`,
-                description: `${xpKing.name} has hoarded ${xpKing.xp.toLocaleString()} XP like a dragon hoards gold. Sleep? That's for people with less XP. 🐉`
-            });
-        }
-        
-        // Most Pangkahs Dealt
-        const pangkahDealer = findBest(playersWithRates, 'pangkahs');
-        if (pangkahDealer && pangkahDealer.pangkahs > 0) {
-            records.push({
-                id: 'pangkahs', category: 'glory', icon: '⚡',
-                title: 'Pangkah Terrorist', player: pangkahDealer.name,
-                value: `${pangkahDealer.pangkahs} dealt`,
-                description: `${pangkahDealer.name} has dealt ${pangkahDealer.pangkahs} pangkahs. This player woke up and chose violence. Every. Single. Game. 💀`
-            });
-        }
-        
-        // Most Clean Wins
-        const cleanMaster = findBest(playersWithRates, 'cleanWins');
-        if (cleanMaster && cleanMaster.cleanWins > 0) {
-            records.push({
-                id: 'cleanwins', category: 'glory', icon: '🧼',
-                title: 'Mr. Clean', player: cleanMaster.name,
-                value: `${cleanMaster.cleanWins} clean rounds`,
-                description: `${cleanMaster.name} has won ${cleanMaster.cleanWins} clean rounds. So fresh, so clean! Marie Kondo would be proud. ✨`
-            });
-        }
-        
-        // Most Games Played
-        const grinder = findBest(playersWithRates, 'games');
-        if (grinder && grinder.games > 0) {
-            records.push({
-                id: 'games', category: 'glory', icon: '🎮',
-                title: 'No-Life Achievement', player: grinder.name,
-                value: `${grinder.games} games`,
-                description: `${grinder.name} has played ${grinder.games} games. What is grass? What is sunlight? These are questions they stopped asking long ago. 🌿❌`
-            });
-        }
-        
-        // ===== SHAME RECORDS =====
-        
-        // Highest Lose Rate (using WEIGHTED score for fairness)
-        if (rateEligible.length > 0) {
-            const worst = findBest(rateEligible, 'weightedLoseRate');
-            if (parseFloat(worst.loseRate) > 0) {
-                records.push({
-                    id: 'loserate', category: 'shame', icon: '🤡',
-                    title: 'Professional Clown', player: worst.name,
-                    value: `${worst.loseRate}% lose rate (${worst.games} games)`,
-                    description: `${worst.name} loses ${worst.loseRate}% of their ${worst.games} games. Consistent at being inconsistent! 🎪`
-                });
-            }
-        }
-        
-        // Most Losses
-        const loseKing = findBest(playersWithRates, 'losses');
-        if (loseKing && loseKing.losses > 0) {
-            records.push({
-                id: 'losses', category: 'shame', icon: '💀',
-                title: 'L Collector', player: loseKing.name,
-                value: `${loseKing.losses} losses`,
-                description: `${loseKing.name} has collected ${loseKing.losses} L's like they're Pokemon cards. Gotta catch 'em all! At least they're #1 at something... 😭`
-            });
-        }
-        
-        // Most Pangkahs Received
-        const pangkahVictim = findBest(playersWithRates, 'pangkahsReceived');
-        if (pangkahVictim && pangkahVictim.pangkahsReceived > 0) {
-            records.push({
-                id: 'gotpangkah', category: 'shame', icon: '🎯',
-                title: 'Human Dartboard', player: pangkahVictim.name,
-                value: `${pangkahVictim.pangkahsReceived} received`,
-                description: `${pangkahVictim.name} has eaten ${pangkahVictim.pangkahsReceived} pangkahs to the face. If getting pangkah'd was an Olympic sport, they'd have gold! 🥊`
-            });
-        }
-        
-        // Most Auto-Plays (AFK)
-        const afkKing = findBest(playersWithRates, 'autoPlays');
-        if (afkKing && afkKing.autoPlays > 0) {
-            records.push({
-                id: 'afk', category: 'shame', icon: '😴',
-                title: 'AFK Speedrunner', player: afkKing.name,
-                value: `${afkKing.autoPlays} auto-plays`,
-                description: `${afkKing.name} has ${afkKing.autoPlays} auto-plays. Are they playing the game or is the game playing them? We'll never know because they're probably asleep. 💤`
-            });
-        }
-        
-        // Most Cards Held
-        const cardHoarder = findBest(playersWithRates, 'maxCardsHeld');
-        if (cardHoarder && cardHoarder.maxCardsHeld > 0) {
-            records.push({
-                id: 'maxcards', category: 'shame', icon: '🐿️',
-                title: 'Card Hoarder', player: cardHoarder.name,
-                value: `${cardHoarder.maxCardsHeld} cards`,
-                description: `${cardHoarder.name} once held ${cardHoarder.maxCardsHeld} cards in their hand. Were they playing cards or building a house? This isn't UNO, bestie! 🃏`
-            });
-        }
-        
-        // Most Hands Given Away
-        const handGiver = findBest(playersWithRates, 'handsGiven');
-        if (handGiver && handGiver.handsGiven > 0) {
-            records.push({
-                id: 'given', category: 'shame', icon: '🎅',
-                title: 'Santa Claus', player: handGiver.name,
-                value: `${handGiver.handsGiven} hands given`,
-                description: `${handGiver.name} has generously donated ${handGiver.handsGiven} hands to other players. So giving! So charitable! So... wait, that's a bad thing here. 🎁`
-            });
-        }
-        
-        // ===== MISC RECORDS =====
-        
-        // Most Hands Absorbed (Soul Stealer)
-        const handAbsorber = findBest(playersWithRates, 'handsAbsorbed');
-        if (handAbsorber && handAbsorber.handsAbsorbed > 0) {
-            records.push({
-                id: 'absorbed', category: 'misc', icon: '🦑',
-                title: 'Soul Stealer', player: handAbsorber.name,
-                value: `${handAbsorber.handsAbsorbed} hands absorbed`,
-                description: `${handAbsorber.name} has absorbed ${handAbsorber.handsAbsorbed} hands from other players. "Your cards... will make a fine addition to my collection." 🫴`
-            });
-        }
-        
-        // Most Second Places (Always Bridesmaid)
-        const silverCollector = findBest(playersWithRates, 'secondPlace');
-        if (silverCollector && silverCollector.secondPlace > 0) {
-            records.push({
-                id: 'second', category: 'misc', icon: '🥈',
-                title: 'Always Bridesmaid', player: silverCollector.name,
-                value: `${silverCollector.secondPlace} second places`,
-                description: `${silverCollector.name} has finished 2nd place ${silverCollector.secondPlace} times. So close yet so far! Maybe next time, champ. Maybe next time... 😢`
-            });
-        }
-        
-        // Most Third Places (Bronze Collector)
-        const bronzeCollector = findBest(playersWithRates, 'thirdPlace');
-        if (bronzeCollector && bronzeCollector.thirdPlace > 0) {
-            records.push({
-                id: 'third', category: 'misc', icon: '🥉',
-                title: 'Bronze Enthusiast', player: bronzeCollector.name,
-                value: `${bronzeCollector.thirdPlace} third places`,
-                description: `${bronzeCollector.name} has claimed ${bronzeCollector.thirdPlace} bronze medals. Not quite podium, not quite loser. The Switzerland of Pangkah. 🇨🇭`
-            });
-        }
-        
-        // Night Owl (Most Night Games)
-        const nightOwl = findBest(playersWithRates, 'nightGames');
-        if (nightOwl && nightOwl.nightGames > 0) {
-            records.push({
-                id: 'night', category: 'misc', icon: '🦉',
-                title: 'Night Owl', player: nightOwl.name,
-                value: `${nightOwl.nightGames} night games`,
-                description: `${nightOwl.name} has played ${nightOwl.nightGames} games between 10PM-6AM. Sleep is for the weak! (Please get some rest though) 🌙`
-            });
-        }
-        
-        // Most Comebacks
-        const comebackKing = findBest(playersWithRates, 'comebacks');
-        if (comebackKing && comebackKing.comebacks > 0) {
-            records.push({
-                id: 'comeback', category: 'misc', icon: '🔄',
-                title: 'Comeback Kid', player: comebackKing.name,
-                value: `${comebackKing.comebacks} comebacks`,
-                description: `${comebackKing.name} has pulled off ${comebackKing.comebacks} epic comebacks from 15+ cards! "Call an ambulance... but not for me!" 💪`
-            });
-        }
-        
-        // Bot Victim (Lost to Bots)
-        const botVictim = findBest(playersWithRates, 'lossesToBot');
-        if (botVictim && botVictim.lossesToBot > 0) {
-            records.push({
-                id: 'botvictim', category: 'misc', icon: '🤖',
-                title: 'Bot Food', player: botVictim.name,
-                value: `${botVictim.lossesToBot} losses to bots`,
-                description: `${botVictim.name} has lost to BOTS ${botVictim.lossesToBot} times. The AI uprising has already begun... for them at least. Beep boop! 🤖`
-            });
-        }
-        
-        // Most Cards Played
-        const cardSpammer = findBest(playersWithRates, 'cardsPlayed');
-        if (cardSpammer && cardSpammer.cardsPlayed > 0) {
-            records.push({
-                id: 'cardsplayed', category: 'misc', icon: '🃏',
-                title: 'Card Slinger', player: cardSpammer.name,
-                value: `${cardSpammer.cardsPlayed.toLocaleString()} cards played`,
-                description: `${cardSpammer.name} has played ${cardSpammer.cardsPlayed.toLocaleString()} cards total. That's a LOT of clicking. RIP their mouse. 🖱️💀`
-            });
-        }
-        
-        // ===== ADDITIONAL RECORDS =====
-        
-        // Perfect Wins (won without receiving any pangkah)
-        const perfectionist = findBest(playersWithRates, 'perfectWins');
-        if (perfectionist && perfectionist.perfectWins > 0) {
-            records.push({
-                id: 'perfect', category: 'glory', icon: '💎',
-                title: 'Flawless Victory', player: perfectionist.name,
-                value: `${perfectionist.perfectWins} perfect wins`,
-                description: `${perfectionist.name} has won ${perfectionist.perfectWins} games WITHOUT receiving a single pangkah. Are they Neo from The Matrix? Is this even legal?! 🕶️`
-            });
-        }
-        
-        // Pangkah Ratio (dealt vs received) - Glory if positive
+        const gloryEligible = playersWithRates.filter(p => p.games >= MIN_GAMES_FOR_GLORY_RATES);
         const ratioEligible = playersWithRates.filter(p => p.pangkahs >= 10 && p.pangkahsReceived >= 10);
-        if (ratioEligible.length > 0) {
-            const bestRatio = findBest(ratioEligible, 'pangkahRatio');
-            if (bestRatio && parseFloat(bestRatio.pangkahRatio) > 1) {
-                records.push({
-                    id: 'ratio', category: 'glory', icon: '⚖️',
-                    title: 'Karma Dealer', player: bestRatio.name,
-                    value: `${bestRatio.pangkahRatio}x ratio`,
-                    description: `${bestRatio.name} dishes out ${bestRatio.pangkahRatio}x more pangkahs than they receive. They don't get mad, they get even... and then some! 😏`
-                });
-            }
-        }
         
-        // Top Two Consistency (wins + 2nd places)
-        const consistent = findBest(playersWithRates.filter(p => p.games >= MIN_GAMES_DISPLAY), 'topTwo');
-        if (consistent && consistent.topTwo > 0) {
-            const topTwoRate = ((consistent.topTwo / consistent.games) * 100).toFixed(1);
-            records.push({
-                id: 'toptwo', category: 'glory', icon: '🎖️',
-                title: 'Consistent King', player: consistent.name,
-                value: `${consistent.topTwo} top-2 finishes (${topTwoRate}%)`,
-                description: `${consistent.name} finishes in top 2 like it's their job (${topTwoRate}% of ${consistent.games} games). Reliable? More like UNSHAKEABLE! 📈`
-            });
-        }
+        // ===========================
+        // GLORY RECORDS (weighted for rate-based)
+        // ===========================
         
-        // Bot Bully (absorbed hands from bots)
-        const botBully = findBest(playersWithRates, 'handsAbsorbedFromBot');
-        if (botBully && botBully.handsAbsorbedFromBot > 0) {
-            records.push({
-                id: 'botbully', category: 'misc', icon: '🔨',
-                title: 'Bot Bully', player: botBully.name,
-                value: `${botBully.handsAbsorbedFromBot} bot hands stolen`,
-                description: `${botBully.name} has stolen ${botBully.handsAbsorbedFromBot} hands from helpless bots. They can't fight back! This is basically cyber-bullying! 🤖😢`
-            });
-        }
+        // 1. Win Rate Champion (WEIGHTED)
+        const winRateChamp = findBest(gloryEligible, 'weightedWinRate');
+        records.push({
+            id: 'winrate', category: 'glory', icon: '👑',
+            title: 'The Chosen One',
+            player: winRateChamp?.name || null,
+            value: winRateChamp ? `${winRateChamp.winRate}% (${winRateChamp.games} games)` : '---',
+            description: winRateChamp 
+                ? `${winRateChamp.name} dominates with ${winRateChamp.winRate}% win rate across ${winRateChamp.games} games!`
+                : 'Play at least 10 games to claim this record!'
+        });
         
-        // Pangkah Magnet from Bots
-        const botTarget = findBest(playersWithRates, 'pangkahsReceivedFromBot');
-        if (botTarget && botTarget.pangkahsReceivedFromBot > 0) {
-            records.push({
-                id: 'bottarget', category: 'shame', icon: '🎪',
-                title: 'Bot\'s Favorite Target', player: botTarget.name,
-                value: `${botTarget.pangkahsReceivedFromBot} from bots`,
-                description: `${botTarget.name} has been pangkah'd by BOTS ${botTarget.pangkahsReceivedFromBot} times. Even the AI knows an easy target when it sees one! 🎯🤖`
-            });
-        }
+        // 2. Most Wins
+        const winKing = findBest(playersWithRates, 'wins');
+        records.push({
+            id: 'wins', category: 'glory', icon: '🏆',
+            title: 'Victory Addict',
+            player: winKing?.name || null,
+            value: winKing ? `${winKing.wins} wins` : '---',
+            description: winKing 
+                ? `${winKing.name} has won ${winKing.wins} times. Winning is a lifestyle! 💪`
+                : 'Be the first to win a game!'
+        });
         
-        // Middle Child (most 4th-10th place finishes)
-        const middleChild = findBest(playersWithRates, 'fourthToTenth');
-        if (middleChild && middleChild.fourthToTenth > 0) {
-            records.push({
-                id: 'middle', category: 'shame', icon: '😐',
-                title: 'Painfully Average', player: middleChild.name,
-                value: `${middleChild.fourthToTenth} mid finishes`,
-                description: `${middleChild.name} has finished 4th-10th place ${middleChild.fourthToTenth} times. Not good, not bad, just... there. The human equivalent of room temperature water. 🚿`
-            });
-        }
+        // 3. Best Win Streak
+        const streakKing = findBest(playersWithRates, 'bestStreak');
+        records.push({
+            id: 'streak', category: 'glory', icon: '🔥',
+            title: 'Unstoppable Menace',
+            player: streakKing?.name || null,
+            value: streakKing ? `${streakKing.bestStreak} streak` : '---',
+            description: streakKing 
+                ? `${streakKing.name} went DEMON MODE with ${streakKing.bestStreak} consecutive wins! 😈`
+                : 'Win multiple games in a row to claim this!'
+        });
         
-        // Podium Collector (total 1st + 2nd + 3rd)
+        // 4. Most XP
+        const xpKing = findBest(playersWithRates, 'xp');
+        records.push({
+            id: 'xp', category: 'glory', icon: '✨',
+            title: 'XP Goblin',
+            player: xpKing?.name || null,
+            value: xpKing ? `${xpKing.xp.toLocaleString()} XP` : '---',
+            description: xpKing 
+                ? `${xpKing.name} has hoarded ${xpKing.xp.toLocaleString()} XP like a dragon! 🐉`
+                : 'Earn XP by playing games!'
+        });
+        
+        // 5. Most Pangkahs Dealt
+        const pangkahDealer = findBest(playersWithRates, 'pangkahs');
+        records.push({
+            id: 'pangkahs', category: 'glory', icon: '⚡',
+            title: 'Pangkah Terrorist',
+            player: pangkahDealer?.name || null,
+            value: pangkahDealer ? `${pangkahDealer.pangkahs} dealt` : '---',
+            description: pangkahDealer 
+                ? `${pangkahDealer.name} has dealt ${pangkahDealer.pangkahs} pangkahs. Violence chosen! 💀`
+                : 'Deal pangkahs to claim this record!'
+        });
+        
+        // 6. Most Clean Round Wins
+        const cleanMaster = findBest(playersWithRates, 'cleanWins');
+        records.push({
+            id: 'cleanwins', category: 'glory', icon: '🧼',
+            title: 'Mr. Clean',
+            player: cleanMaster?.name || null,
+            value: cleanMaster ? `${cleanMaster.cleanWins} clean rounds` : '---',
+            description: cleanMaster 
+                ? `${cleanMaster.name} has won ${cleanMaster.cleanWins} clean rounds. So fresh! ✨`
+                : 'Win rounds without pangkah to claim!'
+        });
+        
+        // 7. Most Games Played
+        const grinder = findBest(playersWithRates, 'games');
+        records.push({
+            id: 'games', category: 'glory', icon: '🎮',
+            title: 'No-Life Achievement',
+            player: grinder?.name || null,
+            value: grinder ? `${grinder.games} games` : '---',
+            description: grinder 
+                ? `${grinder.name} has played ${grinder.games} games. What is grass? 🌿❌`
+                : 'Play more games to claim!'
+        });
+        
+        // 8. Perfect Wins
+        const perfectionist = findBest(playersWithRates, 'perfectWins');
+        records.push({
+            id: 'perfect', category: 'glory', icon: '💎',
+            title: 'Flawless Victory',
+            player: perfectionist?.name || null,
+            value: perfectionist ? `${perfectionist.perfectWins} perfect wins` : '---',
+            description: perfectionist 
+                ? `${perfectionist.name} has ${perfectionist.perfectWins} wins without receiving pangkah! 🕶️`
+                : 'Win a game without receiving any pangkah!'
+        });
+        
+        // 9. Karma Dealer (best pangkah ratio)
+        const bestRatio = ratioEligible.length > 0 ? findBest(ratioEligible.filter(p => p.pangkahRatio > 1), 'pangkahRatio') : null;
+        records.push({
+            id: 'ratio', category: 'glory', icon: '⚖️',
+            title: 'Karma Dealer',
+            player: bestRatio?.name || null,
+            value: bestRatio ? `${bestRatio.pangkahRatio.toFixed(2)}x ratio` : '---',
+            description: bestRatio 
+                ? `${bestRatio.name} dishes out ${bestRatio.pangkahRatio.toFixed(2)}x more pangkahs than received! 😏`
+                : 'Deal more pangkahs than you receive (min 10 each)!'
+        });
+        
+        // 10. Podium Addict
         const podiumKing = findBest(playersWithRates, 'totalPodium');
-        if (podiumKing && podiumKing.totalPodium > 0) {
-            records.push({
-                id: 'podium', category: 'glory', icon: '🏅',
-                title: 'Podium Addict', player: podiumKing.name,
-                value: `${podiumKing.totalPodium} podium finishes`,
-                description: `${podiumKing.name} has stood on the podium ${podiumKing.totalPodium} times. Their trophy shelf is crying for mercy! 🏆🏆🏆`
-            });
-        }
+        records.push({
+            id: 'podium', category: 'glory', icon: '🏅',
+            title: 'Podium Addict',
+            player: podiumKing?.name || null,
+            value: podiumKing ? `${podiumKing.totalPodium} podiums` : '---',
+            description: podiumKing 
+                ? `${podiumKing.name} has ${podiumKing.totalPodium} top-3 finishes! Trophy shelf crying! 🏆`
+                : 'Finish in top 3 to claim!'
+        });
         
-        // Highest Average Pangkahs per Game (aggression) - weighted
-        const aggroEligible = playersWithRates.filter(p => p.games >= MIN_GAMES_DISPLAY);
-        if (aggroEligible.length > 0) {
-            const aggressor = findBest(aggroEligible, 'avgPangkahsPerGame');
-            if (aggressor && parseFloat(aggressor.avgPangkahsPerGame) > 0) {
-                records.push({
-                    id: 'aggro', category: 'misc', icon: '😈',
-                    title: 'Agent of Chaos', player: aggressor.name,
-                    value: `${aggressor.avgPangkahsPerGame} pangkahs/game`,
-                    description: `${aggressor.name} averages ${aggressor.avgPangkahsPerGame} pangkahs per game across ${aggressor.games} games. They don't play to win, they play to watch the world BURN! 🔥`
-                });
-            }
-        }
+        // 11. Consistent King (most top-2 finishes)
+        const consistent = findBest(playersWithRates, 'topTwo');
+        records.push({
+            id: 'toptwo', category: 'glory', icon: '🎖️',
+            title: 'Consistent King',
+            player: consistent?.name || null,
+            value: consistent ? `${consistent.topTwo} top-2 finishes` : '---',
+            description: consistent 
+                ? `${consistent.name} finishes top 2 like it's their job! UNSHAKEABLE! 📈`
+                : 'Finish in top 2 to claim!'
+        });
         
-        // Highest Average Pangkahs RECEIVED per Game (unlucky) - weighted
-        if (aggroEligible.length > 0) {
-            const unlucky = findBest(aggroEligible, 'avgPangkahsReceivedPerGame');
-            if (unlucky && parseFloat(unlucky.avgPangkahsReceivedPerGame) > 0) {
-                records.push({
-                    id: 'unlucky', category: 'shame', icon: '🍀',
-                    title: 'Reverse Lucky Charm', player: unlucky.name,
-                    value: `${unlucky.avgPangkahsReceivedPerGame} received/game`,
-                    description: `${unlucky.name} receives ${unlucky.avgPangkahsReceivedPerGame} pangkahs per game on average across ${unlucky.games} games. If bad luck was a person, it would be them. 🪬❌`
-                });
-            }
-        }
+        // 12. Comeback Kid
+        const comebackKing = findBest(playersWithRates, 'comebacks');
+        records.push({
+            id: 'comeback', category: 'glory', icon: '🔄',
+            title: 'Comeback Kid',
+            player: comebackKing?.name || null,
+            value: comebackKing ? `${comebackKing.comebacks} comebacks` : '---',
+            description: comebackKing 
+                ? `${comebackKing.name} has ${comebackKing.comebacks} comebacks from 15+ cards! 💪`
+                : 'Win after having 15+ cards to claim!'
+        });
         
-        // Worst Pangkah Ratio (received more than dealt)
-        if (ratioEligible.length > 0) {
-            const worstRatio = ratioEligible.reduce((worst, p) => 
-                parseFloat(p.pangkahRatio) < parseFloat(worst.pangkahRatio) ? p : worst, ratioEligible[0]);
-            if (worstRatio && parseFloat(worstRatio.pangkahRatio) < 1) {
-                records.push({
-                    id: 'badratio', category: 'shame', icon: '📉',
-                    title: 'Karma\'s Punching Bag', player: worstRatio.name,
-                    value: `${worstRatio.pangkahRatio}x ratio`,
-                    description: `${worstRatio.name} receives ${(1/worstRatio.pangkahRatio).toFixed(1)}x more pangkahs than they deal. The universe said "no" and meant it! 💫`
-                });
-            }
-        }
+        // ===========================
+        // SHAME RECORDS (raw values - give everyone a chance!)
+        // ===========================
         
-        // Never Top Two (most games without reaching top 2)
-        const neverShines = findBest(playersWithRates.filter(p => p.games >= MIN_GAMES_DISPLAY), 'notTopTwo');
-        if (neverShines && neverShines.notTopTwo > 0) {
-            const failRate = ((neverShines.notTopTwo / neverShines.games) * 100).toFixed(1);
-            records.push({
-                id: 'nevertop', category: 'shame', icon: '🌑',
-                title: 'Never Their Day', player: neverShines.name,
-                value: `${neverShines.notTopTwo} non-top-2 (${failRate}%)`,
-                description: `${neverShines.name} has failed to reach top 2 in ${neverShines.notTopTwo} of ${neverShines.games} games. Tomorrow is another day... to disappoint! 🌅`
-            });
-        }
+        // 13. Highest Lose Rate (RAW - no weighted, anyone can claim)
+        const highestLoseRate = findBest(playersWithRates.filter(p => p.games >= 3), 'loseRate');
+        records.push({
+            id: 'loserate', category: 'shame', icon: '🤡',
+            title: 'Professional Clown',
+            player: highestLoseRate?.name || null,
+            value: highestLoseRate ? `${highestLoseRate.loseRate}% (${highestLoseRate.games} games)` : '---',
+            description: highestLoseRate 
+                ? `${highestLoseRate.name} loses ${highestLoseRate.loseRate}% of games. Impressive consistency! 🎪`
+                : 'Lose some games to claim this... honor?'
+        });
         
-        // The Veteran (oldest player by createdAt)
-        const veteran = players.reduce((oldest, p) => 
-            new Date(p.createdAt) < new Date(oldest.createdAt) ? p : oldest, players[0]);
-        if (veteran && veteran.games >= 1) {
-            const daysSince = Math.floor((new Date() - new Date(veteran.createdAt)) / (1000 * 60 * 60 * 24));
-            records.push({
-                id: 'veteran', category: 'misc', icon: '👴',
-                title: 'Elder of the Sect', player: veteran.displayName,
-                value: `${daysSince} days`,
-                description: `${veteran.displayName} has been here for ${daysSince} days. They remember when this game had bugs. Oh wait, it still does. But they stayed anyway! 🏛️`
-            });
-        }
+        // 14. Most Losses
+        const loseKing = findBest(playersWithRates, 'losses');
+        records.push({
+            id: 'losses', category: 'shame', icon: '💀',
+            title: 'L Collector',
+            player: loseKing?.name || null,
+            value: loseKing ? `${loseKing.losses} losses` : '---',
+            description: loseKing 
+                ? `${loseKing.name} has collected ${loseKing.losses} L's like Pokemon cards! 😭`
+                : 'Collect some losses to claim!'
+        });
+        
+        // 15. Most Pangkahs Received
+        const pangkahVictim = findBest(playersWithRates, 'pangkahsReceived');
+        records.push({
+            id: 'gotpangkah', category: 'shame', icon: '🎯',
+            title: 'Human Dartboard',
+            player: pangkahVictim?.name || null,
+            value: pangkahVictim ? `${pangkahVictim.pangkahsReceived} received` : '---',
+            description: pangkahVictim 
+                ? `${pangkahVictim.name} has eaten ${pangkahVictim.pangkahsReceived} pangkahs! Olympic gold material! 🥊`
+                : 'Receive pangkahs to claim!'
+        });
+        
+        // 16. AFK King
+        const afkKing = findBest(playersWithRates, 'autoPlays');
+        records.push({
+            id: 'afk', category: 'shame', icon: '😴',
+            title: 'AFK Speedrunner',
+            player: afkKing?.name || null,
+            value: afkKing ? `${afkKing.autoPlays} auto-plays` : '---',
+            description: afkKing 
+                ? `${afkKing.name} has ${afkKing.autoPlays} auto-plays. Probably asleep! 💤`
+                : 'Let the timer run out to claim!'
+        });
+        
+        // 17. Card Hoarder
+        const cardHoarder = findBest(playersWithRates, 'maxCardsHeld');
+        records.push({
+            id: 'maxcards', category: 'shame', icon: '🐿️',
+            title: 'Card Hoarder',
+            player: cardHoarder?.name || null,
+            value: cardHoarder ? `${cardHoarder.maxCardsHeld} cards` : '---',
+            description: cardHoarder 
+                ? `${cardHoarder.name} once held ${cardHoarder.maxCardsHeld} cards. Building a house? 🃏`
+                : 'Hold many cards at once to claim!'
+        });
+        
+        // 18. Santa Claus (hands given)
+        const handGiver = findBest(playersWithRates, 'handsGiven');
+        records.push({
+            id: 'given', category: 'shame', icon: '🎅',
+            title: 'Santa Claus',
+            player: handGiver?.name || null,
+            value: handGiver ? `${handGiver.handsGiven} hands given` : '---',
+            description: handGiver 
+                ? `${handGiver.name} has donated ${handGiver.handsGiven} hands. So generous! 🎁`
+                : 'Give your hand to another player!'
+        });
+        
+        // 19. Bot's Favorite Target
+        const botTarget = findBest(playersWithRates, 'pangkahsReceivedFromBot');
+        records.push({
+            id: 'bottarget', category: 'shame', icon: '🎪',
+            title: 'Bot\'s Favorite',
+            player: botTarget?.name || null,
+            value: botTarget ? `${botTarget.pangkahsReceivedFromBot} from bots` : '---',
+            description: botTarget 
+                ? `${botTarget.name} got pangkah'd by BOTS ${botTarget.pangkahsReceivedFromBot} times! 🎯🤖`
+                : 'Get pangkah\'d by bots to claim!'
+        });
+        
+        // 20. Painfully Average (4th-10th places)
+        const middleChild = findBest(playersWithRates, 'fourthToTenth');
+        records.push({
+            id: 'middle', category: 'shame', icon: '😐',
+            title: 'Painfully Average',
+            player: middleChild?.name || null,
+            value: middleChild ? `${middleChild.fourthToTenth} mid finishes` : '---',
+            description: middleChild 
+                ? `${middleChild.name} finished 4th-10th ${middleChild.fourthToTenth} times. Room temperature water. 🚿`
+                : 'Finish in the middle of the pack!'
+        });
+        
+        // 21. Karma's Punching Bag (worst ratio)
+        const worstRatio = ratioEligible.length > 0 ? findWorst(ratioEligible.filter(p => p.pangkahRatio < 1 && p.pangkahRatio > 0), 'pangkahRatio') : null;
+        records.push({
+            id: 'badratio', category: 'shame', icon: '📉',
+            title: 'Karma\'s Punching Bag',
+            player: worstRatio?.name || null,
+            value: worstRatio ? `${worstRatio.pangkahRatio.toFixed(2)}x ratio` : '---',
+            description: worstRatio 
+                ? `${worstRatio.name} receives ${(1/worstRatio.pangkahRatio).toFixed(1)}x more pangkahs than dealt! 💫`
+                : 'Receive more pangkahs than you deal (min 10 each)!'
+        });
+        
+        // 22. Reverse Lucky Charm (highest avg pangkahs received per game)
+        const unlucky = findBest(playersWithRates.filter(p => p.games >= 3), 'avgPangkahsReceivedPerGame');
+        records.push({
+            id: 'unlucky', category: 'shame', icon: '🍀',
+            title: 'Reverse Lucky Charm',
+            player: unlucky?.name || null,
+            value: unlucky ? `${unlucky.avgPangkahsReceivedPerGame.toFixed(2)}/game` : '---',
+            description: unlucky 
+                ? `${unlucky.name} receives ${unlucky.avgPangkahsReceivedPerGame.toFixed(2)} pangkahs per game. Bad luck personified! 🪬`
+                : 'Consistently receive pangkahs to claim!'
+        });
+        
+        // 23. Never Their Day (most non-top-2 finishes)
+        const neverShines = findBest(playersWithRates.filter(p => p.games >= 3), 'notTopTwo');
+        records.push({
+            id: 'nevertop', category: 'shame', icon: '🌑',
+            title: 'Never Their Day',
+            player: neverShines?.name || null,
+            value: neverShines ? `${neverShines.notTopTwo} non-top-2` : '---',
+            description: neverShines 
+                ? `${neverShines.name} failed top 2 in ${neverShines.notTopTwo} games. Tomorrow is another day! 🌅`
+                : 'Play games without reaching top 2!'
+        });
+        
+        // ===========================
+        // MISC RECORDS
+        // ===========================
+        
+        // 24. Soul Stealer (hands absorbed)
+        const handAbsorber = findBest(playersWithRates, 'handsAbsorbed');
+        records.push({
+            id: 'absorbed', category: 'misc', icon: '🦑',
+            title: 'Soul Stealer',
+            player: handAbsorber?.name || null,
+            value: handAbsorber ? `${handAbsorber.handsAbsorbed} absorbed` : '---',
+            description: handAbsorber 
+                ? `${handAbsorber.name} has absorbed ${handAbsorber.handsAbsorbed} hands. Fine addition to collection! 🫴`
+                : 'Absorb hands from other players!'
+        });
+        
+        // 25. Always Bridesmaid (2nd places)
+        const silverCollector = findBest(playersWithRates, 'secondPlace');
+        records.push({
+            id: 'second', category: 'misc', icon: '🥈',
+            title: 'Always Bridesmaid',
+            player: silverCollector?.name || null,
+            value: silverCollector ? `${silverCollector.secondPlace} second places` : '---',
+            description: silverCollector 
+                ? `${silverCollector.name} finished 2nd ${silverCollector.secondPlace} times. So close! 😢`
+                : 'Finish in 2nd place to claim!'
+        });
+        
+        // 26. Bronze Enthusiast (3rd places)
+        const bronzeCollector = findBest(playersWithRates, 'thirdPlace');
+        records.push({
+            id: 'third', category: 'misc', icon: '🥉',
+            title: 'Bronze Enthusiast',
+            player: bronzeCollector?.name || null,
+            value: bronzeCollector ? `${bronzeCollector.thirdPlace} third places` : '---',
+            description: bronzeCollector 
+                ? `${bronzeCollector.name} claimed ${bronzeCollector.thirdPlace} bronze medals. Switzerland of Pangkah! 🇨🇭`
+                : 'Finish in 3rd place to claim!'
+        });
+        
+        // 27. Night Owl
+        const nightOwl = findBest(playersWithRates, 'nightGames');
+        records.push({
+            id: 'night', category: 'misc', icon: '🦉',
+            title: 'Night Owl',
+            player: nightOwl?.name || null,
+            value: nightOwl ? `${nightOwl.nightGames} night games` : '---',
+            description: nightOwl 
+                ? `${nightOwl.name} played ${nightOwl.nightGames} games at 10PM-6AM. Sleep is for the weak! 🌙`
+                : 'Play games between 10PM-6AM!'
+        });
+        
+        // 28. Bot Food (losses to bots)
+        const botVictim = findBest(playersWithRates, 'lossesToBot');
+        records.push({
+            id: 'botvictim', category: 'misc', icon: '🤖',
+            title: 'Bot Food',
+            player: botVictim?.name || null,
+            value: botVictim ? `${botVictim.lossesToBot} losses to bots` : '---',
+            description: botVictim 
+                ? `${botVictim.name} lost to BOTS ${botVictim.lossesToBot} times. AI uprising begins! 🤖`
+                : 'Lose to bots to claim!'
+        });
+        
+        // 29. Card Slinger (most cards played)
+        const cardSpammer = findBest(playersWithRates, 'cardsPlayed');
+        records.push({
+            id: 'cardsplayed', category: 'misc', icon: '🃏',
+            title: 'Card Slinger',
+            player: cardSpammer?.name || null,
+            value: cardSpammer ? `${cardSpammer.cardsPlayed.toLocaleString()} cards` : '---',
+            description: cardSpammer 
+                ? `${cardSpammer.name} played ${cardSpammer.cardsPlayed.toLocaleString()} cards total. RIP mouse! 🖱️💀`
+                : 'Play cards to increase your count!'
+        });
+        
+        // 30. Bot Bully (hands absorbed from bots)
+        const botBully = findBest(playersWithRates, 'handsAbsorbedFromBot');
+        records.push({
+            id: 'botbully', category: 'misc', icon: '🔨',
+            title: 'Bot Bully',
+            player: botBully?.name || null,
+            value: botBully ? `${botBully.handsAbsorbedFromBot} bot hands` : '---',
+            description: botBully 
+                ? `${botBully.name} stole ${botBully.handsAbsorbedFromBot} hands from bots. Cyber-bullying! 🤖😢`
+                : 'Absorb hands from bots!'
+        });
+        
+        // 31. Agent of Chaos (avg pangkahs per game)
+        const aggressor = findBest(playersWithRates.filter(p => p.games >= 3), 'avgPangkahsPerGame');
+        records.push({
+            id: 'aggro', category: 'misc', icon: '😈',
+            title: 'Agent of Chaos',
+            player: aggressor?.name || null,
+            value: aggressor ? `${aggressor.avgPangkahsPerGame.toFixed(2)}/game` : '---',
+            description: aggressor 
+                ? `${aggressor.name} averages ${aggressor.avgPangkahsPerGame.toFixed(2)} pangkahs/game. Chaos incarnate! 🔥`
+                : 'Deal lots of pangkahs per game!'
+        });
+        
+        // 32. NEW: First Blood (first win - tracked by having exactly 1 win)
+        const firstBlood = playersWithRates.find(p => p.wins === 1 && p.games <= 5);
+        records.push({
+            id: 'firstblood', category: 'misc', icon: '🩸',
+            title: 'First Blood',
+            player: firstBlood?.name || null,
+            value: firstBlood ? `1 win in ${firstBlood.games} games` : '---',
+            description: firstBlood 
+                ? `${firstBlood.name} just got their first taste of victory! Welcome to the arena! 🎉`
+                : 'Reserved for the newest winner!'
+        });
+        
+        // 33. NEW: Survivor (most games played with positive win rate)
+        const survivor = findBest(playersWithRates.filter(p => p.games >= 20 && parseFloat(p.winRate) > parseFloat(p.loseRate)), 'games');
+        records.push({
+            id: 'survivor', category: 'misc', icon: '🏕️',
+            title: 'Survivor',
+            player: survivor?.name || null,
+            value: survivor ? `${survivor.games} games (${survivor.winRate}% W)` : '---',
+            description: survivor 
+                ? `${survivor.name} survived ${survivor.games} games with more wins than losses! Endurance legend! 🏆`
+                : 'Play 20+ games with positive win rate!'
+        });
+        
+        // 34. NEW: Glass Cannon (high pangkah dealt but also high received)
+        const glassEligible = playersWithRates.filter(p => p.pangkahs >= 20 && p.pangkahsReceived >= 20);
+        const glassCannon = glassEligible.length > 0 ? glassEligible.reduce((best, p) => {
+            const total = p.pangkahs + p.pangkahsReceived;
+            const bestTotal = best.pangkahs + best.pangkahsReceived;
+            return total > bestTotal ? p : best;
+        }, glassEligible[0]) : null;
+        records.push({
+            id: 'glasscannon', category: 'misc', icon: '💥',
+            title: 'Glass Cannon',
+            player: glassCannon?.name || null,
+            value: glassCannon ? `${glassCannon.pangkahs}⚡ / ${glassCannon.pangkahsReceived}🎯` : '---',
+            description: glassCannon 
+                ? `${glassCannon.name} deals AND receives tons of pangkahs. Lives dangerously! 🎲`
+                : 'Deal and receive lots of pangkahs (20+ each)!'
+        });
+        
+        // Sort records by category: glory first, then shame, then misc
+        const categoryOrder = { glory: 0, shame: 1, misc: 2 };
+        records.sort((a, b) => categoryOrder[a.category] - categoryOrder[b.category]);
         
         res.json({ records });
     } catch (err) {

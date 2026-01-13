@@ -1378,59 +1378,119 @@ function botDecide(room, botIdx) {
         const playersAfter = getPlayersAfterBot(room, botIdx);
         const highInPlay = getHighestInPlayBySuit(mem, hand);
         
+        // CRITICAL: Get ALL active players (not just after bot) to check void suits
+        const allActivePlayers = room.players
+            .map((p, i) => ({ idx: i, hand: p.hand }))
+            .filter(p => p.idx !== botIdx && p.hand.length > 0);
+        
+        // Find suits that ANY opponent is void in - DANGEROUS to lead!
+        const dangerousSuits = new Set();
+        allActivePlayers.forEach(p => {
+            const voids = mem.knownVoidSuits.get(p.idx);
+            if (voids) voids.forEach(s => dangerousSuits.add(s));
+        });
+        
+        // Get safe suits (suits no one is known to be void in)
+        const safeSuits = Object.entries(bySuit)
+            .filter(([suit, cards]) => cards.length > 0 && !dangerousSuits.has(suit));
+        
+        console.log(`[AI Lead] Dangerous suits (opponents void): ${[...dangerousSuits].join(', ') || 'none'}`);
+        console.log(`[AI Lead] Safe suits available: ${safeSuits.map(([s]) => s).join(', ') || 'none'}`);
+        
         // EARLY GAME: Aggressive - dump high cards, eliminate suits
         if (phase === 'early') {
-            // Find singleton suits (one card) - play to eliminate!
+            // Find singleton suits (one card) - play to eliminate! But prefer safe suits
             const singletons = Object.entries(bySuit).filter(([s, arr]) => arr.length === 1);
-            if (singletons.length > 0) {
-                // Dump highest value singleton
-                const best = singletons.reduce((a, b) => a[1][0].val > b[1][0].val ? a : b);
-                console.log(`[AI Early] Eliminating singleton ${best[0]}`);
+            const safeSingletons = singletons.filter(([s]) => !dangerousSuits.has(s));
+            
+            if (safeSingletons.length > 0) {
+                const best = safeSingletons.reduce((a, b) => a[1][0].val > b[1][0].val ? a : b);
+                console.log(`[AI Early] Safe singleton elimination: ${best[0]}`);
                 return best[1][0];
             }
             
-            // Dump high card from most common suit
+            // If only dangerous singletons, still play them in early game (less risk)
+            if (singletons.length > 0 && dangerousSuits.size < 4) {
+                const best = singletons.reduce((a, b) => a[1][0].val > b[1][0].val ? a : b);
+                console.log(`[AI Early] Risky singleton elimination: ${best[0]}`);
+                return best[1][0];
+            }
+            
+            // Dump high card from safe suit if possible
+            if (safeSuits.length > 0) {
+                const mostCommon = safeSuits.sort((a, b) => b[1].length - a[1].length)[0];
+                const highCard = mostCommon[1][mostCommon[1].length - 1];
+                console.log(`[AI Early] Safe high dump: ${highCard.rank}${mostCommon[0][0]}`);
+                return highCard;
+            }
+            
+            // Fallback: dump from most common suit even if dangerous (early = less risk)
             const mostCommon = Object.entries(bySuit)
                 .filter(([s, arr]) => arr.length > 0)
                 .sort((a, b) => b[1].length - a[1].length)[0];
             if (mostCommon) {
                 const highCard = mostCommon[1][mostCommon[1].length - 1];
-                console.log(`[AI Early] Dumping high ${highCard.rank}${highCard.suit[0]}`);
+                console.log(`[AI Early] Fallback high dump: ${highCard.rank}${mostCommon[0][0]}`);
                 return highCard;
             }
         }
         
-        // MID GAME: Look for bait opportunities
+        // MID GAME: Look for bait opportunities, but AVOID dangerous suits
         if (phase === 'mid') {
-            for (const [suit, cards] of Object.entries(bySuit)) {
-                if (cards.length === 0) continue;
-                
-                // Check if someone after us is void in this suit
-                const voidAfter = playersAfter.filter(idx => isPlayerVoid(mem, idx, suit));
-                if (voidAfter.length > 0) {
-                    // Bait! But only if we're not the highest
-                    const myHigh = cards[cards.length - 1].val;
-                    if (myHigh < highInPlay[suit]) {
-                        console.log(`[AI Mid] BAIT: ${cards[0].rank}${suit[0]}, player ${voidAfter[0]} is void!`);
-                        return cards[0]; // Low card bait
+            // First priority: Play safe suits
+            if (safeSuits.length > 0) {
+                // Check for bait within safe suits (someone AFTER is void)
+                for (const [suit, cards] of safeSuits) {
+                    const voidAfter = playersAfter.filter(idx => isPlayerVoid(mem, idx, suit));
+                    if (voidAfter.length > 0) {
+                        const myHigh = cards[cards.length - 1].val;
+                        if (myHigh < highInPlay[suit]) {
+                            console.log(`[AI Mid] Safe BAIT: ${cards[0].rank}${suit[0]}`);
+                            return cards[0];
+                        }
                     }
+                }
+                
+                // No bait - play low from most common safe suit
+                const best = safeSuits.sort((a, b) => b[1].length - a[1].length)[0];
+                console.log(`[AI Mid] Safe low: ${best[1][0].rank}${best[0][0]}`);
+                return best[1][0];
+            }
+            
+            // No safe suits - must play dangerous suit, choose least dangerous
+            const leastDangerous = Object.entries(bySuit)
+                .filter(([s, arr]) => arr.length > 0)
+                .sort((a, b) => b[1].length - a[1].length)[0];
+            if (leastDangerous) {
+                console.log(`[AI Mid] FORCED dangerous: ${leastDangerous[1][0].rank}${leastDangerous[0][0]}`);
+                return leastDangerous[1][0];
+            }
+        }
+        
+        // LATE GAME: Very cautious - NEVER lead dangerous suits if avoidable
+        if (phase === 'late') {
+            // MUST avoid dangerous suits in late game
+            if (safeSuits.length > 0) {
+                // Find safest suit (most cards still in play among safe suits)
+                let safest = null, safestCount = -1;
+                for (const [suit, cards] of safeSuits) {
+                    let remaining = 13 - cards.length - mem.discardedCards.filter(c => c.suit === suit).length;
+                    if (remaining > safestCount) {
+                        safestCount = remaining;
+                        safest = [suit, cards];
+                    }
+                }
+                if (safest) {
+                    console.log(`[AI Late] Safe low: ${safest[1][0].rank}${safest[0][0]}`);
+                    return safest[1][0];
                 }
             }
             
-            // No bait - play low from common suit
-            const safeSuit = Object.entries(bySuit)
-                .filter(([s, arr]) => arr.length > 0)
-                .sort((a, b) => b[1].length - a[1].length)[0];
-            if (safeSuit) return safeSuit[1][0];
-        }
-        
-        // LATE GAME: Very cautious - play safest low card
-        if (phase === 'late') {
-            // Find suit with most cards still in play (safest)
+            // No safe suits - we're in trouble, play lowest card from least dangerous
+            console.log(`[AI Late] WARNING: No safe suits! All suits are dangerous.`);
             let safest = null, safestCount = -1;
             for (const [suit, cards] of Object.entries(bySuit)) {
                 if (cards.length === 0) continue;
-                // Count cards of this suit NOT in bot's hand or discarded
                 let remaining = 13 - cards.length - mem.discardedCards.filter(c => c.suit === suit).length;
                 if (remaining > safestCount) {
                     safestCount = remaining;
@@ -1438,7 +1498,7 @@ function botDecide(room, botIdx) {
                 }
             }
             if (safest) {
-                console.log(`[AI Late] Safest low: ${safest[1][0].rank}${safest[0][0]}`);
+                console.log(`[AI Late] Forced dangerous: ${safest[1][0].rank}${safest[0][0]}`);
                 return safest[1][0];
             }
         }
@@ -1608,6 +1668,7 @@ io.on('connection', (socket) => {
         if (room.players.length < MIN_PLAYERS) return socket.emit('errorMsg', 'Need more');
         room.gameNumber++; room.gameStarted = true; room.finishOrder = []; room.fateAces = []; room.discarded = []; room.pangkahDealer = null;
         room.players.forEach(p => { p.rematchReady = false; initStats(p); });
+        resetAIMemory(roomID); // Reset AI memory for new game
         deal(room);
         io.to(roomID).emit('gameStarted', { players: room.players, turn: room.turn, gameNumber: room.gameNumber });
         broadcastRooms();
@@ -1713,6 +1774,7 @@ io.on('connection', (socket) => {
                     room.discarded = []; 
                     room.pangkahDealer = null;
                     room.players.forEach(pl => { pl.rematchReady = false; initStats(pl); });
+                    resetAIMemory(roomID); // Reset AI memory for rematch
                     deal(room);
                     io.to(roomID).emit('gameStarted', { players: room.players, turn: room.turn, gameNumber: room.gameNumber });
                     broadcastRooms();

@@ -2068,7 +2068,7 @@ function render(players,turn,table=[]){
         const titleData=p.equippedTitle;
         const titleText=isBot?'🤖 Bot':titleData?`${titleData.icon||''} ${titleData.name}`:'';
         const titleColor=titleData?getTitleColor(titleData.rarity):'var(--text-tertiary)';
-        const badgeImg=getBadgeImage(playerLevel,playerIsGM);
+        const badgeImg=isBot?'/badge/bot-badge.png':getBadgeImage(playerLevel,playerIsGM);
         const displayLevel=isBot?'BOT':playerIsGM?'∞':playerLevel;
         const nameColor=p.userID===userID?'var(--ui-blue)':isBot?'var(--accent-purple)':'#fff';
         const hofFrame=getPlayerFrame(p.userID, playerIsGM);

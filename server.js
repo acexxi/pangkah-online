@@ -670,16 +670,16 @@ app.get('/api/hall-of-fame', async (req, res) => {
                 : 'Hold many cards at once to claim!'
         });
         
-        // 18. Santa Claus (hands given)
+        // 18. Free Win Collector (handsGiven = others TH you = you WIN!)
         const handGiver = findBest(playersWithRates, 'handsGiven');
         records.push({
-            id: 'given', category: 'shame', icon: '🎅',
-            title: 'Santa Claus',
+            id: 'given', category: 'glory', icon: '🎁',
+            title: 'Free Win Collector',
             player: handGiver?.name || null,
-            value: handGiver ? `${handGiver.handsGiven} hands given` : '---',
+            value: handGiver ? `${handGiver.handsGiven} free wins` : '---',
             description: handGiver 
-                ? `${handGiver.name} has donated ${handGiver.handsGiven} hands. So generous! 🎁`
-                : 'Give your hand to another player!'
+                ? `${handGiver.name} got TH'd ${handGiver.handsGiven} times. Others gave them free wins! 👑`
+                : 'Get TH\'d by others to claim this glory!'
         });
         
         // 19. Bot's Favorite Target
@@ -746,16 +746,16 @@ app.get('/api/hall-of-fame', async (req, res) => {
         // MISC RECORDS
         // ===========================
         
-        // 24. Soul Stealer (hands absorbed)
+        // 24. Desperate Absorber (hands absorbed = you TAKE cards = more cards = bad!)
         const handAbsorber = findBest(playersWithRates, 'handsAbsorbed');
         records.push({
-            id: 'absorbed', category: 'misc', icon: '🦑',
-            title: 'Soul Stealer',
+            id: 'absorbed', category: 'shame', icon: '🧽',
+            title: 'Desperate Absorber',
             player: handAbsorber?.name || null,
-            value: handAbsorber ? `${handAbsorber.handsAbsorbed} absorbed` : '---',
+            value: handAbsorber ? `${handAbsorber.handsAbsorbed} hands taken` : '---',
             description: handAbsorber 
-                ? `${handAbsorber.name} has absorbed ${handAbsorber.handsAbsorbed} hands. Fine addition to collection! 🫴`
-                : 'Absorb hands from other players!'
+                ? `${handAbsorber.name} TH'd others ${handAbsorber.handsAbsorbed} times. Gave them free wins! 😰`
+                : 'TH others when desperate to claim this!'
         });
         
         // 25. Always Bridesmaid (2nd places)
@@ -818,16 +818,16 @@ app.get('/api/hall-of-fame', async (req, res) => {
                 : 'Play cards to increase your count!'
         });
         
-        // 30. Bot Bully (hands absorbed from bots)
+        // 30. Bot Surrenderer (hands absorbed from bots = you TH'd bots = gave bots free win)
         const botBully = findBest(playersWithRates, 'handsAbsorbedFromBot');
         records.push({
-            id: 'botbully', category: 'misc', icon: '🔨',
-            title: 'Bot Bully',
+            id: 'botbully', category: 'shame', icon: '🤖',
+            title: 'Bot Surrenderer',
             player: botBully?.name || null,
-            value: botBully ? `${botBully.handsAbsorbedFromBot} bot hands` : '---',
+            value: botBully ? `${botBully.handsAbsorbedFromBot} bot TH's` : '---',
             description: botBully 
-                ? `${botBully.name} stole ${botBully.handsAbsorbedFromBot} hands from bots. Cyber-bullying! 🤖😢`
-                : 'Absorb hands from bots!'
+                ? `${botBully.name} TH'd bots ${botBully.handsAbsorbedFromBot} times. Gave BOTS free wins! 🤖😭`
+                : 'TH bots when desperate to claim!'
         });
         
         // 31. Agent of Chaos (avg pangkahs per game)
